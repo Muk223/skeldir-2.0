@@ -2,6 +2,8 @@
 
 This directory contains OpenAPI 3.1.0 specifications for all Skeldir Attribution Intelligence API endpoints.
 
+> **Note**: This directory includes the complete content from the original [`skeldir-api-contracts`](https://github.com/Muk223/skeldir-api-contracts) repository. The original repository structure is preserved, and all contract development now occurs in this monorepo for atomic versioning with backend and frontend code.
+
 ## Structure
 
 ```
