@@ -1,0 +1,30 @@
+{
+  "name": "skeldir-2.0-monorepo",
+  "version": "1.0.0",
+  "description": "SKELDIR 2.0 Attribution Intelligence Platform - Monorepo",
+  "private": true,
+  "scripts": {
+    "contracts:validate": "openapi-generator-cli validate -i contracts/openapi/v1/**/*.yaml",
+    "models:generate": "bash scripts/generate-models.sh",
+    "mocks:start": "bash scripts/start-mocks.sh",
+    "mocks:stop": "bash scripts/stop-mocks.sh",
+    "mocks:restart": "bash scripts/restart-mocks.sh all",
+    "test": "playwright test",
+    "test:integration": "playwright test",
+    "install:all": "npm install && cd backend && pip install -r requirements.txt || echo 'Backend requirements.txt not found' && cd ../frontend && npm install || echo 'Frontend package.json not found'"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@openapitools/openapi-generator-cli": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/org/skeldir-2.0.git"
+  },
+  "license": "MIT"
+}
+

@@ -1,0 +1,79 @@
+# Contract→Schema Mapping (Machine-Readable)
+# This YAML file enables future CI validation of contract compliance
+
+types:
+  openapi_string_uuid:
+    postgres: uuid
+    validation: "uuid format"
+    example_contract: "api-contracts/openapi/v1/attribution.yaml:60-63"
+    example_field: "tenant_id"
+  
+  openapi_string_datetime:
+    postgres: timestamptz
+    validation: "ISO 8601 format"
+    example_contract: "api-contracts/openapi/v1/reconciliation.yaml:55-58"
+    example_field: "last_run_at"
+  
+  openapi_number_float_currency:
+    postgres: integer
+    validation: "cents, CHECK >= 0"
+    conversion: "API: revenue_cents / 100.0"
+    example_contract: "api-contracts/openapi/v1/attribution.yaml:47-49"
+    example_field: "total_revenue"
+    rationale: "Integer arithmetic is exact, better performance than DECIMAL"
+  
+  openapi_boolean:
+    postgres: boolean
+    validation: "true/false"
+    example_contract: "api-contracts/openapi/v1/attribution.yaml:52-54"
+    example_field: "verified"
+  
+  openapi_integer:
+    postgres: integer
+    validation: "integer range"
+    example_contract: "api-contracts/openapi/v1/attribution.yaml:56-59"
+    example_field: "data_freshness_seconds"
+
+nullability:
+  required:
+    postgres: "NOT NULL"
+    exceptions:
+      - name: "soft_delete"
+        description: "Soft-delete fields (deleted_at) may be nullable"
+      - name: "audit"
+        description: "Optional audit metadata may be nullable"
+      - name: "backward_compatibility"
+        description: "New required fields may use NOT NULL DEFAULT <value> for migration safety"
+
+enums:
+  small_stable:
+    postgres: "CHECK col IN (...)"
+    threshold: 10
+    example_contract: "api-contracts/openapi/v1/reconciliation.yaml:47-52"
+    example_field: "state"
+    example_values: ["idle", "running", "failed", "completed"]
+  
+  large_evolving:
+    postgres: "lookup table"
+    threshold: ">10 or frequently changing"
+    rationale: "Lookup tables provide flexibility for evolving enums"
+
+identifiers:
+  primary_key:
+    pattern: "id uuid PRIMARY KEY DEFAULT gen_random_uuid()"
+    rationale: "UUIDs provide globally unique identifiers, prevent enumeration attacks"
+  
+  idempotency_key:
+    pattern: "{tenant_id}:{event_id}"
+    example: "550e8400-e29b-41d4-a716-446655440000:evt_12345"
+    rationale: "Compound key format ensures idempotency across tenants and events"
+
+timestamps:
+  authoritative_clock: "now()"
+  type: "timestamptz"
+  rationale: "PostgreSQL now() provides server-side authoritative timestamps"
+  monotonicity_notes:
+    - "created_at is immutable (never updated)"
+    - "updated_at is updated on every row modification"
+    - "Domain-specific timestamps may differ from created_at"
+

@@ -1,0 +1,143 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.venv/
+venv/
+ENV/
+env/
+backend/.venv/
+backend/venv/
+backend/ENV/
+backend/env/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+frontend/node_modules/
+frontend/.next/
+frontend/.nuxt/
+frontend/.cache/
+frontend/dist/
+frontend/build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+backend/.env
+frontend/.env
+
+# Generated artifacts
+app/schemas/*.py
+!app/schemas/__init__.py
+backend/app/schemas/*.py
+!backend/app/schemas/__init__.py
+
+# Build artifacts
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+
+# Logs
+*.log
+logs/
+backend/logs/
+frontend/logs/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+backend/.cache/
+frontend/.cache/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Docker
+docker-compose.override.yml
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# System files (Windows)
+AppData/
+Application Data/
+Cookies/
+Local Settings/
+My Documents/
+NetHood/
+PrintHood/
+Recent/
+SendTo/
+Start Menu/
+Templates/
+NTUSER.*
+ntuser.*
+*.blf
+*.regtrans-ms
+*.LOG*
+
+# User directories (should not be in repo)
+3D Objects/
+Box/
+Contacts/
+Desktop/
+Documents/
+Downloads/
+Favorites/
+Links/
+Music/
+OneDrive/
+Pictures/
+Saved Games/
+Searches/
+Videos/
+
+# IDE extensions (should not be in repo)
+.void-editor/
+.vscode/extensions/
+.cursor/extensions/
+

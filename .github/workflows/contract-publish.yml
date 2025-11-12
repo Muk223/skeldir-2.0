@@ -1,0 +1,71 @@
+name: Contract Publish
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'contracts/**/*.yaml'
+
+jobs:
+  tag-release:
+    name: Tag Contract Release
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Get contract version
+        id: version
+        run: |
+          VERSION=$(grep -A 2 "^info:" contracts/openapi/v1/auth.yaml | grep "version:" | awk '{print $2}' | tr -d '"')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Contract version: $VERSION"
+      
+      - name: Create git tag
+        run: |
+          TAG="contracts-v${{ steps.version.outputs.version }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, skipping"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release contracts v${{ steps.version.outputs.version }}"
+            git push origin "$TAG"
+            echo "Created and pushed tag: $TAG"
+          fi
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: contracts-v${{ steps.version.outputs.version }}
+          name: Contracts v${{ steps.version.outputs.version }}
+          body: |
+            ## Contract Release v${{ steps.version.outputs.version }}
+            
+            This release contains the OpenAPI 3.1.0 contract specifications for Skeldir Attribution Intelligence API.
+            
+            ### Contracts Included
+            - Authentication (`auth.yaml`)
+            - Attribution (`attribution.yaml`)
+            - Reconciliation (`reconciliation.yaml`)
+            - Export (`export.yaml`)
+            - Health (`health.yaml`)
+            - Webhooks (Shopify, WooCommerce, Stripe, PayPal)
+            
+            ### Usage
+            - View contracts: `contracts/openapi/v1/`
+            - Generate Pydantic models: `bash scripts/generate-models.sh`
+            - Validate contracts: See CI workflow
+            
+            See [CHANGELOG.md](CHANGELOG.md) for detailed changes.
+          files: |
+            contracts/**/*.yaml
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

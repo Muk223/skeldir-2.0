@@ -1,0 +1,3 @@
+# Schema snapshots directory
+# Schema dumps for drift detection are stored here
+# Naming: schema_YYYYMMDD_HHMMSS.sql

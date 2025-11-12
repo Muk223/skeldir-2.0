@@ -1,0 +1,29 @@
+# Code ownership for Skeldir API Contracts repository
+#
+# This file defines who must review changes to specific paths.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Contract ownership - backend team leads must review all contract changes
+api-contracts/ @backend-team-leads
+
+# CI/CD workflows - backend team leads own CI configuration
+.github/workflows/contract-validation.yml @backend-team-leads
+.github/workflows/contract-publish.yml @backend-team-leads
+
+# Breaking changes require frontend lead review for SDK/FE alignment
+# Note: Breaking changes are detected via CI, but FE lead should be notified
+api-contracts/openapi/v1/**/*.yaml @frontend-lead
+
+# Repository configuration files
+README.md @backend-team-leads
+LICENSE @backend-team-leads
+SECURITY.md @backend-team-leads
+PRIVACY-NOTES.md @backend-team-leads
+CHANGELOG.md @backend-team-leads
+
+# Documentation and governance
+docs/ @backend-team-leads
+
+# Scripts
+scripts/ @backend-team-leads
+

@@ -1,0 +1,163 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  # Single git checkout - Schmidt's key requirement
+  checkout:
+    name: Checkout Code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for versioning
+
+  # Contract validation
+  validate-contracts:
+    name: Validate Contracts
+    runs-on: ubuntu-latest
+    needs: checkout
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install OpenAPI Generator CLI
+        run: |
+          npm install -g @openapitools/openapi-generator-cli
+      
+      - name: Validate all OpenAPI files
+        run: |
+          echo "Validating OpenAPI specifications..."
+          for file in contracts/openapi/v1/**/*.yaml contracts/openapi/v1/_common/*.yaml; do
+            if [ -f "$file" ]; then
+              echo "Validating $file..."
+              openapi-generator-cli validate -i "$file" || exit 1
+            fi
+          done
+          echo "All OpenAPI files validated successfully"
+
+  # Backend tests (when backend exists)
+  test-backend:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    needs: checkout
+    if: contains(github.event.head_commit.modified, 'backend/') || contains(github.event.head_commit.added, 'backend/')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+      
+      - name: Run tests
+        run: |
+          cd backend
+          pytest
+
+  # Frontend tests (when frontend exists)
+  test-frontend:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+    needs: checkout
+    if: contains(github.event.head_commit.modified, 'frontend/') || contains(github.event.head_commit.added, 'frontend/')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm install
+      
+      - name: Run tests
+        run: |
+          cd frontend
+          npm test
+
+  # Integration tests
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: checkout
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: |
+          npm install
+      
+      - name: Start mock servers
+        run: |
+          docker-compose -f docker-compose.yml up -d
+          # Wait for services to be ready
+          timeout 60 bash -c 'until curl -f http://localhost:4014/api/health; do sleep 2; done'
+      
+      - name: Run Playwright tests
+        run: |
+          npx playwright test
+      
+      - name: Stop mock servers
+        if: always()
+        run: |
+          docker-compose -f docker-compose.yml down
+
+  # Generate models
+  generate-models:
+    name: Generate Pydantic Models
+    runs-on: ubuntu-latest
+    needs: checkout
+    if: contains(github.event.head_commit.modified, 'contracts/') || contains(github.event.head_commit.added, 'contracts/')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install datamodel-code-generator[openapi] pydantic>=2.0.0
+      
+      - name: Generate Pydantic models
+        run: |
+          chmod +x scripts/generate-models.sh
+          bash scripts/generate-models.sh
+      
+      - name: Verify model generation
+        run: |
+          if [ ! -f "backend/app/schemas/attribution.py" ] || [ ! -f "backend/app/schemas/auth.py" ]; then
+            echo "ERROR: Model generation failed - required files not found"
+            exit 1
+          fi
+          echo "Model generation successful"
+
