@@ -10,6 +10,8 @@
 
 This monorepo contains the complete Skeldir 2.0 Attribution Intelligence platform, following a **contract-first** development approach with atomic versioning. All components (contracts, backend, frontend) are versioned together in a single repository, enabling:
 
+> **Note**: This monorepo was created by migrating content from the original [`skeldir-api-contracts`](https://github.com/Muk223/skeldir-api-contracts) repository. The original repository is referenced as a git submodule in `api-contracts-reference/` for historical reference. Active development now occurs in this monorepo's `contracts/` directory.
+
 - **Atomic Versioning**: Single commit hash versions all components simultaneously
 - **CI/CD Simplification**: Single git checkout for all validation and testing
 - **Contract-Driven Development**: OpenAPI contracts serve as immutable source of truth
@@ -28,9 +30,11 @@ This monorepo contains the complete Skeldir 2.0 Attribution Intelligence platfor
 ├── frontend/         # Replit UI (to be migrated)
 │   ├── src/          # Frontend source code
 │   └── public/       # Static assets
-├── contracts/        # OpenAPI 3.1.0 contract specifications
+├── contracts/        # OpenAPI 3.1.0 contract specifications (migrated from skeldir-api-contracts)
 │   ├── openapi/v1/   # Version 1 API contracts
 │   └── baselines/    # Frozen baselines for breaking change detection
+├── api-contracts-reference/  # Git submodule reference to original skeldir-api-contracts repository
+├── api-contracts/    # Legacy contracts directory (preserved for reference)
 ├── docs/             # Shared documentation
 │   └── database/     # Database governance documentation
 ├── scripts/          # Shared utility scripts
