@@ -151,18 +151,49 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Validate all migrations
+        with:
+          fetch-depth: 0
+      - name: Detect migration changes
+        id: detect-migrations
+        shell: bash
         run: |
+          set -eo pipefail
+          git status
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            find alembic/versions -type f -name "*.py" | sort > migration_targets.txt
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD)
+          echo "$CHANGED" > changed_files.txt
+          grep '^alembic/versions/' changed_files.txt || true
+
+          TARGETS=$(grep '^alembic/versions/' changed_files.txt || true)
+          if [[ -z "$TARGETS" ]]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          printf '%s\n' "$TARGETS" | sort > migration_targets.txt
+          echo "run=true" >> "$GITHUB_OUTPUT"
+
+      - name: Validate modified migrations for destructive DDL
+        if: steps.detect-migrations.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -eo pipefail
           chmod +x scripts/validate-migration.sh
-          for migration in alembic/versions/*.py; do
-            # Skip test files
-            if [[ "$migration" == *"test_"* ]]; then
-              echo "Skipping test file: $migration"
-              continue
-            fi
+          if [[ ! -s migration_targets.txt ]]; then
+            echo "No candidate migrations detected; skipping."
+            exit 0
+          fi
+          while IFS= read -r migration; do
+            [[ -z "$migration" ]] && continue
+            echo "Validating $migration"
             ./scripts/validate-migration.sh "$migration"
-          done
+          done < migration_targets.txt
 
   # Generate models
   generate-models:
