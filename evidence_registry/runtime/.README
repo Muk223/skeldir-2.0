@@ -1,0 +1,30 @@
+# Runtime Evidence Artifacts
+
+**Purpose:** Capture empirical evidence of process orchestration, service availability, and runtime environment state.
+
+## Required Artifacts:
+
+### Baseline Capture (Phase B)
+- `process_snapshot.txt` - Output of `ps aux` showing running processes
+- `open_ports.txt` - Output of `lsof -i` showing port bindings
+- `env_dump.txt` - Environment variables and PATH configuration
+- `binary_checks.txt` - Binary availability tests (uvicorn, celery, psql, prism, python imports)
+- `nix_baseline.txt` - Current replit.nix configuration and missing packages
+
+### Post-Remediation Validation (Phase D)
+- `init_log.txt` - Output from scripts/init_runtime.sh execution
+- `running_processes.txt` - Process snapshot after services started
+- `port_bindings.txt` - Port bindings after services started
+- `connectivity_tests.txt` - Health check results for all services
+
+## Evidence Standards:
+- All artifacts must include timestamps
+- All command outputs stored verbatim
+- Failures are valid evidence (document, don't suppress)
+- Include execution context (working directory, user, environment)
+
+## Exit Gate Requirements:
+- FastAPI, Celery, PostgreSQL, Redis, Prism all running with distinct PIDs
+- Services responding to connectivity tests
+- No CrashLoopBackOff states
+

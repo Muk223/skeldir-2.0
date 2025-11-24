@@ -1,0 +1,31 @@
+# Contract Evidence Artifacts
+
+**Purpose:** Prove contract authority, consistency, validation, and enforcement.
+
+## Required Artifacts:
+
+### Baseline Capture (Phase B)
+- `backend_route_map.txt` - All FastAPI routes with operation_ids and paths
+- `contract_operations_map.txt` - All OpenAPI operations from bundled contracts
+- `route_contract_gaps.txt` - Comparison showing routes without contracts and contracts without routes
+
+### Validation Framework (Phase E)
+- `contract_validation_log.txt` - Output from validate-contracts.sh execution
+- `fidelity_test_results.txt` - Pytest results from route-contract mapping tests
+- `drift_detection_proof.txt` - Evidence of semantic drift detection working
+
+### Interim Semantics (Phase F)
+- `interim_semantics_proof.json` - API response showing verified=false with upgrade_notice
+
+## Evidence Standards:
+- Machine-readable outputs (JSON, structured text)
+- Include validation tool versions
+- Capture both passing and intentionally failing tests
+- Document expected vs actual outcomes
+
+## Exit Gate Requirements:
+- All contracts pass OpenAPI validation
+- Backend routes map 1:1 to contract operations
+- Drift detection catches schema changes
+- API returns contract-compliant interim responses
+

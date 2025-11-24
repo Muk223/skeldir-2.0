@@ -1,0 +1,29 @@
+# Database Evidence Artifacts
+
+**Purpose:** Validate database schema alignment, PII controls, and governance constraints.
+
+## Required Artifacts:
+
+### Baseline Capture (Phase B)
+- `current_schema.sql` - pg_dump output or note if DB unavailable
+- `migration_inventory.txt` - List of all Alembic migration files
+
+### Governance Validation (Phase H)
+- `pii_guardrail_validation.txt` - Output from validate-pii-guardrails.sh
+- `integrity_validation.txt` - Output from test-data-integrity.sh
+- `audit_scan_results.txt` - Output from run-audit-scan.sh
+- `schema_alignment.txt` - Comparison of canonical vs actual schema
+
+## Evidence Standards:
+- SQL outputs include full error messages
+- Test both success and failure cases
+- Document trigger behavior with examples
+- Include schema version information
+
+## Exit Gate Requirements:
+- PII guardrails block contaminated inserts
+- Immutability triggers prevent UPDATE/DELETE
+- RLS enforces tenant isolation
+- Audit scan executes without errors
+- Schema matches migration definitions
+

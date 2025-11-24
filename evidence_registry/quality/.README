@@ -1,0 +1,28 @@
+# Quality Evidence Artifacts
+
+**Purpose:** Prove CI/CD gates prevent invalid states and semantic drift.
+
+## Required Artifacts:
+
+### Future CI Integration (Phase E, documented only)
+- `ci_output.txt` - CI pipeline execution logs
+- `contract_drift_detection.txt` - oasdiff outputs showing breaking change detection
+- `test_failure_artifacts/` - Directory containing intentional failure evidence
+
+## Evidence Standards:
+- Capture full CI/CD pipeline outputs
+- Document both passing and failing builds
+- Show semantic drift rejection
+- Include linter outputs
+- Test coverage reports
+
+## Exit Gate Requirements:
+- CI rejects contract drift
+- Lint errors fail pipeline
+- Schema inconsistencies caught
+- Breaking changes detected
+- All quality gates proven operational
+
+## Note:
+Phase B0.1 focuses on local validation. Full CI integration evidence deferred to later phases.
+
