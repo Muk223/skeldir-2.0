@@ -1,3 +1,28 @@
+# ============================================================================
+# DEPRECATED - DO NOT USE
+# ============================================================================
+#
+# This Docker Compose configuration is DEPRECATED as of Phase 1 implementation.
+#
+# REASON:
+#   Replit environment constraints do not support Docker Compose.
+#   Mock servers have been migrated to Replit-native Prism CLI subprocesses.
+#
+# NEW APPROACH:
+#   - Mock servers run as subprocesses managed by bash scripts
+#   - Binding: api-contracts/dist/openapi/v1/*.bundled.yaml (validated artifacts)
+#   - Process management: scripts/start-mocks.sh, scripts/stop-mocks.sh
+#   - Port limit: 3 primary mocks + 1 on-demand (Replit constraints)
+#
+# MIGRATION:
+#   - Old: docker-compose up
+#   - New: bash scripts/start-mocks.sh
+#
+# For on-demand mock switching:
+#   bash scripts/switch-mock.sh <domain>
+#
+# ============================================================================
+
 version: '3.8'
 
 # SKELDIR 2.0 Monorepo - Unified Docker Compose
@@ -121,4 +146,3 @@ services:
     environment:
       - PRISM_ERRORS=true
     command: prism mock /contracts/webhooks/v1/paypal.yaml -p 4018 -h 0.0.0.0
-

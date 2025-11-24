@@ -1,0 +1,47 @@
+# Contract-First Enforcement: Scope Configuration
+# Defines which FastAPI routes are governed by contract-first enforcement
+
+# In-scope API prefixes: Routes under these prefixes MUST have corresponding OpenAPI operations
+in_scope_prefixes:
+  - /api/auth
+  - /api/attribution
+  - /api/reconciliation
+  - /api/export
+  - /api/health
+  - /api/webhooks
+
+# Out-of-scope paths: Routes explicitly excluded from contract enforcement
+# These are internal/infrastructure endpoints that don't require OpenAPI contracts
+out_of_scope_paths:
+  - /health
+  - /metrics
+  - /internal/**
+  - /docs
+  - /redoc
+  - /openapi.json
+
+# Contract-only allowlist: Operations defined in contracts but intentionally not yet implemented
+# Format: "METHOD /path/to/endpoint"
+# Use this sparingly - it's for upcoming endpoints only, not a permanent bypass
+contract_only_allowlist:
+  # Example: "POST /api/attribution/v1/query/advanced"  # Planned for v1.1
+  []
+
+# Mapping: In-scope prefixes to their corresponding bundled OpenAPI specifications
+# Used to determine which contract file governs each route
+spec_mappings:
+  /api/auth: api-contracts/dist/openapi/v1/auth.bundled.yaml
+  /api/attribution: api-contracts/dist/openapi/v1/attribution.bundled.yaml
+  /api/reconciliation: api-contracts/dist/openapi/v1/reconciliation.bundled.yaml
+  /api/export: api-contracts/dist/openapi/v1/export.bundled.yaml
+  /api/health: api-contracts/dist/openapi/v1/health.bundled.yaml
+  /api/webhooks/shopify: api-contracts/dist/openapi/v1/webhooks.shopify.bundled.yaml
+  /api/webhooks/woocommerce: api-contracts/dist/openapi/v1/webhooks.woocommerce.bundled.yaml
+  /api/webhooks/stripe: api-contracts/dist/openapi/v1/webhooks.stripe.bundled.yaml
+  /api/webhooks/paypal: api-contracts/dist/openapi/v1/webhooks.paypal.bundled.yaml
+
+# Governance notes:
+# - Every FastAPI route MUST be either in-scope or explicitly out-of-scope
+# - "Unknown" classification indicates missing configuration and causes validation failure
+# - contract_only_allowlist is audited monthly; stale entries must be removed
+

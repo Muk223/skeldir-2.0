@@ -3,16 +3,18 @@ name: API Contract Validation
 on:
   push:
     paths:
-      - 'contracts/**/*.yaml'
+      - 'api-contracts/**/*.yaml'
+      - 'scripts/contracts/**'
       - '.github/workflows/contract-validation.yml'
   pull_request:
     paths:
-      - 'contracts/**/*.yaml'
+      - 'api-contracts/**/*.yaml'
+      - 'scripts/contracts/**'
       - '.github/workflows/contract-validation.yml'
 
 jobs:
-  validate-openapi:
-    name: Validate OpenAPI Specifications
+  bundle-contracts:
+    name: Bundle OpenAPI Contracts
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -23,20 +25,64 @@ jobs:
         with:
           node-version: '20'
       
+      - name: Install dependencies
+        run: |
+          npm install
+      
+      - name: Bundle all contracts
+        run: |
+          chmod +x scripts/contracts/bundle.sh
+          bash scripts/contracts/bundle.sh
+      
+      - name: Verify bundled artifacts
+        run: |
+          if [ ! -d "api-contracts/dist/openapi/v1" ]; then
+            echo "ERROR: Bundled artifacts directory not found"
+            exit 1
+          fi
+          BUNDLE_COUNT=$(find api-contracts/dist/openapi/v1 -name "*.bundled.yaml" | wc -l)
+          if [ "$BUNDLE_COUNT" -lt 9 ]; then
+            echo "ERROR: Expected 9 bundled files, found $BUNDLE_COUNT"
+            exit 1
+          fi
+          echo "✓ Found $BUNDLE_COUNT bundled artifacts"
+  
+  validate-openapi:
+    name: Validate OpenAPI Specifications
+    runs-on: ubuntu-latest
+    needs: bundle-contracts
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: |
+          npm install
+      
       - name: Install OpenAPI Generator CLI
         run: |
           npm install -g @openapitools/openapi-generator-cli
       
-      - name: Validate all OpenAPI files
+      - name: Bundle contracts
         run: |
-          echo "Validating OpenAPI specifications..."
-          for file in contracts/openapi/v1/**/*.yaml contracts/openapi/v1/_common/*.yaml; do
+          chmod +x scripts/contracts/bundle.sh
+          bash scripts/contracts/bundle.sh
+      
+      - name: Validate bundled OpenAPI files
+        run: |
+          echo "Validating bundled OpenAPI specifications..."
+          for file in api-contracts/dist/openapi/v1/*.bundled.yaml; do
             if [ -f "$file" ]; then
-              echo "Validating $file..."
-              openapi-generator-cli validate -i "$file" || exit 1
+              echo "Validating $(basename $file)..."
+              npx @openapitools/openapi-generator-cli validate -i "$file" || exit 1
             fi
           done
-          echo "All OpenAPI files validated successfully"
+          echo "All bundled OpenAPI files validated successfully"
   
   check-breaking-changes:
     name: Check Breaking Changes
@@ -60,10 +106,18 @@ jobs:
       - name: Check breaking changes
         run: |
           echo "Checking for breaking changes..."
-          if [ -d "contracts/baselines/v1.0.0" ]; then
-            for file in contracts/openapi/v1/**/*.yaml; do
+          if [ -d "api-contracts/baselines/v1.0.0" ]; then
+            for file in api-contracts/openapi/v1/**/*.yaml api-contracts/openapi/v1/_common/*.yaml; do
               if [ -f "$file" ]; then
-                baseline_file="contracts/baselines/v1.0.0/$(basename $(dirname $file))/$(basename $file)"
+                # Handle webhook files in subdirectory
+                if [[ "$file" == *"webhooks/"* ]]; then
+                  baseline_file="api-contracts/baselines/v1.0.0/webhooks/$(basename $file)"
+                elif [[ "$file" == *"_common/"* ]]; then
+                  # Skip _common files for breaking change checks
+                  continue
+                else
+                  baseline_file="api-contracts/baselines/v1.0.0/$(basename $file)"
+                fi
                 if [ -f "$baseline_file" ]; then
                   echo "Comparing $file with baseline..."
                   oasdiff breaking "$baseline_file" "$file" || exit 1
@@ -74,6 +128,36 @@ jobs:
             echo "No baseline found, skipping breaking change check"
           fi
           echo "No breaking changes detected"
+  
+  lint-contracts:
+    name: Lint API Contracts (Spectral)
+    runs-on: ubuntu-latest
+    needs: bundle-contracts
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: |
+          npm install
+      
+      - name: Install Spectral
+        run: |
+          npm install -g @stoplight/spectral-cli
+      
+      - name: Lint contracts with Spectral
+        run: |
+          echo "Linting OpenAPI contracts with Spectral..."
+          spectral lint api-contracts/openapi/v1/*.yaml \
+            api-contracts/openapi/v1/webhooks/*.yaml \
+            --ruleset api-contracts/.spectral.yaml \
+            --fail-severity error
+          echo "✓ All contracts passed Spectral linting"
   
   enforce-semver:
     name: Enforce Semantic Versioning
@@ -86,7 +170,7 @@ jobs:
         run: |
           echo "Checking semantic versioning format..."
           semver_regex='^[0-9]+\.[0-9]+\.[0-9]+$'
-          for file in contracts/openapi/v1/**/*.yaml contracts/openapi/v1/_common/*.yaml; do
+          for file in api-contracts/openapi/v1/**/*.yaml api-contracts/openapi/v1/_common/*.yaml; do
             if [ -f "$file" ]; then
               version=$(grep -A 2 "^info:" "$file" | grep "version:" | awk '{print $2}' | tr -d '"')
               if [[ ! "$version" =~ $semver_regex ]]; then
@@ -98,8 +182,221 @@ jobs:
           done
           echo "All files have valid semver versions"
   
+  validate-governance:
+    name: Validate Governance (Coverage & Invariants)
+    runs-on: ubuntu-latest
+    needs: [bundle-contracts, lint-contracts]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Node dependencies
+        run: |
+          npm install
+      
+      - name: Install Python dependencies
+        run: |
+          pip install pyyaml
+      
+      - name: Bundle contracts
+        run: |
+          chmod +x scripts/contracts/bundle.sh
+          bash scripts/contracts/bundle.sh
+      
+      - name: Validate Coverage Manifest
+        run: |
+          echo "Validating coverage manifest..."
+          chmod +x scripts/governance/validate-coverage.py
+          python scripts/governance/validate-coverage.py --verbose
+      
+      - name: Validate Invariants
+        run: |
+          echo "Validating invariants registry..."
+          chmod +x scripts/governance/validate-invariants.py
+          python scripts/governance/validate-invariants.py --verbose
+  
   generate-models:
     name: Generate Pydantic Models
+    runs-on: ubuntu-latest
+    needs: bundle-contracts
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Node dependencies
+        run: |
+          npm install
+      
+      - name: Install Python dependencies
+        run: |
+          pip install -r backend/requirements-dev.txt
+      
+      - name: Bundle contracts
+        run: |
+          chmod +x scripts/contracts/bundle.sh
+          bash scripts/contracts/bundle.sh
+      
+      - name: Generate Pydantic models
+        run: |
+          chmod +x scripts/generate-models.sh
+          bash scripts/generate-models.sh
+      
+      - name: Verify model generation (non-trivial)
+        run: |
+          echo "Verifying generated models are non-trivial..."
+          
+          # Check all expected files exist
+          for file in attribution auth reconciliation export webhooks_shopify webhooks_woocommerce webhooks_stripe webhooks_paypal; do
+            SCHEMA_FILE="backend/app/schemas/${file}.py"
+            
+            if [ ! -f "$SCHEMA_FILE" ]; then
+              echo "ERROR: $SCHEMA_FILE not found"
+              exit 1
+            fi
+            
+            # Check file contains class definitions
+            CLASS_COUNT=$(grep -c "^class " "$SCHEMA_FILE" || echo 0)
+            if [ "$CLASS_COUNT" -eq 0 ]; then
+              echo "ERROR: $SCHEMA_FILE contains no class definitions"
+              cat "$SCHEMA_FILE"
+              exit 1
+            fi
+            
+            # Check file size > 100 bytes (not a stub comment)
+            FILE_SIZE=$(wc -c < "$SCHEMA_FILE")
+            if [ "$FILE_SIZE" -lt 100 ]; then
+              echo "ERROR: $SCHEMA_FILE is too small ($FILE_SIZE bytes)"
+              exit 1
+            fi
+            
+            echo "✓ $SCHEMA_FILE: $CLASS_COUNT classes, $FILE_SIZE bytes"
+          done
+          
+          echo "All generated models are non-trivial"
+      
+      - name: Validate critical model classes exist
+        run: |
+          echo "Validating critical model classes..."
+          
+          # Define critical models that MUST exist
+          declare -A EXPECTED_MODELS=(
+            ["attribution"]="RealtimeRevenueResponse"
+            ["auth"]="LoginRequest LoginResponse RefreshRequest RefreshResponse"
+            ["reconciliation"]="ReconciliationStatusResponse"
+            ["export"]="ExportRevenueResponse"
+            ["webhooks_shopify"]="ShopifyOrderCreateRequest WebhookAcknowledgement"
+          )
+          
+          for domain in "${!EXPECTED_MODELS[@]}"; do
+            SCHEMA_FILE="backend/app/schemas/${domain}.py"
+            MODELS="${EXPECTED_MODELS[$domain]}"
+            
+            for model in $MODELS; do
+              if ! grep -q "class ${model}" "$SCHEMA_FILE"; then
+                echo "ERROR: ${model} not found in $SCHEMA_FILE"
+                echo "Generated file content:"
+                cat "$SCHEMA_FILE"
+                exit 1
+              fi
+              echo "✓ Found ${model} in ${domain}.py"
+            done
+          done
+          
+          echo "All critical model classes exist"
+  
+  validate-model-structures:
+    name: Validate Generated Model Structures
+    runs-on: ubuntu-latest
+    needs: generate-models
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Node dependencies
+        run: |
+          npm install
+      
+      - name: Install Python dependencies
+        run: |
+          pip install -r backend/requirements-dev.txt
+      
+      - name: Bundle and generate models
+        run: |
+          bash scripts/contracts/bundle.sh
+          bash scripts/generate-models.sh
+      
+      - name: Validate model structures
+        run: |
+          python scripts/validate_model_usage.py
+      
+      - name: Run model unit tests
+        run: |
+          cd backend
+          pytest tests/test_generated_models.py -v
+      
+      - name: Operational Gate P4: Check for hand-rolled models
+        run: |
+          python scripts/check_model_usage.py
+      
+      - name: Operational Gate P2: Verify downstream dependency on generated models
+        run: |
+          echo "Testing operational dependency: corrupting generated model..."
+          # Corrupt the RealtimeRevenueResponse class
+          sed -i 's/class RealtimeRevenueResponse/class RealtimeRevenueResponse_BROKEN/' backend/app/schemas/attribution.py
+          
+          # Attempt to import - should fail
+          if python -c "from backend.app.schemas.attribution import RealtimeRevenueResponse" 2>/dev/null; then
+            echo "ERROR: Import succeeded after corruption - models are not operationally required"
+            exit 1
+          fi
+          
+          # Restore file
+          sed -i 's/class RealtimeRevenueResponse_BROKEN/class RealtimeRevenueResponse/' backend/app/schemas/attribution.py
+          
+          # Verify validation script would fail
+          if python scripts/validate_model_usage.py 2>&1 | grep -q "RealtimeRevenueResponse"; then
+            echo "✓ Operational dependency verified: validation fails when model is corrupted"
+          else
+            echo "ERROR: Validation did not detect corrupted model"
+            exit 1
+          fi
+  
+  # ============================================================================
+  # GOVERNANCE VALIDATION JOBS (Phase C0-C5)
+  # ============================================================================
+  
+  validate-canonical-events:
+    name: Validate Canonical Events (C0)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -110,38 +407,89 @@ jobs:
         with:
           python-version: '3.11'
       
+      - name: Install PyYAML
+        run: |
+          pip install pyyaml
+      
+      - name: Validate canonical events and state machine
+        run: |
+          python scripts/governance/validate-canonical-events.py
+  
+  validate-coverage-matrix:
+    name: Validate Coverage Matrix (C1)
+    runs-on: ubuntu-latest
+    needs: validate-canonical-events
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install PyYAML
+        run: |
+          pip install pyyaml
+      
+      - name: Validate provider coverage matrix
+        run: |
+          python scripts/governance/validate-coverage-matrix.py
+  
+  validate-contract-coverage:
+    name: Validate Contract Coverage (C2)
+    runs-on: ubuntu-latest
+    needs: [validate-coverage-matrix, bundle-contracts]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
       - name: Install dependencies
         run: |
-          pip install datamodel-code-generator[openapi] pydantic>=2.0.0
+          npm install
+          pip install pyyaml
       
-      - name: Generate Pydantic models
+      - name: Bundle contracts
         run: |
-          chmod +x scripts/generate-models.sh
-          bash scripts/generate-models.sh
+          chmod +x scripts/contracts/bundle.sh
+          bash scripts/contracts/bundle.sh
       
-      - name: Verify model generation
+      - name: Validate contract coverage
         run: |
-          if [ ! -f "backend/app/schemas/attribution.py" ] || [ ! -f "backend/app/schemas/auth.py" ]; then
-            echo "ERROR: Model generation failed - required files not found"
-            exit 1
-          fi
-          echo "Model generation successful"
+          python scripts/governance/validate-contract-coverage.py
       
-      - name: Test model imports
+      - name: Validate coverage manifest
         run: |
-          # Test imports (files may be placeholders for inline schemas)
-          python -c "
-          import sys
-          try:
-              from backend.app.schemas.attribution import *
-              print('attribution.py imports successfully')
-          except Exception as e:
-              print(f'attribution.py import note: {e}')
-          try:
-              from backend.app.schemas.auth import *
-              print('auth.py imports successfully')
-          except Exception as e:
-              print(f'auth.py import note: {e}')
-          print('Model generation smoke test passed')
-          " || echo "Note: Some files may be placeholders for contracts with inline schemas"
+          python scripts/governance/validate-coverage.py
+  
+  validate-integration-mappings:
+    name: Validate Integration Mappings (C3)
+    runs-on: ubuntu-latest
+    needs: [validate-coverage-matrix, validate-contract-coverage]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install PyYAML
+        run: |
+          pip install pyyaml
+      
+      - name: Validate integration mappings
+        run: |
+          python scripts/governance/validate-integration-mappings.py
 

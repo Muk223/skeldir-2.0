@@ -1786,3 +1786,6 @@ WHERE allocation_date < CURRENT_DATE - INTERVAL '90 days';
 **Document Version**: 1.0  
 **Last Updated**: 2025-11-17
 
+
+
+

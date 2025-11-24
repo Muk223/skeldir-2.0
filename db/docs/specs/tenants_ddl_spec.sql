@@ -50,3 +50,6 @@ COMMENT ON CONSTRAINT ck_tenants_name_not_empty ON tenants IS
 
 
 
+
+
+

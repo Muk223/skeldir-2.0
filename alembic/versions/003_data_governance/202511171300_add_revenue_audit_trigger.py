@@ -181,3 +181,6 @@ def downgrade() -> None:
     # Drop tenant_id column
     op.execute("ALTER TABLE revenue_state_transitions DROP COLUMN IF EXISTS tenant_id")
 
+
+
+

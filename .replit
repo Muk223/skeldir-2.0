@@ -1,0 +1,20 @@
+run = "echo 'Skeldir 2.0 - Contract-First Development Environment' && echo 'Available commands:' && echo '  npm run mocks:start  - Start mock servers' && echo '  make contract-full   - Run full contract pipeline' && echo '  python scripts/contracts/print_domain_map.py - Show domain mapping'"
+language = "bash"
+
+[nix]
+channel = "stable-23_11"
+
+[env]
+PATH = "/home/runner/$REPL_SLUG/.config/npm/bin:/home/runner/$REPL_SLUG/node_modules/.bin:$PATH"
+npm_config_prefix = "/home/runner/$REPL_SLUG/.config/npm"
+
+[packager]
+language = "nodejs"
+
+[packager.features]
+packageSearch = true
+guessImports = true
+enabledForHosting = false
+
+
+

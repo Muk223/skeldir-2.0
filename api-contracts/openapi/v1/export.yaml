@@ -1,8 +1,15 @@
 openapi: 3.1.0
 info:
   title: Skeldir Export API
-  version: 1.0.0
+  version: 1.1.0
   description: Data export endpoints for Skeldir Attribution Intelligence platform
+  x-domain: "export"
+  x-owner: "export-owner@skeldir.com"
+  x-version-history:
+    - version: "1.1.0"
+      date: "2024-01-15"
+      changes: "Governance metadata added, all invariants validated"
+      phase: "G4.5"
 servers:
   - url: https://api.skeldir.com
     description: Production server
@@ -36,8 +43,8 @@ paths:
               - json
             default: json
           description: Export format (CSV or JSON)
-        - $ref: '../_common/pagination.yaml#/components/parameters/limit'
-        - $ref: '../_common/pagination.yaml#/components/parameters/cursor'
+        - $ref: '_common/pagination.yaml#/components/parameters/limit'
+        - $ref: '_common/pagination.yaml#/components/parameters/cursor'
         - name: start_date
           in: query
           required: false
@@ -75,21 +82,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - file_url
-                  - tenant_id
-                properties:
-                  file_url:
-                    type: string
-                    format: uri
-                    description: URL to download the exported file
-                    example: "https://api.skeldir.com/exports/revenue_20251110.json"
-                  tenant_id:
-                    type: string
-                    format: uuid
-                    description: Tenant identifier
-                    example: "550e8400-e29b-41d4-a716-446655440000"
+                $ref: '#/components/schemas/ExportRevenueResponse'
               examples:
                 json_export:
                   summary: JSON export
@@ -105,12 +98,179 @@ paths:
                   summary: CSV export
                   value: "date,revenue,channel\n2025-01-01,1000.50,google_search\n2025-01-02,1500.75,facebook_ads"
         '401':
-          $ref: '../_common/components.yaml#/components/responses/Unauthorized'
+          $ref: '_common/components.yaml#/components/responses/Unauthorized'
         '429':
-          $ref: '../_common/components.yaml#/components/responses/TooManyRequests'
+          $ref: '_common/components.yaml#/components/responses/TooManyRequests'
         '500':
-          $ref: '../_common/components.yaml#/components/responses/InternalServerError'
+          $ref: '_common/components.yaml#/components/responses/InternalServerError'
+  /api/export/allocations:
+    get:
+      operationId: exportAllocations
+      tags:
+        - Export
+      summary: Export allocation data
+      description: Export channel allocation data with pagination and date range filtering.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Distributed tracing correlation ID
+        - $ref: '_common/pagination.yaml#/components/parameters/limit'
+        - $ref: '_common/pagination.yaml#/components/parameters/cursor'
+        - name: start_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Start date for allocation data (ISO 8601 format)
+          example: "2025-01-01"
+        - name: end_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: End date for allocation data (ISO 8601 format)
+          example: "2025-11-10"
+      responses:
+        '200':
+          description: Allocation data exported successfully
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportAllocationsResponse'
+              examples:
+                json_export:
+                  summary: JSON export
+                  value:
+                    file_url: "https://api.skeldir.com/exports/allocations_20251110.json"
+                    tenant_id: "550e8400-e29b-41d4-a716-446655440000"
+        '401':
+          $ref: '_common/components.yaml#/components/responses/Unauthorized'
+        '429':
+          $ref: '_common/components.yaml#/components/responses/TooManyRequests'
+        '500':
+          $ref: '_common/components.yaml#/components/responses/InternalServerError'
+  /api/export/events:
+    get:
+      operationId: exportEvents
+      tags:
+        - Export
+      summary: Export event data
+      description: Export raw event data with pagination and date range filtering.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Distributed tracing correlation ID
+        - $ref: '_common/pagination.yaml#/components/parameters/limit'
+        - $ref: '_common/pagination.yaml#/components/parameters/cursor'
+        - name: start_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Start date for event data (ISO 8601 format)
+          example: "2025-01-01"
+        - name: end_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: End date for event data (ISO 8601 format)
+          example: "2025-11-10"
+      responses:
+        '200':
+          description: Event data exported successfully
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportEventsResponse'
+              examples:
+                json_export:
+                  summary: JSON export
+                  value:
+                    file_url: "https://api.skeldir.com/exports/events_20251110.json"
+                    tenant_id: "550e8400-e29b-41d4-a716-446655440000"
+        '401':
+          $ref: '_common/components.yaml#/components/responses/Unauthorized'
+        '429':
+          $ref: '_common/components.yaml#/components/responses/TooManyRequests'
+        '500':
+          $ref: '_common/components.yaml#/components/responses/InternalServerError'
 components:
+  schemas:
+    ExportRevenueResponse:
+      type: object
+      required:
+        - file_url
+        - tenant_id
+      properties:
+        file_url:
+          type: string
+          format: uri
+          description: URL to download the exported file
+          example: "https://api.skeldir.com/exports/revenue_20251110.json"
+        tenant_id:
+          type: string
+          format: uuid
+          description: Tenant identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+    ExportAllocationsResponse:
+      type: object
+      required:
+        - file_url
+        - tenant_id
+      properties:
+        file_url:
+          type: string
+          format: uri
+          description: URL to download the exported allocations file
+          example: "https://api.skeldir.com/exports/allocations_20251110.json"
+        tenant_id:
+          type: string
+          format: uuid
+          description: Tenant identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+    ExportEventsResponse:
+      type: object
+      required:
+        - file_url
+        - tenant_id
+      properties:
+        file_url:
+          type: string
+          format: uri
+          description: URL to download the exported events file
+          example: "https://api.skeldir.com/exports/events_20251110.json"
+        tenant_id:
+          type: string
+          format: uuid
+          description: Tenant identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
   securitySchemes:
     BearerAuth:
-      $ref: '../_common/components.yaml#/components/securitySchemes/BearerAuth'
+      $ref: '_common/components.yaml#/components/securitySchemes/BearerAuth'

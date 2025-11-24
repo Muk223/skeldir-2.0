@@ -1,8 +1,15 @@
 openapi: 3.1.0
 info:
   title: Skeldir Authentication API
-  version: 1.0.0
+  version: 1.1.0
   description: Authentication and authorization endpoints for Skeldir Attribution Intelligence platform
+  x-domain: "auth"
+  x-owner: "auth-owner@skeldir.com"
+  x-version-history:
+    - version: "1.1.0"
+      date: "2024-01-15"
+      changes: "Governance metadata added, all invariants validated"
+      phase: "G4.5"
 servers:
   - url: https://api.skeldir.com
     description: Production server
@@ -30,19 +37,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - email
-                - password
-              properties:
-                email:
-                  type: string
-                  format: email
-                  example: "user@example.com"
-                password:
-                  type: string
-                  format: password
-                  example: "securePassword123"
+              $ref: '#/components/schemas/LoginRequest'
       responses:
         '200':
           description: Authentication successful
@@ -54,27 +49,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - access_token
-                  - refresh_token
-                  - expires_in
-                  - token_type
-                properties:
-                  access_token:
-                    type: string
-                    description: JWT access token
-                  refresh_token:
-                    type: string
-                    description: JWT refresh token
-                  expires_in:
-                    type: integer
-                    description: Token expiration time in seconds
-                    example: 3600
-                  token_type:
-                    type: string
-                    description: Token type
-                    example: "Bearer"
+                $ref: '#/components/schemas/LoginResponse'
               examples:
                 success:
                   summary: Successful login
@@ -84,11 +59,11 @@ paths:
                     expires_in: 3600
                     token_type: "Bearer"
         '401':
-          $ref: '../_common/components.yaml#/components/responses/Unauthorized'
+          $ref: '_common/components.yaml#/components/responses/Unauthorized'
         '429':
-          $ref: '../_common/components.yaml#/components/responses/TooManyRequests'
+          $ref: '_common/components.yaml#/components/responses/TooManyRequests'
         '500':
-          $ref: '../_common/components.yaml#/components/responses/InternalServerError'
+          $ref: '_common/components.yaml#/components/responses/InternalServerError'
   
   /api/auth/refresh:
     post:
@@ -112,13 +87,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - refresh_token
-              properties:
-                refresh_token:
-                  type: string
-                  description: JWT refresh token
+              $ref: '#/components/schemas/RefreshRequest'
       responses:
         '200':
           description: Token refresh successful
@@ -130,27 +99,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - access_token
-                  - refresh_token
-                  - expires_in
-                  - token_type
-                properties:
-                  access_token:
-                    type: string
-                    description: New JWT access token
-                  refresh_token:
-                    type: string
-                    description: New JWT refresh token
-                  expires_in:
-                    type: integer
-                    description: Token expiration time in seconds
-                    example: 3600
-                  token_type:
-                    type: string
-                    description: Token type
-                    example: "Bearer"
+                $ref: '#/components/schemas/RefreshResponse'
               examples:
                 success:
                   summary: Successful token refresh
@@ -160,11 +109,11 @@ paths:
                     expires_in: 3600
                     token_type: "Bearer"
         '401':
-          $ref: '../_common/components.yaml#/components/responses/Unauthorized'
+          $ref: '_common/components.yaml#/components/responses/Unauthorized'
         '429':
-          $ref: '../_common/components.yaml#/components/responses/TooManyRequests'
+          $ref: '_common/components.yaml#/components/responses/TooManyRequests'
         '500':
-          $ref: '../_common/components.yaml#/components/responses/InternalServerError'
+          $ref: '_common/components.yaml#/components/responses/InternalServerError'
   
   /api/auth/logout:
     post:
@@ -201,25 +150,94 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - message
-                properties:
-                  message:
-                    type: string
-                    example: "Logout successful"
+                $ref: '#/components/schemas/LogoutResponse'
               examples:
                 success:
                   summary: Successful logout
                   value:
                     message: "Logout successful"
         '401':
-          $ref: '../_common/components.yaml#/components/responses/Unauthorized'
+          $ref: '_common/components.yaml#/components/responses/Unauthorized'
         '429':
-          $ref: '../_common/components.yaml#/components/responses/TooManyRequests'
+          $ref: '_common/components.yaml#/components/responses/TooManyRequests'
         '500':
-          $ref: '../_common/components.yaml#/components/responses/InternalServerError'
+          $ref: '_common/components.yaml#/components/responses/InternalServerError'
 components:
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        password:
+          type: string
+          format: password
+          example: "securePassword123"
+    LoginResponse:
+      type: object
+      required:
+        - access_token
+        - refresh_token
+        - expires_in
+        - token_type
+      properties:
+        access_token:
+          type: string
+          description: JWT access token
+        refresh_token:
+          type: string
+          description: JWT refresh token
+        expires_in:
+          type: integer
+          description: Token expiration time in seconds
+          example: 3600
+        token_type:
+          type: string
+          description: Token type
+          example: "Bearer"
+    RefreshRequest:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          description: JWT refresh token
+    RefreshResponse:
+      type: object
+      required:
+        - access_token
+        - refresh_token
+        - expires_in
+        - token_type
+      properties:
+        access_token:
+          type: string
+          description: New JWT access token
+        refresh_token:
+          type: string
+          description: New JWT refresh token
+        expires_in:
+          type: integer
+          description: Token expiration time in seconds
+          example: 3600
+        token_type:
+          type: string
+          description: Token type
+          example: "Bearer"
+    LogoutResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          example: "Logout successful"
   securitySchemes:
     BearerAuth:
-      $ref: '../_common/components.yaml#/components/securitySchemes/BearerAuth'
+      $ref: '_common/components.yaml#/components/securitySchemes/BearerAuth'

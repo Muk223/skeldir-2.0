@@ -16,12 +16,29 @@ All components are versioned atomically via single commit hashes.
 
 SKELDIR follows a **contract-first** approach:
 
-1. **Define Contract**: Create/update OpenAPI spec in `contracts/{domain}/v1/` (e.g., `contracts/attribution/v1/attribution.yaml`)
-2. **Validate Contract**: Run `make contracts-validate`
-3. **Generate Models**: Run `make models-generate` to create Pydantic models
-4. **Implement Backend**: Implement endpoints in `backend/app/`
-5. **Update Frontend**: Update frontend SDK and UI
-6. **Test Integration**: Run integration tests
+1. **Define Contract**: Create/update OpenAPI spec in `api-contracts/openapi/v1/` (e.g., `api-contracts/openapi/v1/attribution.yaml`)
+2. **Componentize Schemas**: All request/response DTOs must be named schemas in `components/schemas` (not inline)
+3. **Bundle Contracts**: Run `bash scripts/contracts/bundle.sh` to create bundled artifacts
+4. **Generate Models**: Run `bash scripts/generate-models.sh` to create Pydantic models
+5. **Validate Models**: Run `python scripts/validate_model_usage.py` to verify model structures
+6. **Implement Backend**: Implement endpoints in `backend/app/` using generated models
+7. **Test Integration**: Run integration tests
+
+### Adding/Modifying API Contracts
+
+1. **Define schema in components**: All request/response DTOs must be named schemas in `components/schemas`
+2. **Test locally**:
+   ```bash
+   bash scripts/contracts/bundle.sh
+   bash scripts/generate-models.sh
+   python scripts/validate_model_usage.py
+   ```
+3. **Verify CI passes**: Push to PR and ensure all contract validation jobs pass
+4. **Review checklist**:
+   - [ ] Schema is in `components/schemas` (not inline)
+   - [ ] Generated model class exists in target module
+   - [ ] Model structure validation passes
+   - [ ] No breaking changes (or migration guide provided)
 
 ## Development Setup
 

@@ -12,3 +12,6 @@ This directory contains performance validation artifacts for B0.3 OLAP/indexing 
 
 See `docs/database/REMEDIATION-B0.3-OLAP-DESIGN.md` Section 4.3 for artifact structure and generation procedure.
 
+
+
+

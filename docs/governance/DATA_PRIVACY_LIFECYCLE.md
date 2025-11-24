@@ -378,3 +378,6 @@ WHERE remediation_status IN ('resolved', 'abandoned')
 **Document Version**: 1.0  
 **Last Updated**: 2025-11-17
 
+
+
+

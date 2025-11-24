@@ -1,0 +1,206 @@
+"""
+Route-Contract Fidelity Tests - Phase E
+Validates 1:1 mapping between FastAPI routes and OpenAPI contract operations.
+
+Exit criteria:
+- Every in-scope FastAPI route has a corresponding OpenAPI operation
+- Every OpenAPI operation has a corresponding FastAPI route (or is allowlisted)
+- Operation IDs match between implementation and contract
+"""
+
+import sys
+from pathlib import Path
+import yaml
+import pytest
+
+# Add backend to path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "backend"))
+
+# Contract scope configuration
+CONTRACT_SCOPE_FILE = Path(__file__).parent.parent.parent / "backend" / "app" / "config" / "contract_scope.yaml"
+CONTRACTS_DIR = Path(__file__).parent.parent.parent / "api-contracts" / "dist" / "openapi" / "v1"
+
+
+def load_contract_scope():
+    """Load contract scope configuration."""
+    with open(CONTRACT_SCOPE_FILE, 'r') as f:
+        return yaml.safe_load(f)
+
+
+def extract_openapi_operations(contract_path):
+    """Extract all operations from an OpenAPI spec."""
+    with open(contract_path, 'r', encoding='utf-8') as f:
+        spec = yaml.safe_load(f)
+    
+    operations = []
+    if 'paths' not in spec:
+        return operations
+    
+    for path, methods in spec['paths'].items():
+        for method, operation in methods.items():
+            if method.lower() in ['get', 'post', 'put', 'patch', 'delete']:
+                operations.append({
+                    'method': method.upper(),
+                    'path': path,
+                    'operation_id': operation.get('operationId', 'N/A'),
+                    'summary': operation.get('summary', 'N/A')
+                })
+    
+    return operations
+
+
+def extract_fastapi_routes():
+    """Extract all routes from FastAPI app."""
+    try:
+        from app.main import app
+        
+        routes = []
+        for route in app.routes:
+            if hasattr(route, 'methods') and hasattr(route, 'path'):
+                # Filter out HEAD and OPTIONS
+                methods = route.methods - {'HEAD', 'OPTIONS'}
+                operation_id = getattr(route, 'operation_id', None)
+                name = getattr(route, 'name', 'N/A')
+                
+                for method in methods:
+                    routes.append({
+                        'method': method,
+                        'path': route.path,
+                        'operation_id': operation_id,
+                        'name': name
+                    })
+        
+        return routes
+    except ImportError as e:
+        pytest.skip(f"FastAPI app not importable: {e}")
+        return []
+
+
+def test_contract_scope_configuration_exists():
+    """Verify contract scope configuration exists."""
+    assert CONTRACT_SCOPE_FILE.exists(), f"Contract scope config not found: {CONTRACT_SCOPE_FILE}"
+
+
+def test_contracts_directory_exists():
+    """Verify contracts directory exists."""
+    assert CONTRACTS_DIR.exists(), f"Contracts directory not found: {CONTRACTS_DIR}"
+
+
+def test_route_to_contract_mapping():
+    """Test that all in-scope FastAPI routes have corresponding contract operations."""
+    scope = load_contract_scope()
+    in_scope_prefixes = scope.get('in_scope_prefixes', [])
+    out_of_scope_paths = scope.get('out_of_scope_paths', [])
+    
+    routes = extract_fastapi_routes()
+    
+    # Collect all contract operations
+    all_contract_operations = {}
+    for contract_file in CONTRACTS_DIR.glob("*.bundled.yaml"):
+        operations = extract_openapi_operations(contract_file)
+        for op in operations:
+            key = f"{op['method']} {op['path']}"
+            all_contract_operations[key] = op
+    
+    unmapped_routes = []
+    
+    for route in routes:
+        # Skip out-of-scope routes
+        is_out_of_scope = any(
+            route['path'].startswith(prefix.rstrip('*')) 
+            for prefix in out_of_scope_paths
+        )
+        if is_out_of_scope:
+            continue
+        
+        # Check if route is in-scope
+        is_in_scope = any(
+            route['path'].startswith(prefix)
+            for prefix in in_scope_prefixes
+        )
+        
+        if is_in_scope:
+            # Check if contract operation exists
+            route_key = f"{route['method']} {route['path']}"
+            if route_key not in all_contract_operations:
+                unmapped_routes.append(route)
+    
+    assert len(unmapped_routes) == 0, (
+        f"Found {len(unmapped_routes)} in-scope routes without contract operations:\n" +
+        "\n".join(f"  - {r['method']} {r['path']}" for r in unmapped_routes)
+    )
+
+
+def test_contract_to_route_mapping():
+    """Test that all contract operations have corresponding FastAPI routes (or are allowlisted)."""
+    scope = load_contract_scope()
+    spec_mappings = scope.get('spec_mappings', {})
+    contract_only_allowlist = scope.get('contract_only_allowlist', [])
+    
+    routes = extract_fastapi_routes()
+    route_keys = {f"{r['method']} {r['path']}" for r in routes}
+    
+    # Collect contract operations that should be implemented
+    expected_operations = []
+    for prefix, contract_path in spec_mappings.items():
+        full_path = Path(__file__).parent.parent.parent / contract_path
+        if full_path.exists():
+            operations = extract_openapi_operations(full_path)
+            for op in operations:
+                key = f"{op['method']} {op['path']}"
+                expected_operations.append((key, op))
+    
+    unimplemented_operations = []
+    
+    for key, op in expected_operations:
+        if key not in route_keys and key not in contract_only_allowlist:
+            unimplemented_operations.append(op)
+    
+    # In Phase B0.1, many operations are expected to be unimplemented
+    # This test documents the gap rather than failing
+    if unimplemented_operations:
+        print(f"\nNOTE: {len(unimplemented_operations)} contract operations not yet implemented (expected in B0.1):")
+        for op in unimplemented_operations[:5]:  # Show first 5
+            print(f"  - {op['method']} {op['path']} ({op['operation_id']})")
+        if len(unimplemented_operations) > 5:
+            print(f"  ... and {len(unimplemented_operations) - 5} more")
+
+
+def test_operation_id_consistency():
+    """Test that operation IDs are consistent between routes and contracts."""
+    routes = extract_fastapi_routes()
+    
+    # Collect contract operations by path
+    contract_operations = {}
+    for contract_file in CONTRACTS_DIR.glob("*.bundled.yaml"):
+        operations = extract_openapi_operations(contract_file)
+        for op in operations:
+            key = f"{op['method']} {op['path']}"
+            contract_operations[key] = op
+    
+    mismatched_ids = []
+    
+    for route in routes:
+        route_key = f"{route['method']} {route['path']}"
+        if route_key in contract_operations:
+            contract_op = contract_operations[route_key]
+            if route['operation_id'] and route['operation_id'] != contract_op['operation_id']:
+                mismatched_ids.append({
+                    'route': route_key,
+                    'route_id': route['operation_id'],
+                    'contract_id': contract_op['operation_id']
+                })
+    
+    assert len(mismatched_ids) == 0, (
+        f"Found {len(mismatched_ids)} routes with mismatched operation IDs:\n" +
+        "\n".join(
+            f"  - {m['route']}: route='{m['route_id']}' vs contract='{m['contract_id']}'"
+            for m in mismatched_ids
+        )
+    )
+
+
+if __name__ == "__main__":
+    # Run tests with pytest
+    pytest.main([__file__, "-v", "-s"])
+

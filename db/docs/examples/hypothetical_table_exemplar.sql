@@ -177,3 +177,6 @@ GRANT SELECT ON TABLE revenue_events TO app_ro;
 
 
 
+
+
+

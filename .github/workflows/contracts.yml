@@ -1,0 +1,90 @@
+name: Contract Validation
+
+on:
+  push:
+    paths:
+      - 'api-contracts/**'
+      - 'contracts/**'
+      - 'scripts/contracts/**'
+  pull_request:
+    paths:
+      - 'api-contracts/**'
+      - 'contracts/**'
+      - 'scripts/contracts/**'
+
+jobs:
+  validate-contracts:
+    name: Validate OpenAPI Contracts
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          npm install
+          pip install pyyaml
+      
+      - name: Bundle contracts
+        working-directory: api-contracts
+        run: |
+          npx @redocly/cli bundle auth --config=redocly.yaml --output=dist/openapi/v1/auth.bundled.yaml --ext yaml --dereferenced
+          npx @redocly/cli bundle attribution --config=redocly.yaml --output=dist/openapi/v1/attribution.bundled.yaml --ext yaml --dereferenced
+          npx @redocly/cli bundle reconciliation --config=redocly.yaml --output=dist/openapi/v1/reconciliation.bundled.yaml --ext yaml --dereferenced
+          npx @redocly/cli bundle export --config=redocly.yaml --output=dist/openapi/v1/export.bundled.yaml --ext yaml --dereferenced
+          npx @redocly/cli bundle health --config=redocly.yaml --output=dist/openapi/v1/health.bundled.yaml --ext yaml --dereferenced
+          npx @redocly/cli bundle shopify_webhook --config=redocly.yaml --output=dist/openapi/v1/webhooks.shopify.bundled.yaml --ext yaml --dereferenced
+          npx @redocly/cli bundle woocommerce_webhook --config=redocly.yaml --output=dist/openapi/v1/webhooks.woocommerce.bundled.yaml --ext yaml --dereferenced
+          npx @redocly/cli bundle stripe_webhook --config=redocly.yaml --output=dist/openapi/v1/webhooks.stripe.bundled.yaml --ext yaml --dereferenced
+          npx @redocly/cli bundle paypal_webhook --config=redocly.yaml --output=dist/openapi/v1/webhooks.paypal.bundled.yaml --ext yaml --dereferenced
+      
+      - name: Gate 1 - Validate bundle completeness
+        run: |
+          python scripts/contracts/check_dist_complete.py
+          if [ $? -ne 0 ]; then
+            echo "::error::Bundle completeness check failed - not all bundles present"
+            python scripts/contracts/check_dist_complete.py --json
+            exit 1
+          fi
+      
+      - name: Gate 2 - Validate zero external refs
+        run: |
+          python scripts/contracts/assert_no_external_refs.py
+          if [ $? -ne 0 ]; then
+            echo "::error::External references found - bundles not fully dereferenced"
+            python scripts/contracts/assert_no_external_refs.py --json
+            exit 1
+          fi
+      
+      - name: Upload bundled artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundled-contracts
+          path: api-contracts/dist/openapi/v1/*.bundled.yaml
+          retention-days: 30
+      
+      - name: Summary
+        if: success()
+        run: |
+          echo "✅ Contract validation PASSED"
+          echo "- All 9 bundles present"
+          echo "- Zero external refs (fully dereferenced)"
+          echo ""
+          echo "Operational ≠ Functional: VALIDATED"
+
+
+

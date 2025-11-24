@@ -131,6 +131,12 @@ components:
           $ref: '#/components/headers/X-RateLimit-Remaining'
         X-RateLimit-Reset:
           $ref: '#/components/headers/X-RateLimit-Reset'
+        Retry-After:
+          schema:
+            type: integer
+            minimum: 1
+          description: "Seconds to wait before retrying the request"
+          example: 30
       content:
         application/json:
           schema:
@@ -161,6 +167,7 @@ components:
             instance: "/api/attribution/revenue/realtime"
             error_id: "550e8400-e29b-41d4-a716-446655440000"
             correlation_id: "550e8400-e29b-41d4-a716-446655440000"
+
 
 
 

@@ -143,3 +143,6 @@ async def test_cross_tenant_query_blocked_at_db_level(tenant_a_id, tenant_b_id, 
     # assert count == 0, "RLS should block cross-tenant queries"
     pass
 
+
+
+

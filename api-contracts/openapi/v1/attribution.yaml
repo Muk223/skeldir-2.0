@@ -1,8 +1,15 @@
 openapi: 3.1.0
 info:
   title: Skeldir Attribution API
-  version: 1.0.0
+  version: 1.1.0
   description: Attribution and revenue verification endpoints for Skeldir Attribution Intelligence platform
+  x-domain: "attribution"
+  x-owner: "attribution-owner@skeldir.com"
+  x-version-history:
+    - version: "1.1.0"
+      date: "2024-01-15"
+      changes: "Type hardening (total_revenue: string→number), interim state examples, Bayesian placeholders, cache headers"
+      phase: "G4.1"
 servers:
   - url: https://api.skeldir.com
     description: Production server
@@ -34,9 +41,108 @@ paths:
               schema:
                 type: string
                 format: uuid
+            ETag:
+              schema:
+                type: string
+              description: Entity tag for caching
+            Cache-Control:
+              schema:
+                type: string
+                enum:
+                  - "max-age=30, must-revalidate"
+              description: Cache control directive (30 second cache)
           content:
             application/json:
               schema:
+                $ref: '#/components/schemas/RealtimeRevenueResponse'
+              examples:
+                verified:
+                  summary: Verified revenue (post-reconciliation)
+                  value:
+                    total_revenue: 125000.50
+                    verified: true
+                    data_freshness_seconds: 45
+                    tenant_id: "550e8400-e29b-41d4-a716-446655440000"
+                interim:
+                  summary: Interim revenue (pre-reconciliation)
+                  value:
+                    total_revenue: 125000.50
+                    verified: false
+                    data_freshness_seconds: 45
+                    tenant_id: "550e8400-e29b-41d4-a716-446655440000"
+                    upgrade_notice: "Revenue data pending reconciliation. Values will be verified after B2.4 reconciliation pipeline completes."
+        '401':
+          $ref: '_common/components.yaml#/components/responses/Unauthorized'
+        '429':
+          $ref: '_common/components.yaml#/components/responses/TooManyRequests'
+        '500':
+          $ref: '_common/components.yaml#/components/responses/InternalServerError'
+  /api/attribution/allocate:
+    post:
+      operationId: postAttributionAllocate
+      tags:
+        - Attribution
+      summary: Request channel revenue allocation
+      description: Request statistically aware attribution allocations using the specified model and scope.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Distributed tracing correlation ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AllocationRequest'
+      responses:
+        '200':
+          description: Allocation results with statistical confidence
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllocationResponse'
+              example:
+                model_type: bayesian_mmm
+                model_version: "v1.0.0"
+                allocations:
+                  - channel: search
+                    allocated_revenue: 82000.25
+                    confidence_score: 0.87
+                    credible_interval_lower: 78000.00
+                    credible_interval_upper: 86000.00
+                  - channel: social
+                    allocated_revenue: 31000.10
+                    confidence_score: 0.65
+                    credible_interval_lower: 27000.00
+                    credible_interval_upper: 36000.00
+                  - channel: email
+                    allocated_revenue: 12000.40
+                    confidence_score: 0.72
+                    credible_interval_lower: 10000.00
+                    credible_interval_upper: 15000.00
+                diagnostics:
+                  r_hat: 1.002
+                  effective_sample_size: 1200
+        '401':
+          $ref: '_common/components.yaml#/components/responses/Unauthorized'
+        '429':
+          $ref: '_common/components.yaml#/components/responses/TooManyRequests'
+        '500':
+          $ref: '_common/components.yaml#/components/responses/InternalServerError'
+components:
+  schemas:
+    RealtimeRevenueResponse:
                 type: object
                 required:
                   - total_revenue
@@ -46,8 +152,9 @@ paths:
                 properties:
                   total_revenue:
                     type: number
-                    format: float
-                    description: Total revenue in dollars
+                    format: double
+                    minimum: 0
+                    description: Total revenue in dollars (non-negative)
                     example: 125000.50
                   verified:
                     type: boolean
@@ -55,6 +162,7 @@ paths:
                     example: true
                   data_freshness_seconds:
                     type: integer
+                    minimum: 0
                     description: Number of seconds since data was last updated
                     example: 45
                   tenant_id:
@@ -62,21 +170,115 @@ paths:
                     format: uuid
                     description: Tenant identifier
                     example: "550e8400-e29b-41d4-a716-446655440000"
-              examples:
-                success:
-                  summary: Successful revenue retrieval
-                  value:
-                    total_revenue: 125000.50
-                    verified: true
-                    data_freshness_seconds: 45
-                    tenant_id: "550e8400-e29b-41d4-a716-446655440000"
-        '401':
-          $ref: '../_common/components.yaml#/components/responses/Unauthorized'
-        '429':
-          $ref: '../_common/components.yaml#/components/responses/TooManyRequests'
-        '500':
-          $ref: '../_common/components.yaml#/components/responses/InternalServerError'
-components:
+                  upgrade_notice:
+                    type: string
+                    description: Notice about interim data state (present when verified=false, removed after B2.4)
+                    example: "Revenue data pending reconciliation. Values will be verified after B2.4 reconciliation pipeline completes."
+                  credible_interval_lower:
+                    type: number
+                    format: double
+                    minimum: 0
+                    description: "Lower bound of 95% Bayesian credible interval (future: B2.4+, optional)"
+                    example: 120000.00
+                  credible_interval_upper:
+                    type: number
+                    format: double
+                    minimum: 0
+                    description: "Upper bound of 95% Bayesian credible interval (future: B2.4+, optional)"
+                    example: 130000.00
+    AllocationRequest:
+      type: object
+      required:
+        - model_type
+        - start_date
+        - end_date
+      properties:
+        model_type:
+          type: string
+          enum:
+            - bayesian_mmm
+            - hierarchical_bayesian
+          description: Bayesian model selection for the allocation request (reserved for statistical engines).
+        start_date:
+          type: string
+          format: date
+          description: Inclusive start date for the allocation window (YYYY-MM-DD).
+        end_date:
+          type: string
+          format: date
+          description: Inclusive end date for the allocation window (YYYY-MM-DD).
+        channels:
+          type: array
+          description: Optional list of channel identifiers to scope the allocation.
+          items:
+            type: string
+        currency:
+          type: string
+          description: Optional ISO currency code for allocated values (e.g., USD).
+    ChannelAllocation:
+      type: object
+      required:
+        - channel
+        - allocated_revenue
+        - confidence_score
+        - credible_interval_lower
+        - credible_interval_upper
+      properties:
+        channel:
+          type: string
+          description: Channel identifier (e.g., search, social, email).
+        allocated_revenue:
+          type: number
+          format: double
+          minimum: 0
+          description: Revenue allocated to this channel over the requested window.
+        confidence_score:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          description: Confidence (0-1) in the allocation for this channel.
+        credible_interval_lower:
+          type: number
+          format: double
+          minimum: 0
+          description: Lower bound of 95% Bayesian credible interval for allocated revenue.
+        credible_interval_upper:
+          type: number
+          format: double
+          minimum: 0
+          description: Upper bound of 95% Bayesian credible interval for allocated revenue.
+    AllocationResponse:
+      type: object
+      required:
+        - allocations
+        - model_type
+        - model_version
+      properties:
+        allocations:
+          type: array
+          description: Per-channel allocation results with uncertainty metrics.
+          items:
+            $ref: '#/components/schemas/ChannelAllocation'
+        model_type:
+          type: string
+          description: Model used to compute the allocation (echoed from request).
+        model_version:
+          type: string
+          description: Opaque version identifier for the allocation model implementation.
+        diagnostics:
+          type: object
+          description: "Reserved diagnostics for B2+ empirical validation."
+          properties:
+            r_hat:
+              type: number
+              description: "RESERVED FOR B2+ EMPIRICAL VALIDATION - Convergence diagnostic (target <1.01)"
+              x-empirical-gate: "verify_science_stack.py"
+            effective_sample_size:
+              type: integer
+              description: "RESERVED FOR B2+ EMPIRICAL VALIDATION - Effective sample size (target >400)"
+              x-empirical-gate: "verify_science_stack.py"
+
   securitySchemes:
     BearerAuth:
-      $ref: '../_common/components.yaml#/components/securitySchemes/BearerAuth'
+      $ref: '_common/components.yaml#/components/securitySchemes/BearerAuth'

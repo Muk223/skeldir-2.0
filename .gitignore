@@ -65,6 +65,9 @@ app/schemas/*.py
 backend/app/schemas/*.py
 !backend/app/schemas/__init__.py
 
+# Bundled OpenAPI artifacts
+api-contracts/dist/
+
 # Build artifacts
 *.pyc
 *.pyo

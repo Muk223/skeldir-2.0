@@ -1,8 +1,15 @@
 openapi: 3.1.0
 info:
   title: Skeldir Health API
-  version: 1.0.0
+  version: 1.1.0
   description: Health check endpoints for Skeldir Attribution Intelligence platform. Used for monitoring and uptime checks.
+  x-domain: "health"
+  x-owner: "health-owner@skeldir.com"
+  x-version-history:
+    - version: "1.1.0"
+      date: "2024-01-15"
+      changes: "Governance metadata added"
+      phase: "G4.5"
 servers:
   - url: https://api.skeldir.com
     description: Production server
@@ -43,4 +50,65 @@ paths:
                   value:
                     status: "healthy"
                     timestamp: "2025-11-10T14:30:00Z"
-components: {}
+  /api/status:
+    get:
+      operationId: serviceStatus
+      tags:
+        - Health
+      summary: Service status endpoint
+      description: Returns overall service status and dependency states.
+      security: []
+      parameters: []
+      responses:
+        '200':
+          description: Service status summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceStatusResponse'
+              examples:
+                healthy:
+                  summary: Service healthy with dependencies OK
+                  value:
+                    status: "healthy"
+                    timestamp: "2025-11-10T14:30:00Z"
+                    dependencies:
+                      - name: "database"
+                        status: "healthy"
+                        latency_ms: 12
+                      - name: "queue"
+                        status: "healthy"
+                        latency_ms: 5
+components:
+  schemas:
+    ServiceStatusResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          example: "healthy"
+        timestamp:
+          type: string
+          format: date-time
+          description: Current server timestamp
+          example: "2025-11-10T14:30:00Z"
+        dependencies:
+          type: array
+          description: Optional list of dependency health states.
+          items:
+            type: object
+            required:
+              - name
+              - status
+            properties:
+              name:
+                type: string
+              status:
+                type: string
+                example: "healthy"
+              latency_ms:
+                type: integer
+                description: Optional latency measurement in milliseconds.

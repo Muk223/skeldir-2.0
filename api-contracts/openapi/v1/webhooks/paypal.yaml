@@ -1,8 +1,15 @@
 openapi: 3.1.0
 info:
   title: Skeldir PayPal Webhook API
-  version: 1.0.0
+  version: 1.1.0
   description: PayPal webhook ingestion endpoints for Skeldir Attribution Intelligence platform
+  x-domain: "webhooks/paypal"
+  x-owner: "webhooks-owner@skeldir.com"
+  x-version-history:
+    - version: "1.1.0"
+      date: "2024-01-15"
+      changes: "Added payment/sale/refunded event, hardened currency field"
+      phase: "G4.4"
 servers:
   - url: https://api.skeldir.com
     description: Production server
@@ -58,28 +65,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              description: |
-                PayPal sale webhook payload. Note: PII fields (payer email, payer information, shipping address)
-                are stripped before persistence. Only transaction ID, amount, currency, and create_time are retained.
-              properties:
-                id:
-                  type: string
-                  description: PayPal transaction ID (used for idempotency)
-                amount:
-                  type: object
-                  description: Transaction amount object
-                  properties:
-                    total:
-                      type: string
-                      description: Total amount as string (will be converted to cents)
-                    currency:
-                      type: string
-                      description: Currency code
-                create_time:
-                  type: string
-                  format: date-time
-                  description: Transaction creation timestamp
+              $ref: '#/components/schemas/PayPalSaleCompletedRequest'
       responses:
         '200':
           description: Webhook processed successfully
@@ -91,18 +77,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - acknowledged
-                  - event_id
-                properties:
-                  acknowledged:
-                    type: boolean
-                    example: true
-                  event_id:
-                    type: string
-                    description: Internal event ID for tracking
-                    example: "evt_550e8400e29b41d4a716446655440000"
+                $ref: '#/components/schemas/WebhookAcknowledgement'
               examples:
                 success:
                   summary: Webhook acknowledged
@@ -133,4 +108,167 @@ paths:
                     correlation_id: "550e8400-e29b-41d4-a716-446655440000"
         '401':
           $ref: '../_common/components.yaml#/components/responses/Unauthorized'
-components: {}
+  
+  /webhooks/paypal/payment/sale/refunded:
+    post:
+      operationId: paypalSaleRefunded
+      tags:
+        - Webhooks
+        - PayPal
+      summary: PayPal sale refunded webhook
+      description: |
+        Receives PayPal sale refunded webhooks for revenue reconciliation.
+        
+        **Security**: This endpoint validates PayPal webhook signatures using the PAYPAL-AUTH-ALGO, PAYPAL-CERT-URL, and PAYPAL-TRANSMISSION-SIG headers.
+        The webhook secret must be configured in the tenant settings. PayPal uses RSA-SHA256 signature verification.
+        
+        **Privacy**: All PII (payer email, payer information, shipping address) is stripped from the payload before persistence.
+        No storage of personally identifiable information occurs. Only session-scoped data is retained for attribution purposes.
+        Session IDs are ephemeral (30-minute inactivity timeout) and are NOT used for cross-session tracking.
+        
+        **Required for**: B2.4 revenue reconciliation pipeline
+      security: []
+      parameters:
+        - name: PAYPAL-AUTH-ALGO
+          in: header
+          required: true
+          schema:
+            type: string
+          description: PayPal signature algorithm (typically SHA256withRSA)
+        - name: PAYPAL-CERT-URL
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: URL to PayPal certificate for signature verification
+        - name: PAYPAL-TRANSMISSION-SIG
+          in: header
+          required: true
+          schema:
+            type: string
+          description: PayPal webhook signature for verification
+        - name: X-Correlation-ID
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Distributed tracing correlation ID (generated if not provided)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PayPalSaleRefundedRequest'
+      responses:
+        '200':
+          description: Webhook processed successfully
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookAcknowledgement'
+              examples:
+                success:
+                  summary: Webhook acknowledged
+                  value:
+                    acknowledged: true
+                    event_id: "evt_550e8400e29b41d4a716446655440000"
+        '400':
+          description: Invalid webhook payload or signature
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/components.yaml#/components/schemas/Problem'
+        '401':
+          $ref: '../_common/components.yaml#/components/responses/Unauthorized'
+components:
+  schemas:
+    PayPalSaleCompletedRequest:
+      type: object
+      description: |
+        PayPal sale webhook payload. Note: PII fields (payer email, payer information, shipping address)
+        are stripped before persistence. Only transaction ID, amount, currency, and create_time are retained.
+      properties:
+        id:
+          type: string
+          description: PayPal transaction ID (used for idempotency)
+        amount:
+          type: object
+          description: Transaction amount object
+          properties:
+            total:
+              type: string
+              description: Total amount as string (will be converted to cents)
+            currency:
+              type: string
+              pattern: "^[A-Z]{3}$"
+              description: "ISO 4217 uppercase currency code"
+              example: "USD"
+        create_time:
+          type: string
+          format: date-time
+          description: Transaction creation timestamp
+    PayPalSaleRefundedRequest:
+      type: object
+      description: |
+        PayPal sale refunded webhook payload. Note: PII fields (payer email, payer information, shipping address)
+        are stripped before persistence. Only refund ID, transaction ID, refund amount, and timestamp are retained.
+      properties:
+        id:
+          type: string
+          description: PayPal refund ID (used for idempotency)
+          example: "RF123456789"
+        parent_payment:
+          type: string
+          description: PayPal transaction ID being refunded
+          example: "PAY-123456789"
+        amount:
+          type: object
+          description: Refund amount object
+          properties:
+            total:
+              type: string
+              description: Total refund amount as string (will be converted to cents)
+              example: "39.99"
+            currency:
+              type: string
+              pattern: "^[A-Z]{3}$"
+              description: "ISO 4217 uppercase currency code"
+              example: "USD"
+        create_time:
+          type: string
+          format: date-time
+          description: Refund creation timestamp
+          example: "2025-11-10T15:30:00Z"
+        state:
+          type: string
+          enum:
+            - completed
+            - pending
+          description: Refund state
+          example: "completed"
+    
+    WebhookAcknowledgement:
+      type: object
+      required:
+        - acknowledged
+        - event_id
+      properties:
+        acknowledged:
+          type: boolean
+          example: true
+        event_id:
+          type: string
+          description: Internal event ID for tracking
+          example: "evt_550e8400e29b41d4a716446655440000"

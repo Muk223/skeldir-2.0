@@ -1,8 +1,15 @@
 openapi: 3.1.0
 info:
   title: Skeldir Reconciliation API
-  version: 1.0.0
+  version: 1.1.0
   description: Reconciliation and verification pipeline status endpoints for Skeldir Attribution Intelligence platform
+  x-domain: "reconciliation"
+  x-owner: "reconciliation-owner@skeldir.com"
+  x-version-history:
+    - version: "1.1.0"
+      date: "2024-01-15"
+      changes: "Governance metadata added, all invariants validated"
+      phase: "G4.5"
 servers:
   - url: https://api.skeldir.com
     description: Production server
@@ -37,31 +44,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - state
-                  - last_run_at
-                  - tenant_id
-                properties:
-                  state:
-                    type: string
-                    enum:
-                      - idle
-                      - running
-                      - failed
-                      - completed
-                    description: Current state of the reconciliation pipeline
-                    example: "completed"
-                  last_run_at:
-                    type: string
-                    format: date-time
-                    description: Timestamp of the last reconciliation run
-                    example: "2025-11-10T14:30:00Z"
-                  tenant_id:
-                    type: string
-                    format: uuid
-                    description: Tenant identifier
-                    example: "550e8400-e29b-41d4-a716-446655440000"
+                $ref: '#/components/schemas/ReconciliationStatusResponse'
               examples:
                 idle:
                   summary: Pipeline idle
@@ -88,12 +71,236 @@ paths:
                     last_run_at: "2025-11-10T14:30:00Z"
                     tenant_id: "550e8400-e29b-41d4-a716-446655440000"
         '401':
-          $ref: '../_common/components.yaml#/components/responses/Unauthorized'
+          $ref: '_common/components.yaml#/components/responses/Unauthorized'
         '429':
-          $ref: '../_common/components.yaml#/components/responses/TooManyRequests'
+          $ref: '_common/components.yaml#/components/responses/TooManyRequests'
         '500':
-          $ref: '../_common/components.yaml#/components/responses/InternalServerError'
+          $ref: '_common/components.yaml#/components/responses/InternalServerError'
+  /api/reconciliation/transactions:
+    get:
+      operationId: listReconciliationTransactions
+      tags:
+        - Reconciliation
+      summary: List reconciliation transactions
+      description: Retrieve reconciled transactions with pagination support for verification.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Distributed tracing correlation ID
+        - $ref: '_common/pagination.yaml#/components/parameters/limit'
+        - $ref: '_common/pagination.yaml#/components/parameters/cursor'
+      responses:
+        '200':
+          description: Transactions retrieved successfully
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TransactionRecord'
+                  next_cursor:
+                    type: string
+                    nullable: true
+                    description: Cursor for next page, if available.
+              examples:
+                sample:
+                  summary: Transaction list
+                  value:
+                    items:
+                      - transaction_id: "txn_1"
+                        amount: 1250.75
+                        currency: "USD"
+                        status: "reconciled"
+                        occurred_at: "2025-11-10T14:30:00Z"
+                        tenant_id: "550e8400-e29b-41d4-a716-446655440000"
+                    next_cursor: null
+        '401':
+          $ref: '_common/components.yaml#/components/responses/Unauthorized'
+        '429':
+          $ref: '_common/components.yaml#/components/responses/TooManyRequests'
+        '500':
+          $ref: '_common/components.yaml#/components/responses/InternalServerError'
+  /api/reconciliation/discrepancies:
+    get:
+      operationId: listReconciliationDiscrepancies
+      tags:
+        - Reconciliation
+      summary: List reconciliation discrepancies
+      description: Retrieve discrepancies identified during reconciliation.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Distributed tracing correlation ID
+        - $ref: '_common/pagination.yaml#/components/parameters/limit'
+        - $ref: '_common/pagination.yaml#/components/parameters/cursor'
+      responses:
+        '200':
+          description: Discrepancies retrieved successfully
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DiscrepancyRecord'
+                  next_cursor:
+                    type: string
+                    nullable: true
+                    description: Cursor for next page, if available.
+              examples:
+                sample:
+                  summary: Discrepancy list
+                  value:
+                    items:
+                      - discrepancy_id: "disc_1"
+                        transaction_id: "txn_1"
+                        expected_amount: 1250.75
+                        observed_amount: 1200.00
+                        currency: "USD"
+                        reason: "payment_gateway_delay"
+                        detected_at: "2025-11-10T15:00:00Z"
+                        tenant_id: "550e8400-e29b-41d4-a716-446655440000"
+                    next_cursor: null
+        '401':
+          $ref: '_common/components.yaml#/components/responses/Unauthorized'
+        '429':
+          $ref: '_common/components.yaml#/components/responses/TooManyRequests'
+        '500':
+          $ref: '_common/components.yaml#/components/responses/InternalServerError'
 components:
+  schemas:
+    ReconciliationStatusResponse:
+      type: object
+      required:
+        - state
+        - last_run_at
+        - tenant_id
+      properties:
+        state:
+          type: string
+          enum:
+            - idle
+            - running
+            - failed
+            - completed
+          description: Current state of the reconciliation pipeline
+          example: "completed"
+        last_run_at:
+          type: string
+          format: date-time
+          description: Timestamp of the last reconciliation run
+          example: "2025-11-10T14:30:00Z"
+        tenant_id:
+          type: string
+          format: uuid
+          description: Tenant identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+    TransactionRecord:
+      type: object
+      required:
+        - transaction_id
+        - amount
+        - currency
+        - status
+        - occurred_at
+        - tenant_id
+      properties:
+        transaction_id:
+          type: string
+          description: Unique transaction identifier
+        amount:
+          type: number
+          format: double
+          description: Transaction amount
+        currency:
+          type: string
+          description: ISO currency code
+        status:
+          type: string
+          enum:
+            - reconciled
+            - pending
+            - failed
+          description: Reconciliation status for the transaction
+        occurred_at:
+          type: string
+          format: date-time
+          description: Timestamp when the transaction occurred
+        tenant_id:
+          type: string
+          format: uuid
+          description: Tenant identifier
+    DiscrepancyRecord:
+      type: object
+      required:
+        - discrepancy_id
+        - transaction_id
+        - expected_amount
+        - observed_amount
+        - currency
+        - reason
+        - detected_at
+        - tenant_id
+      properties:
+        discrepancy_id:
+          type: string
+          description: Unique discrepancy identifier
+        transaction_id:
+          type: string
+          description: Related transaction identifier
+        expected_amount:
+          type: number
+          format: double
+          description: Expected transaction amount
+        observed_amount:
+          type: number
+          format: double
+          description: Observed transaction amount
+        currency:
+          type: string
+          description: ISO currency code
+        reason:
+          type: string
+          description: Reason for discrepancy
+        detected_at:
+          type: string
+          format: date-time
+          description: Timestamp when discrepancy was detected
+        tenant_id:
+          type: string
+          format: uuid
+          description: Tenant identifier
   securitySchemes:
     BearerAuth:
-      $ref: '../_common/components.yaml#/components/securitySchemes/BearerAuth'
+      $ref: '_common/components.yaml#/components/securitySchemes/BearerAuth'

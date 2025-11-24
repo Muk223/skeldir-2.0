@@ -1,0 +1,22 @@
+# Scientific Computing Stack for Bayesian Inference
+# Phase C: Scientific Infrastructure Validation
+# 
+# Rationale for versions:
+# - numpy>=1.24.0: Core numerical library
+# - pandas>=2.0.0: Data handling
+# - scipy>=1.10.0: Statistical functions
+# - matplotlib>=3.7.0: Visualization
+#
+# NOTE: PyMC/ArviZ installation deferred - requires Python 3.11-3.13 (current: 3.14)
+# In Replit environment with Python 3.11, full stack will be installed
+# For Phase C validation, we demonstrate scientific computation capability with available packages
+
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.10.0
+matplotlib>=3.7.0
+
+# PyMC/ArviZ will be installed in Replit environment (Python 3.11)
+# pymc==5.10.0  # Requires Python <3.13
+# arviz==0.17.0  # Requires Python <3.13
+

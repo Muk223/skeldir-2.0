@@ -1,0 +1,242 @@
+name: Contract-First Enforcement
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/app/api/**'
+      - 'backend/app/main.py'
+      - 'api-contracts/**'
+      - 'backend/app/config/contract_scope.yaml'
+      - 'scripts/contracts/**'
+      - '.github/workflows/contract-enforcement.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'backend/app/api/**'
+      - 'backend/app/main.py'
+      - 'api-contracts/**'
+      - 'backend/app/config/contract_scope.yaml'
+      - 'scripts/contracts/**'
+      - '.github/workflows/contract-enforcement.yml'
+
+jobs:
+  # Phase 1: Bundle contracts (prerequisite from B0.1)
+  bundle-contracts:
+    name: Bundle OpenAPI Contracts
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Bundle contracts
+        run: |
+          cd api-contracts
+          npx @redocly/cli bundle auth --config=redocly.yaml --output=dist/openapi/v1/auth.bundled.yaml --ext yaml --dereferenced --force
+          npx @redocly/cli bundle attribution --config=redocly.yaml --output=dist/openapi/v1/attribution.bundled.yaml --ext yaml --dereferenced --force
+          npx @redocly/cli bundle reconciliation --config=redocly.yaml --output=dist/openapi/v1/reconciliation.bundled.yaml --ext yaml --dereferenced --force
+          npx @redocly/cli bundle export --config=redocly.yaml --output=dist/openapi/v1/export.bundled.yaml --ext yaml --dereferenced --force
+          npx @redocly/cli bundle health --config=redocly.yaml --output=dist/openapi/v1/health.bundled.yaml --ext yaml --dereferenced --force
+          npx @redocly/cli bundle shopify_webhook --config=redocly.yaml --output=dist/openapi/v1/webhooks.shopify.bundled.yaml --ext yaml --dereferenced --force
+          npx @redocly/cli bundle woocommerce_webhook --config=redocly.yaml --output=dist/openapi/v1/webhooks.woocommerce.bundled.yaml --ext yaml --dereferenced --force
+          npx @redocly/cli bundle stripe_webhook --config=redocly.yaml --output=dist/openapi/v1/webhooks.stripe.bundled.yaml --ext yaml --dereferenced --force
+          npx @redocly/cli bundle paypal_webhook --config=redocly.yaml --output=dist/openapi/v1/webhooks.paypal.bundled.yaml --ext yaml --dereferenced --force
+      
+      - name: Verify bundles exist
+        run: |
+          python scripts/contracts/check_dist_complete.py
+      
+      - name: Upload bundled specs
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundled-specs
+          path: api-contracts/dist/openapi/v1/*.bundled.yaml
+          retention-days: 1
+
+  # Phase 2: Generate Pydantic models (prerequisite from P1)
+  generate-models:
+    name: Generate Pydantic Models
+    runs-on: ubuntu-latest
+    needs: bundle-contracts
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Download bundled specs
+        uses: actions/download-artifact@v4
+        with:
+          name: bundled-specs
+          path: api-contracts/dist/openapi/v1/
+      
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements-dev.txt
+      
+      - name: Generate models
+        run: |
+          bash scripts/generate-models.sh
+      
+      - name: Validate critical models exist
+        run: |
+          python -c "from backend.app.schemas.auth import LoginRequest, LoginResponse"
+          python -c "from backend.app.schemas.attribution import RealtimeRevenueResponse"
+      
+      - name: Upload generated models
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-models
+          path: backend/app/schemas/*.py
+          retention-days: 1
+
+  # Phase 3: Static Conformance Check (NEW - CF3)
+  contract-static:
+    name: Static Contract Conformance
+    runs-on: ubuntu-latest
+    needs: generate-models
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Download bundled specs
+        uses: actions/download-artifact@v4
+        with:
+          name: bundled-specs
+          path: api-contracts/dist/openapi/v1/
+      
+      - name: Download generated models
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-models
+          path: backend/app/schemas/
+      
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements-dev.txt
+          pip install pyyaml
+      
+      - name: Generate R-Graph (Implementation Routes)
+        run: |
+          python scripts/contracts/dump_routes.py
+      
+      - name: Generate C-Graph (Contract Operations)
+        run: |
+          python scripts/contracts/dump_contract_ops.py
+      
+      - name: Check Static Conformance
+        run: |
+          python scripts/contracts/check_static_conformance.py
+      
+      - name: Upload graphs for inspection
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance-graphs
+          path: |
+            tmp/r_graph.json
+            tmp/c_graph.json
+          retention-days: 7
+
+  # Phase 4: Dynamic Conformance Check (NEW - CF4)
+  contract-dynamic:
+    name: Dynamic Contract Conformance
+    runs-on: ubuntu-latest
+    needs: contract-static
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Download bundled specs
+        uses: actions/download-artifact@v4
+        with:
+          name: bundled-specs
+          path: api-contracts/dist/openapi/v1/
+      
+      - name: Download generated models
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-models
+          path: backend/app/schemas/
+      
+      - name: Install dependencies
+        run: |
+          pip install -r backend/requirements-dev.txt
+      
+      - name: Run Schemathesis Contract Tests
+        run: |
+          cd tests/contract
+          pytest test_contract_semantics.py -v --tb=short
+      
+      - name: Generate coverage report
+        if: always()
+        run: |
+          cd tests/contract
+          pytest test_contract_semantics.py::test_coverage_report -v -s
+      
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: tests/contract/.pytest_cache/
+          retention-days: 7
+
+  # Final: Aggregate Status
+  contract-enforcement-status:
+    name: Contract Enforcement Status
+    runs-on: ubuntu-latest
+    needs: [bundle-contracts, generate-models, contract-static, contract-dynamic]
+    if: always()
+    
+    steps:
+      - name: Check enforcement status
+        run: |
+          echo "Contract-First Enforcement Status:"
+          echo "  - Bundle Contracts: ${{ needs.bundle-contracts.result }}"
+          echo "  - Generate Models: ${{ needs.generate-models.result }}"
+          echo "  - Static Conformance: ${{ needs.contract-static.result }}"
+          echo "  - Dynamic Conformance: ${{ needs.contract-dynamic.result }}"
+          
+          if [ "${{ needs.bundle-contracts.result }}" != "success" ] || \
+             [ "${{ needs.generate-models.result }}" != "success" ] || \
+             [ "${{ needs.contract-static.result }}" != "success" ] || \
+             [ "${{ needs.contract-dynamic.result }}" != "success" ]; then
+            echo ""
+            echo "❌ Contract-First Enforcement FAILED"
+            echo "Implementation diverges from specification."
+            echo "Review failure logs and align implementation with contracts."
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ Contract-First Enforcement PASSED"
+          echo "Implementation perfectly aligned with specification."
+
+
+
