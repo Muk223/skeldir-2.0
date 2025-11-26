@@ -305,7 +305,7 @@ jobs:
               print(f"Error extracting routes: {e}")
               import traceback
               traceback.print_exc()
-PYEOF
+          PYEOF
           
           if grep -q " -> " ../evidence_registry/contracts/backend_routes_raw.txt; then
             echo "✓ Backend routes extracted" >> ../evidence_registry/contracts/phase_2_status.txt
