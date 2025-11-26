@@ -57,9 +57,6 @@ jobs:
           node --version > evidence_registry/runtime/node_version.txt 2>&1
           npm --version >> evidence_registry/runtime/node_version.txt 2>&1
           
-          # Docker
-          docker --version > evidence_registry/runtime/docker_version.txt 2>&1
-          docker-compose --version >> evidence_registry/runtime/docker_version.txt 2>&1
           
           # OS Info
           uname -a > evidence_registry/runtime/os_info.txt 2>&1

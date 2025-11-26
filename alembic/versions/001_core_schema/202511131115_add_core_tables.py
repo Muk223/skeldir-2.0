@@ -322,12 +322,12 @@ def downgrade() -> None:
     """
     
     # Drop tables in reverse dependency order
-    op.execute("DROP TABLE IF EXISTS reconciliation_runs CASCADE")
-    op.execute("DROP TABLE IF EXISTS revenue_ledger CASCADE")
-    op.execute("DROP TABLE IF EXISTS attribution_allocations CASCADE")
-    op.execute("DROP TABLE IF EXISTS dead_events CASCADE")
-    op.execute("DROP TABLE IF EXISTS attribution_events CASCADE")
-    op.execute("DROP TABLE IF EXISTS tenants CASCADE")
+    op.execute("DROP TABLE IF EXISTS reconciliation_runs CASCADE")  # CI:DESTRUCTIVE_OK - Downgrade rollback
+    op.execute("DROP TABLE IF EXISTS revenue_ledger CASCADE")  # CI:DESTRUCTIVE_OK - Downgrade rollback
+    op.execute("DROP TABLE IF EXISTS attribution_allocations CASCADE")  # CI:DESTRUCTIVE_OK - Downgrade rollback
+    op.execute("DROP TABLE IF EXISTS dead_events CASCADE")  # CI:DESTRUCTIVE_OK - Downgrade rollback
+    op.execute("DROP TABLE IF EXISTS attribution_events CASCADE")  # CI:DESTRUCTIVE_OK - Downgrade rollback
+    op.execute("DROP TABLE IF EXISTS tenants CASCADE")  # CI:DESTRUCTIVE_OK - Downgrade rollback
 
 
 

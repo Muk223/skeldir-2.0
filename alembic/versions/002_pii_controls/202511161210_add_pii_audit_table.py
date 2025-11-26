@@ -309,5 +309,5 @@ def downgrade() -> None:
     op.execute("DROP INDEX IF EXISTS idx_pii_audit_findings_detected_key")
     
     # Drop table
-    op.execute("DROP TABLE IF EXISTS pii_audit_findings CASCADE")
+    op.execute("DROP TABLE IF EXISTS pii_audit_findings CASCADE")  # CI:DESTRUCTIVE_OK - Downgrade rollback
 
