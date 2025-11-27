@@ -34,7 +34,6 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
 yarn.lock
 frontend/node_modules/
 frontend/.next/
@@ -97,9 +96,6 @@ frontend/.cache/
 Thumbs.db
 .DS_Store
 
-# Docker
-docker-compose.override.yml
-
 # Playwright
 test-results/
 playwright-report/
@@ -143,4 +139,3 @@ Videos/
 .void-editor/
 .vscode/extensions/
 .cursor/extensions/
-
