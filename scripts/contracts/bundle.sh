@@ -1,12 +1,12 @@
-#!/usr/bin/env bash
-# Bundles OpenAPI specs into dist/contracts for CI workflows.
+﻿#!/usr/bin/env bash
+# Bundles OpenAPI specs into api-contracts/dist/openapi/v1 for CI workflows.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SOURCE_DIR="$REPO_ROOT/api-contracts/openapi/v1"
-DIST_DIR="$REPO_ROOT/dist/contracts"
+DIST_DIR="$REPO_ROOT/api-contracts/dist/openapi/v1"
 
 log() {
     printf '[bundle] %s\n' "$1"
@@ -31,8 +31,8 @@ for contract in "${contracts[@]}"; do
     if command -v dos2unix >/dev/null 2>&1; then
         dos2unix "$DIST_DIR/$filename" >/dev/null 2>&1 || true
     fi
-    log "✓ $filename"
+    log "âœ“ $filename"
 done
 
 log "All OpenAPI contracts copied successfully."
-log "Artifacts ready under dist/contracts/."
+log "Artifacts ready under api-contracts/dist/openapi/v1/."

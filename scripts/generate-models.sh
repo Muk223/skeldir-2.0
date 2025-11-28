@@ -11,7 +11,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-BUNDLED_DIR="api-contracts/dist/openapi/v1"
+BUNDLED_DIR="dist/contracts"
 SCHEMAS_DIR="backend/app/schemas"
 PYTHON_VERSION="3.11"
 
@@ -229,7 +229,7 @@ if [ ! -f "$SCHEMAS_DIR/__init__.py" ]; then
 """
 Pydantic models generated from bundled OpenAPI contracts.
 
-These models are auto-generated from api-contracts/dist/openapi/v1/*.bundled.yaml files.
+These models are auto-generated from dist/contracts/*.bundled.yaml files.
 Do not edit manually. Regenerate using scripts/generate-models.sh after contract changes.
 Note: Bundled artifacts are generated from source specs via scripts/contracts/bundle.sh.
 """
@@ -296,3 +296,4 @@ if [ $? -ne 0 ]; then
 fi
 
 echo -e "${GREEN}Model generation completed successfully!${NC}"
+
