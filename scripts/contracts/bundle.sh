@@ -31,8 +31,15 @@ for contract in "${contracts[@]}"; do
     if command -v dos2unix >/dev/null 2>&1; then
         dos2unix "$DIST_DIR/$filename" >/dev/null 2>&1 || true
     fi
-    log "âœ“ $filename"
+    log "✓ $filename"
 done
+
+# Copy _common directory if it exists
+if [ -d "$SOURCE_DIR/_common" ]; then
+    log "Copying _common directory"
+    cp -r "$SOURCE_DIR/_common" "$DIST_DIR/_common"
+    log "✓ _common directory"
+fi
 
 log "All OpenAPI contracts copied successfully."
 log "Artifacts ready under api-contracts/dist/openapi/v1/."

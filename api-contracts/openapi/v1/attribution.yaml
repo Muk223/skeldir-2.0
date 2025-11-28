@@ -5,10 +5,18 @@ info:
   description: |
     Attribution Intelligence API - Realtime Revenue Counter and Attribution Data.
     Provides verified revenue metrics with statistical confidence scoring.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
 
 servers:
   - url: http://localhost:4011
     description: Prism Mock Server (Attribution)
+
+tags:
+  - name: Attribution
+    description: Attribution and revenue tracking endpoints
 
 security:
   - bearerAuth: []

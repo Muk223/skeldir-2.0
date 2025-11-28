@@ -42,7 +42,7 @@ components:
           type: string
           format: uri
           description: URI reference identifying this specific occurrence
-          example: /api/attribution/revenue/realtime
+          example: https://api.skeldir.com/api/attribution/revenue/realtime
         correlation_id:
           type: string
           format: uuid

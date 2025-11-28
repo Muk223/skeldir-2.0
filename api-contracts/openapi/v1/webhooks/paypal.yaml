@@ -5,10 +5,18 @@ info:
   description: |
     PayPal webhook schemas for payment capture events.
     Used for payment verification and revenue reconciliation.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
 
 servers:
   - url: http://localhost:4018
     description: Prism Mock Server (PayPal Webhooks)
+
+tags:
+  - name: PayPal Webhooks
+    description: PayPal webhook endpoints for payment events
 
 paths:
   /webhooks/paypal/payment/sale/completed:
@@ -49,7 +57,7 @@ paths:
               event_type: PAYMENT.SALE.COMPLETED
               create_time: '2025-11-26T14:30:00Z'
               resource:
-                id: 1234567890
+                id: "1234567890"
                 state: completed
                 amount:
                   total: "199.99"

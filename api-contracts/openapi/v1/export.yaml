@@ -5,10 +5,18 @@ info:
   description: |
     Data export functionality for CSV, JSON, and Excel formats.
     Supports scheduled exports and custom date ranges.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
 
 servers:
   - url: http://localhost:4013
     description: Prism Mock Server (Export)
+
+tags:
+  - name: Export
+    description: Data export functionality for CSV, JSON, and Excel formats
 
 security:
   - bearerAuth: []

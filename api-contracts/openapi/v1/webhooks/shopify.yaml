@@ -5,10 +5,18 @@ info:
   description: |
     Shopify webhook schemas for order and checkout events.
     These webhooks are received by the backend for revenue verification.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
 
 servers:
   - url: http://localhost:4015
     description: Prism Mock Server (Shopify Webhooks)
+
+tags:
+  - name: Shopify Webhooks
+    description: Shopify webhook endpoints for order and checkout events
 
 paths:
   /webhooks/shopify/orders/create:

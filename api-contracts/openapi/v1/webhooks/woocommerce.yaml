@@ -5,10 +5,18 @@ info:
   description: |
     WooCommerce webhook schemas for order events.
     Used for revenue verification and attribution tracking.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
 
 servers:
   - url: http://localhost:4016
     description: Prism Mock Server (WooCommerce Webhooks)
+
+tags:
+  - name: WooCommerce Webhooks
+    description: WooCommerce webhook endpoints for order events
 
 paths:
   /webhooks/woocommerce/order/created:

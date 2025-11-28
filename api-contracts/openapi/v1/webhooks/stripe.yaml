@@ -5,10 +5,18 @@ info:
   description: |
     Stripe webhook schemas for payment events.
     Used for payment verification and revenue reconciliation.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
 
 servers:
   - url: http://localhost:4017
     description: Prism Mock Server (Stripe Webhooks)
+
+tags:
+  - name: Stripe Webhooks
+    description: Stripe webhook endpoints for payment events
 
 paths:
   /webhooks/stripe/charge/succeeded:

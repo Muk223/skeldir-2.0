@@ -5,10 +5,18 @@ info:
   description: |
     System health and status monitoring endpoints.
     Provides real-time health checks for all system components.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
 
 servers:
   - url: http://localhost:4014
     description: Prism Mock Server (Health)
+
+tags:
+  - name: Health
+    description: System health and status monitoring endpoints
 
 paths:
   /api/health:

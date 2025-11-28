@@ -5,10 +5,18 @@ info:
   description: |
     User authentication and authorization endpoints.
     Provides JWT-based authentication with secure token refresh.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
 
 servers:
   - url: http://localhost:4010
     description: Prism Mock Server (Auth)
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization endpoints
 
 security:
   - bearerAuth: []

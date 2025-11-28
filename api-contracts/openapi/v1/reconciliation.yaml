@@ -5,10 +5,18 @@ info:
   description: |
     Platform reconciliation status endpoints.
     Provides real-time connection status and data sync information for integrated platforms.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
 
 servers:
   - url: http://localhost:4012
     description: Prism Mock Server (Reconciliation)
+
+tags:
+  - name: Reconciliation
+    description: Platform reconciliation and data sync status endpoints
 
 security:
   - bearerAuth: []
