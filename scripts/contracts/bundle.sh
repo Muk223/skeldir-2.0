@@ -41,5 +41,12 @@ if [ -d "$SOURCE_DIR/_common" ]; then
     log "✓ _common directory"
 fi
 
+# Copy webhooks directory if it exists
+if [ -d "$SOURCE_DIR/webhooks" ]; then
+    log "Copying webhooks directory"
+    cp -r "$SOURCE_DIR/webhooks" "$DIST_DIR/webhooks"
+    log "✓ webhooks directory"
+fi
+
 log "All OpenAPI contracts copied successfully."
 log "Artifacts ready under api-contracts/dist/openapi/v1/."
