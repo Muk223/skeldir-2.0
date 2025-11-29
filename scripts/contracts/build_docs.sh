@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # B0.1 documentation build placeholder
 # Full documentation generation occurs in B0.2 governance phase.
+# This stub lives under scripts/contracts to keep the Contract Artifacts CI trigger paths satisfied.
 
 set -euo pipefail
 
