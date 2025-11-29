@@ -13,7 +13,7 @@
 authentication:
   requirements:
     - requirement_id: AUTH-001
-      operation_id: loginUser
+      operation_id: login
       status: implemented
       canonical_event: null
       description: User authentication via credentials
@@ -65,7 +65,7 @@ health:
 webhooks_shopify:
   requirements:
     - requirement_id: SHOP-001
-      operation_id: handleShopifyOrderCreate
+      operation_id: shopifyOrderCreated
       status: implemented
       canonical_event: purchase_completed
       description: Shopify order creation webhook
@@ -73,13 +73,13 @@ webhooks_shopify:
 webhooks_stripe:
   requirements:
     - requirement_id: STRIPE-001
-      operation_id: handleStripeChargeSucceeded
+      operation_id: stripeChargeSucceeded
       status: implemented
       canonical_event: purchase_completed
       description: Stripe charge succeeded webhook
 
     - requirement_id: STRIPE-002
-      operation_id: handleStripeChargeRefunded
+      operation_id: stripeChargeRefunded
       status: implemented
       canonical_event: refund_issued
       description: Stripe charge refunded webhook
@@ -87,7 +87,7 @@ webhooks_stripe:
 webhooks_woocommerce:
   requirements:
     - requirement_id: WOO-001
-      operation_id: handleWooCommerceOrderCompleted
+      operation_id: woocommerceOrderCompleted
       status: implemented
       canonical_event: purchase_completed
       description: WooCommerce order completed webhook
@@ -95,7 +95,7 @@ webhooks_woocommerce:
 webhooks_paypal:
   requirements:
     - requirement_id: PAYPAL-001
-      operation_id: handlePayPalSaleCompleted
+      operation_id: paypalPaymentSaleCompleted
       status: implemented
       canonical_event: purchase_completed
       description: PayPal sale completed webhook
