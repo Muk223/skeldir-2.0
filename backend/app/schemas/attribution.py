@@ -85,3 +85,7 @@ class ChannelAttribution(BaseModel):
     """
     Return on Ad Spend (revenue/spend)
     """
+
+
+# Alias for CI compatibility
+RealtimeRevenueResponse = RealtimeRevenueCounter
