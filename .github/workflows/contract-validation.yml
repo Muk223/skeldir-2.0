@@ -356,10 +356,14 @@ jobs:
           bash scripts/generate-models.sh
 
       - name: Validate model structures
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           python scripts/validate_model_usage.py
 
       - name: Run model unit tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           cd backend
           pytest tests/test_generated_models.py -v
