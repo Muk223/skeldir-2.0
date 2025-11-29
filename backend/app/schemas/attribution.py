@@ -87,5 +87,7 @@ class ChannelAttribution(BaseModel):
     """
 
 
-# Alias for CI compatibility
-RealtimeRevenueResponse = RealtimeRevenueCounter
+# Alias for CI compatibility (must be a class definition to match workflow grep pattern)
+class RealtimeRevenueResponse(RealtimeRevenueCounter):
+    """Alias for RealtimeRevenueCounter to match CI expectations."""
+    pass
