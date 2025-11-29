@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # Bundles OpenAPI specs into api-contracts/dist/openapi/v1 for CI workflows.
 
 set -euo pipefail
@@ -25,13 +25,14 @@ fi
 
 for contract in "${contracts[@]}"; do
     filename=$(basename "$contract")
-    log "Copying $filename"
-    cp "$contract" "$DIST_DIR/$filename"
+    bundled_name="${filename%.yaml}.bundled.yaml"
+    log "Bundling $filename -> $bundled_name"
+    cp "$contract" "$DIST_DIR/$bundled_name"
     # Normalize to LF endings to keep diffs stable
     if command -v dos2unix >/dev/null 2>&1; then
-        dos2unix "$DIST_DIR/$filename" >/dev/null 2>&1 || true
+        dos2unix "$DIST_DIR/$bundled_name" >/dev/null 2>&1 || true
     fi
-    log "✓ $filename"
+    log "✓ $bundled_name"
 done
 
 # Copy _common directory if it exists
