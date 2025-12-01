@@ -48,27 +48,29 @@ async def get_realtime_revenue(
     # upgrade_notice guides users about data limitations
     
     import os
-    
+    from datetime import datetime
+
     # System phase determines verification status
     system_phase = os.getenv('SYSTEM_PHASE', 'B0.1')
-    
+
     # In B0.1: Revenue data is NOT verified (no reconciliation pipeline yet)
     verified = False if system_phase == 'B0.1' else True
-    
+
     # Construct response with proper semantics
     response_data = {
         "total_revenue": 125000.50,
-        "verified": verified,
+        "event_count": 0,  # Stub value for B0.1 (no event tracking yet)
+        "last_updated": datetime.utcnow().isoformat() + "Z",
         "data_freshness_seconds": 45,
-        "tenant_id": uuid4()
+        "verified": verified
     }
-    
+
     # Add upgrade_notice when data is unverified (interim state)
     if not verified:
         response_data["upgrade_notice"] = (
             "Revenue data pending reconciliation. "
             "Full statistical verification available in Phase B2.6."
         )
-    
+
     return response_data
 
