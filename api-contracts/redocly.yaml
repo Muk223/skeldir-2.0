@@ -1,0 +1,38 @@
+# Skeldir OpenAPI Bundling Configuration
+# Used by CI to generate bundled contract artifacts with full $ref dereferencing
+
+apis:
+  auth:
+    root: openapi/v1/auth.yaml
+  attribution:
+    root: openapi/v1/attribution.yaml
+  reconciliation:
+    root: openapi/v1/reconciliation.yaml
+  export:
+    root: openapi/v1/export.yaml
+  health:
+    root: openapi/v1/health.yaml
+  shopify_webhook:
+    root: openapi/v1/webhooks/shopify.yaml
+  woocommerce_webhook:
+    root: openapi/v1/webhooks/woocommerce.yaml
+  stripe_webhook:
+    root: openapi/v1/webhooks/stripe.yaml
+  paypal_webhook:
+    root: openapi/v1/webhooks/paypal.yaml
+  llm_investigations:
+    root: openapi/v1/llm-investigations.yaml
+  llm_budget:
+    root: openapi/v1/llm-budget.yaml
+
+extends:
+  - recommended
+
+rules:
+  operation-operationId: error
+  tag-description: warn
+  no-invalid-media-type-examples: error
+  security-defined: warn
+
+resolve:
+  doNotResolveExamples: false
