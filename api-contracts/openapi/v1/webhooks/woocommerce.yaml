@@ -157,6 +157,60 @@ paths:
               schema:
                 $ref: '../_common/base.yaml#/components/schemas/SuccessResponse'
 
+  /webhooks/woocommerce/order/refunded:
+    post:
+      summary: WooCommerce order refunded webhook
+      description: Triggered when an order refund is initiated
+      operationId: woocommerceOrderRefunded
+      tags:
+        - WooCommerce Webhooks
+      parameters:
+        - name: X-WC-Webhook-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-WC-Webhook-Topic
+          in: header
+          required: true
+          schema:
+            type: string
+            enum: [order.refunded]
+        - name: X-WC-Webhook-Resource
+          in: header
+          required: true
+          schema:
+            type: string
+            enum: [order]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WooCommerceOrder'
+            example:
+              id: 12345
+              order_key: wc_order_ref_12345
+              date_created: '2025-11-26T14:30:00Z'
+              status: refunded
+              total: "199.99"
+              currency: USD
+              refunds:
+                - id: 9876
+                  amount: "199.99"
+                  reason: customer_request
+              meta_data:
+                - id: 1
+                  key: skeldir_session_id
+                  value: sess_refund123
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../_common/base.yaml#/components/schemas/SuccessResponse'
+
 components:
   schemas:
     WooCommerceOrder:
@@ -191,6 +245,7 @@ components:
           description: Total tax amount
         currency:
           type: string
+          pattern: '^[A-Z]{3}$'
           description: Currency code
           example: USD
         date_created:
@@ -248,4 +303,16 @@ components:
               key:
                 type: string
               value:
+                type: string
+        refunds:
+          type: array
+          description: Refund entries for the order
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              amount:
+                type: string
+              reason:
                 type: string

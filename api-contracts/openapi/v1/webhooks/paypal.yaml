@@ -21,9 +21,9 @@ tags:
 paths:
   /webhooks/paypal/payment/sale/completed:
     post:
-      summary: PayPal payment sale completed webhook
+      summary: PayPal sale completed webhook
       description: Triggered when a PayPal payment sale is completed
-      operationId: paypalPaymentSaleCompleted
+      operationId: paypalSaleCompleted
       tags:
         - PayPal Webhooks
       parameters:
@@ -115,9 +115,9 @@ paths:
 
   /webhooks/paypal/payment/sale/refunded:
     post:
-      summary: PayPal payment sale refunded webhook
+      summary: PayPal sale refunded webhook
       description: Triggered when a PayPal payment is refunded
-      operationId: paypalPaymentSaleRefunded
+      operationId: paypalSaleRefunded
       tags:
         - PayPal Webhooks
       parameters:
@@ -210,6 +210,7 @@ components:
               example: "199.99"
             currency:
               type: string
+              pattern: '^[A-Z]{3}$'
               description: Currency code
               example: USD
         custom_id:

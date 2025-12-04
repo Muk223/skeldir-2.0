@@ -1,0 +1,308 @@
+openapi: 3.1.0
+info:
+  title: Skeldir Stripe Webhooks
+  version: 2.0.0
+  description: |
+    Stripe webhook schemas for payment events.
+    Used for payment verification and revenue reconciliation.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
+servers:
+  - url: http://localhost:4017
+    description: Prism Mock Server (Stripe Webhooks)
+tags:
+  - name: Stripe Webhooks
+    description: Stripe webhook endpoints for payment events
+paths:
+  /webhooks/stripe/charge/succeeded:
+    post:
+      summary: Stripe charge succeeded webhook
+      description: Triggered when a charge is successfully completed
+      operationId: stripeChargeSucceeded
+      tags:
+        - Stripe Webhooks
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Stripe webhook signature for verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: &ref_0
+                - id
+                - type
+                - data
+                - created
+              properties: &ref_1
+                id:
+                  type: string
+                  description: Unique event identifier
+                  example: evt_1234567890
+                type:
+                  type: string
+                  enum:
+                    - charge.succeeded
+                    - charge.refunded
+                    - payment_intent.succeeded
+                    - payment_intent.payment_failed
+                  description: Event type
+                created:
+                  type: integer
+                  description: Unix timestamp of event creation
+                livemode:
+                  type: boolean
+                  description: Whether this is a live mode event
+                data:
+                  type: object
+                  required:
+                    - object
+                  properties:
+                    object:
+                      type: object
+                      required: &ref_4
+                        - id
+                        - amount
+                        - currency
+                        - status
+                      properties: &ref_5
+                        id:
+                          type: string
+                          description: Charge ID
+                          example: ch_1234567890
+                        amount:
+                          type: integer
+                          description: Amount in cents
+                          example: 19999
+                        amount_refunded:
+                          type: integer
+                          description: Amount refunded in cents
+                          example: 0
+                        currency:
+                          type: string
+                          pattern: ^[a-z]{3}$
+                          description: Three-letter currency code
+                          example: usd
+                        status:
+                          type: string
+                          enum:
+                            - succeeded
+                            - pending
+                            - failed
+                        paid:
+                          type: boolean
+                          description: Whether the charge was paid
+                        refunded:
+                          type: boolean
+                          description: Whether the charge was fully refunded
+                        metadata:
+                          type: object
+                          description: Custom metadata including attribution data
+                          additionalProperties:
+                            type: string
+                          example:
+                            skeldir_session_id: sess_abc123
+                            order_id: ord_12345
+                        receipt_email:
+                          type: string
+                          format: email
+                        billing_details:
+                          type: object
+                          properties:
+                            email:
+                              type: string
+                              format: email
+                            name:
+                              type: string
+            example:
+              id: evt_1234567890
+              type: charge.succeeded
+              created: 1732631400
+              data:
+                object:
+                  id: ch_1234567890
+                  amount: 19999
+                  currency: usd
+                  status: succeeded
+                  metadata:
+                    skeldir_session_id: sess_abc123
+                    order_id: ord_12345
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: &ref_2
+                  - success
+                  - correlation_id
+                properties: &ref_3
+                  success:
+                    type: boolean
+                  correlation_id:
+                    type: string
+                    format: uuid
+                  message:
+                    type: string
+        '400':
+          description: Invalid webhook signature
+        '500':
+          description: Internal server error
+          headers: &ref_8
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content: &ref_9
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: &ref_6
+                  - type
+                  - title
+                  - status
+                  - detail
+                  - instance
+                  - correlation_id
+                  - timestamp
+                properties: &ref_7
+                  type:
+                    type: string
+                    format: uri
+                    description: URI reference identifying the problem type
+                    example: https://api.skeldir.com/problems/authentication-failed
+                  title:
+                    type: string
+                    description: Short, human-readable summary of the problem
+                    example: Authentication Failed
+                  status:
+                    type: integer
+                    description: HTTP status code
+                    example: 401
+                  detail:
+                    type: string
+                    description: Human-readable explanation specific to this occurrence
+                    example: The provided JWT token has expired. Please refresh your authentication token.
+                  instance:
+                    type: string
+                    format: uri
+                    description: URI reference identifying this specific occurrence
+                    example: https://api.skeldir.com/api/attribution/revenue/realtime
+                  correlation_id:
+                    type: string
+                    format: uuid
+                    description: Request correlation ID for distributed tracing
+                    example: 550e8400-e29b-41d4-a716-446655440000
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: ISO 8601 timestamp when the error occurred
+                    example: '2025-11-11T14:32:00Z'
+                  errors:
+                    type: array
+                    description: Optional array of specific validation errors
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: email
+                        message:
+                          type: string
+                          example: Invalid email format
+                        code:
+                          type: string
+                          example: INVALID_FORMAT
+  /webhooks/stripe/payment_intent/succeeded:
+    post:
+      summary: Stripe payment intent succeeded webhook
+      description: Triggered when a payment intent is successfully completed
+      operationId: stripePaymentIntentSucceeded
+      tags:
+        - Stripe Webhooks
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: *ref_0
+              properties: *ref_1
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_2
+                properties: *ref_3
+  /webhooks/stripe/charge/refunded:
+    post:
+      summary: Stripe charge refunded webhook
+      description: Triggered when a charge is refunded
+      operationId: stripeChargeRefunded
+      tags:
+        - Stripe Webhooks
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: *ref_0
+              properties: *ref_1
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_2
+                properties: *ref_3
+components:
+  schemas:
+    StripeEvent:
+      type: object
+      required: *ref_0
+      properties: *ref_1
+    StripeCharge:
+      type: object
+      required: *ref_4
+      properties: *ref_5
+    SuccessResponse:
+      type: object
+      required: *ref_2
+      properties: *ref_3
+    ProblemDetails:
+      type: object
+      description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+      required: *ref_6
+      properties: *ref_7
+  responses:
+    ServerError:
+      description: Internal server error
+      headers: *ref_8
+      content: *ref_9

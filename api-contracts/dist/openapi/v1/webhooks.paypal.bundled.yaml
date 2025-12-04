@@ -1,0 +1,343 @@
+openapi: 3.1.0
+info:
+  title: Skeldir PayPal Webhooks
+  version: 2.0.0
+  description: |
+    PayPal webhook schemas for payment capture events.
+    Used for payment verification and revenue reconciliation.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
+servers:
+  - url: http://localhost:4018
+    description: Prism Mock Server (PayPal Webhooks)
+tags:
+  - name: PayPal Webhooks
+    description: PayPal webhook endpoints for payment events
+paths:
+  /webhooks/paypal/payment/sale/completed:
+    post:
+      summary: PayPal sale completed webhook
+      description: Triggered when a PayPal payment sale is completed
+      operationId: paypalSaleCompleted
+      tags:
+        - PayPal Webhooks
+      parameters:
+        - name: PAYPAL-TRANSMISSION-ID
+          in: header
+          required: true
+          schema:
+            type: string
+          description: PayPal transmission ID
+        - name: PAYPAL-TRANSMISSION-SIG
+          in: header
+          required: true
+          schema:
+            type: string
+          description: PayPal transmission signature
+        - name: PAYPAL-CERT-URL
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: URL to PayPal certificate for verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: &ref_0
+                - id
+                - event_type
+                - resource
+              properties: &ref_1
+                id:
+                  type: string
+                  description: Unique webhook event ID
+                  example: WH-1234567890
+                event_type:
+                  type: string
+                  enum:
+                    - PAYMENT.SALE.COMPLETED
+                    - PAYMENT.CAPTURE.COMPLETED
+                    - PAYMENT.SALE.REFUNDED
+                    - PAYMENT.CAPTURE.REFUNDED
+                  description: Type of PayPal event
+                create_time:
+                  type: string
+                  format: date-time
+                  description: Event creation timestamp
+                resource_type:
+                  type: string
+                  description: Type of resource in the event
+                summary:
+                  type: string
+                  description: Human-readable event summary
+                resource:
+                  type: object
+                  required: &ref_4
+                    - id
+                    - amount
+                  properties: &ref_5
+                    id:
+                      type: string
+                      description: Resource ID
+                    state:
+                      type: string
+                      enum:
+                        - completed
+                        - pending
+                        - refunded
+                        - partially_refunded
+                      description: Current state of the resource
+                    amount:
+                      type: object
+                      required:
+                        - total
+                        - currency
+                      properties:
+                        total:
+                          type: string
+                          description: Total amount as string
+                          example: '199.99'
+                        currency:
+                          type: string
+                          pattern: ^[A-Z]{3}$
+                          description: Currency code
+                          example: USD
+                    custom_id:
+                      type: string
+                      description: Custom ID containing attribution data (e.g., session ID)
+                      example: sess_abc123
+                    invoice_id:
+                      type: string
+                      description: Invoice ID if applicable
+                    parent_payment:
+                      type: string
+                      description: Parent payment ID
+                    create_time:
+                      type: string
+                      format: date-time
+                    update_time:
+                      type: string
+                      format: date-time
+                    links:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          href:
+                            type: string
+                            format: uri
+                          rel:
+                            type: string
+                          method:
+                            type: string
+            example:
+              id: WH-1234567890
+              event_type: PAYMENT.SALE.COMPLETED
+              create_time: '2025-11-26T14:30:00Z'
+              resource:
+                id: '1234567890'
+                state: completed
+                amount:
+                  total: '199.99'
+                  currency: USD
+                custom_id: sess_abc123
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: &ref_2
+                  - success
+                  - correlation_id
+                properties: &ref_3
+                  success:
+                    type: boolean
+                  correlation_id:
+                    type: string
+                    format: uuid
+                  message:
+                    type: string
+        '400':
+          description: Invalid webhook signature
+        '500':
+          description: Internal server error
+          headers: &ref_8
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content: &ref_9
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: &ref_6
+                  - type
+                  - title
+                  - status
+                  - detail
+                  - instance
+                  - correlation_id
+                  - timestamp
+                properties: &ref_7
+                  type:
+                    type: string
+                    format: uri
+                    description: URI reference identifying the problem type
+                    example: https://api.skeldir.com/problems/authentication-failed
+                  title:
+                    type: string
+                    description: Short, human-readable summary of the problem
+                    example: Authentication Failed
+                  status:
+                    type: integer
+                    description: HTTP status code
+                    example: 401
+                  detail:
+                    type: string
+                    description: Human-readable explanation specific to this occurrence
+                    example: The provided JWT token has expired. Please refresh your authentication token.
+                  instance:
+                    type: string
+                    format: uri
+                    description: URI reference identifying this specific occurrence
+                    example: https://api.skeldir.com/api/attribution/revenue/realtime
+                  correlation_id:
+                    type: string
+                    format: uuid
+                    description: Request correlation ID for distributed tracing
+                    example: 550e8400-e29b-41d4-a716-446655440000
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: ISO 8601 timestamp when the error occurred
+                    example: '2025-11-11T14:32:00Z'
+                  errors:
+                    type: array
+                    description: Optional array of specific validation errors
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: email
+                        message:
+                          type: string
+                          example: Invalid email format
+                        code:
+                          type: string
+                          example: INVALID_FORMAT
+  /webhooks/paypal/payment/capture/completed:
+    post:
+      summary: PayPal payment capture completed webhook
+      description: Triggered when a PayPal payment capture is completed
+      operationId: paypalPaymentCaptureCompleted
+      tags:
+        - PayPal Webhooks
+      parameters:
+        - name: PAYPAL-TRANSMISSION-ID
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: PAYPAL-TRANSMISSION-SIG
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: PAYPAL-CERT-URL
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uri
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: *ref_0
+              properties: *ref_1
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_2
+                properties: *ref_3
+  /webhooks/paypal/payment/sale/refunded:
+    post:
+      summary: PayPal sale refunded webhook
+      description: Triggered when a PayPal payment is refunded
+      operationId: paypalSaleRefunded
+      tags:
+        - PayPal Webhooks
+      parameters:
+        - name: PAYPAL-TRANSMISSION-ID
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: PAYPAL-TRANSMISSION-SIG
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: PAYPAL-CERT-URL
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uri
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: *ref_0
+              properties: *ref_1
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_2
+                properties: *ref_3
+components:
+  schemas:
+    PayPalEvent:
+      type: object
+      required: *ref_0
+      properties: *ref_1
+    PayPalResource:
+      type: object
+      required: *ref_4
+      properties: *ref_5
+    SuccessResponse:
+      type: object
+      required: *ref_2
+      properties: *ref_3
+    ProblemDetails:
+      type: object
+      description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+      required: *ref_6
+      properties: *ref_7
+  responses:
+    ServerError:
+      description: Internal server error
+      headers: *ref_8
+      content: *ref_9

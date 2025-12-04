@@ -1,0 +1,431 @@
+openapi: 3.1.0
+info:
+  title: Skeldir WooCommerce Webhooks
+  version: 2.0.0
+  description: |
+    WooCommerce webhook schemas for order events.
+    Used for revenue verification and attribution tracking.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
+servers:
+  - url: http://localhost:4016
+    description: Prism Mock Server (WooCommerce Webhooks)
+tags:
+  - name: WooCommerce Webhooks
+    description: WooCommerce webhook endpoints for order events
+paths:
+  /webhooks/woocommerce/order/created:
+    post:
+      summary: WooCommerce order created webhook
+      description: Triggered when a new order is created in WooCommerce
+      operationId: woocommerceOrderCreated
+      tags:
+        - WooCommerce Webhooks
+      parameters:
+        - name: X-WC-Webhook-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+          description: HMAC-SHA256 signature for webhook verification
+        - name: X-WC-Webhook-Topic
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - order.created
+          description: Webhook topic
+        - name: X-WC-Webhook-Resource
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: &ref_0
+                - id
+                - order_key
+                - total
+                - date_created
+              properties: &ref_1
+                id:
+                  type: integer
+                  description: WooCommerce order ID
+                order_key:
+                  type: string
+                  description: Unique order key
+                number:
+                  type: string
+                  description: Order number
+                status:
+                  type: string
+                  enum:
+                    - pending
+                    - processing
+                    - on-hold
+                    - completed
+                    - cancelled
+                    - refunded
+                    - failed
+                  description: Order status
+                total:
+                  type: string
+                  description: Order total as string
+                subtotal:
+                  type: string
+                  description: Order subtotal
+                total_tax:
+                  type: string
+                  description: Total tax amount
+                currency:
+                  type: string
+                  pattern: ^[A-Z]{3}$
+                  description: Currency code
+                  example: USD
+                date_created:
+                  type: string
+                  format: date-time
+                date_modified:
+                  type: string
+                  format: date-time
+                date_completed:
+                  type: string
+                  format: date-time
+                date_paid:
+                  type: string
+                  format: date-time
+                payment_method:
+                  type: string
+                  description: Payment method ID
+                payment_method_title:
+                  type: string
+                  description: Payment method display name
+                customer_id:
+                  type: integer
+                  description: Customer ID (0 for guests)
+                billing:
+                  type: object
+                  properties:
+                    first_name:
+                      type: string
+                    last_name:
+                      type: string
+                    email:
+                      type: string
+                      format: email
+                line_items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      name:
+                        type: string
+                      quantity:
+                        type: integer
+                      total:
+                        type: string
+                meta_data:
+                  type: array
+                  description: Order metadata including attribution data
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      key:
+                        type: string
+                      value:
+                        type: string
+                refunds:
+                  type: array
+                  description: Refund entries for the order
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      amount:
+                        type: string
+                      reason:
+                        type: string
+            example:
+              id: 12345
+              order_key: wc_order_abc123
+              number: '1001'
+              status: processing
+              total: '199.99'
+              currency: USD
+              date_created: '2025-11-26T14:30:00Z'
+              meta_data:
+                - id: 1
+                  key: skeldir_session_id
+                  value: sess_abc123
+                - id: 2
+                  key: utm_source
+                  value: google
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: &ref_2
+                  - success
+                  - correlation_id
+                properties: &ref_3
+                  success:
+                    type: boolean
+                  correlation_id:
+                    type: string
+                    format: uuid
+                  message:
+                    type: string
+        '401':
+          description: Invalid webhook signature
+        '500':
+          description: Internal server error
+          headers: &ref_6
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content: &ref_7
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: &ref_4
+                  - type
+                  - title
+                  - status
+                  - detail
+                  - instance
+                  - correlation_id
+                  - timestamp
+                properties: &ref_5
+                  type:
+                    type: string
+                    format: uri
+                    description: URI reference identifying the problem type
+                    example: https://api.skeldir.com/problems/authentication-failed
+                  title:
+                    type: string
+                    description: Short, human-readable summary of the problem
+                    example: Authentication Failed
+                  status:
+                    type: integer
+                    description: HTTP status code
+                    example: 401
+                  detail:
+                    type: string
+                    description: Human-readable explanation specific to this occurrence
+                    example: The provided JWT token has expired. Please refresh your authentication token.
+                  instance:
+                    type: string
+                    format: uri
+                    description: URI reference identifying this specific occurrence
+                    example: https://api.skeldir.com/api/attribution/revenue/realtime
+                  correlation_id:
+                    type: string
+                    format: uuid
+                    description: Request correlation ID for distributed tracing
+                    example: 550e8400-e29b-41d4-a716-446655440000
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: ISO 8601 timestamp when the error occurred
+                    example: '2025-11-11T14:32:00Z'
+                  errors:
+                    type: array
+                    description: Optional array of specific validation errors
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: email
+                        message:
+                          type: string
+                          example: Invalid email format
+                        code:
+                          type: string
+                          example: INVALID_FORMAT
+  /webhooks/woocommerce/order/updated:
+    post:
+      summary: WooCommerce order updated webhook
+      description: Triggered when an order is updated in WooCommerce
+      operationId: woocommerceOrderUpdated
+      tags:
+        - WooCommerce Webhooks
+      parameters:
+        - name: X-WC-Webhook-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-WC-Webhook-Topic
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - order.updated
+        - name: X-WC-Webhook-Resource
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: *ref_0
+              properties: *ref_1
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_2
+                properties: *ref_3
+  /webhooks/woocommerce/order/completed:
+    post:
+      summary: WooCommerce order completed webhook
+      description: Triggered when an order is marked as completed
+      operationId: woocommerceOrderCompleted
+      tags:
+        - WooCommerce Webhooks
+      parameters:
+        - name: X-WC-Webhook-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-WC-Webhook-Topic
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - order.completed
+        - name: X-WC-Webhook-Resource
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: *ref_0
+              properties: *ref_1
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_2
+                properties: *ref_3
+  /webhooks/woocommerce/order/refunded:
+    post:
+      summary: WooCommerce order refunded webhook
+      description: Triggered when an order refund is initiated
+      operationId: woocommerceOrderRefunded
+      tags:
+        - WooCommerce Webhooks
+      parameters:
+        - name: X-WC-Webhook-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-WC-Webhook-Topic
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - order.refunded
+        - name: X-WC-Webhook-Resource
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: *ref_0
+              properties: *ref_1
+            example:
+              id: 12345
+              order_key: wc_order_ref_12345
+              date_created: '2025-11-26T14:30:00Z'
+              status: refunded
+              total: '199.99'
+              currency: USD
+              refunds:
+                - id: 9876
+                  amount: '199.99'
+                  reason: customer_request
+              meta_data:
+                - id: 1
+                  key: skeldir_session_id
+                  value: sess_refund123
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_2
+                properties: *ref_3
+components:
+  schemas:
+    WooCommerceOrder:
+      type: object
+      required: *ref_0
+      properties: *ref_1
+    SuccessResponse:
+      type: object
+      required: *ref_2
+      properties: *ref_3
+    ProblemDetails:
+      type: object
+      description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+      required: *ref_4
+      properties: *ref_5
+  responses:
+    ServerError:
+      description: Internal server error
+      headers: *ref_6
+      content: *ref_7

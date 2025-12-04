@@ -94,6 +94,29 @@ def find_nested_fields(properties: Dict, parent_path: str) -> List[Tuple[str, Di
     
     return fields
 
+def apply_invariant_exceptions(invariant_def: Dict, contract_name: str) -> Dict:
+    """Return invariant definition adjusted for contract-specific exceptions."""
+    # Copy base definition excluding exceptions metadata
+    effective_def = {
+        key: value for key, value in invariant_def.items()
+        if key != 'exceptions'
+    }
+    
+    exceptions = invariant_def.get('exceptions') or []
+    contract_name_lower = contract_name.lower()
+    
+    for exception in exceptions:
+        platform = exception.get('platform')
+        if platform and platform.lower() in contract_name_lower:
+            for key, value in exception.items():
+                if key == 'platform':
+                    continue
+                effective_def[key] = value
+            break
+    
+    return effective_def
+
+
 def validate_field_against_invariant(field_name: str, field_schema: Dict, 
                                      invariant_def: Dict, field_path: str) -> List[str]:
     """Validate a single field against its invariant definition."""
@@ -222,8 +245,12 @@ def validate_invariants(repo_root: Path, verbose: bool = False) -> Tuple[bool, L
                    (invariant_name == 'currency_stripe' and field_name == 'currency' and 'stripe' in contract_file.name.lower()):
                     stats['invariant_checks_performed'] += 1
                     
+                    effective_invariant = apply_invariant_exceptions(
+                        invariant_def, contract_file.name
+                    )
+                    
                     field_violations = validate_field_against_invariant(
-                        field_name, field_schema, invariant_def, field_path
+                        field_name, field_schema, effective_invariant, field_path
                     )
                     
                     if field_violations:

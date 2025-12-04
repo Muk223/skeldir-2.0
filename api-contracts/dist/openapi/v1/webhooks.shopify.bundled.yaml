@@ -1,0 +1,457 @@
+openapi: 3.1.0
+info:
+  title: Skeldir Shopify Webhooks
+  version: 2.0.0
+  description: |
+    Shopify webhook schemas for order and checkout events.
+    These webhooks are received by the backend for revenue verification.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
+servers:
+  - url: http://localhost:4015
+    description: Prism Mock Server (Shopify Webhooks)
+tags:
+  - name: Shopify Webhooks
+    description: Shopify webhook endpoints for order and checkout events
+paths:
+  /webhooks/shopify/orders/create:
+    post:
+      summary: Shopify order created webhook
+      description: Triggered when a new order is created in Shopify
+      operationId: shopifyOrderCreate
+      tags:
+        - Shopify Webhooks
+      parameters:
+        - name: X-Shopify-Hmac-SHA256
+          in: header
+          required: true
+          schema:
+            type: string
+          description: HMAC signature for webhook verification
+        - name: X-Shopify-Shop-Domain
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Shop domain that triggered the webhook
+        - name: X-Shopify-Topic
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - orders/create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: &ref_0
+                - id
+                - order_number
+                - total_price
+                - created_at
+              properties: &ref_1
+                id:
+                  type: integer
+                  format: int64
+                  description: Shopify order ID
+                order_number:
+                  type: integer
+                  description: Human-readable order number
+                total_price:
+                  type: string
+                  description: Total order price as string
+                subtotal_price:
+                  type: string
+                  description: Subtotal before taxes and shipping
+                total_tax:
+                  type: string
+                  description: Total tax amount
+                currency:
+                  type: string
+                  pattern: ^[A-Z]{3}$
+                  description: Currency code
+                  example: USD
+                created_at:
+                  type: string
+                  format: date-time
+                confirmed:
+                  type: boolean
+                  description: Whether the order is confirmed
+                financial_status:
+                  type: string
+                  enum:
+                    - pending
+                    - paid
+                    - refunded
+                    - voided
+                note_attributes:
+                  type: array
+                  description: Custom attributes including attribution data
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        type: string
+                customer:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      format: int64
+                    email:
+                      type: string
+                      format: email
+                line_items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        format: int64
+                      title:
+                        type: string
+                      quantity:
+                        type: integer
+                      price:
+                        type: string
+            example:
+              id: 820982911946154500
+              order_number: 1001
+              total_price: '199.99'
+              currency: USD
+              created_at: '2025-11-26T14:30:00Z'
+              note_attributes:
+                - name: skeldir_session_id
+                  value: sess_abc123
+                - name: utm_source
+                  value: facebook
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: &ref_2
+                  - success
+                  - correlation_id
+                properties: &ref_3
+                  success:
+                    type: boolean
+                  correlation_id:
+                    type: string
+                    format: uuid
+                  message:
+                    type: string
+        '401':
+          description: Invalid HMAC signature
+        '500':
+          description: Internal server error
+          headers: &ref_10
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content: &ref_11
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: &ref_8
+                  - type
+                  - title
+                  - status
+                  - detail
+                  - instance
+                  - correlation_id
+                  - timestamp
+                properties: &ref_9
+                  type:
+                    type: string
+                    format: uri
+                    description: URI reference identifying the problem type
+                    example: https://api.skeldir.com/problems/authentication-failed
+                  title:
+                    type: string
+                    description: Short, human-readable summary of the problem
+                    example: Authentication Failed
+                  status:
+                    type: integer
+                    description: HTTP status code
+                    example: 401
+                  detail:
+                    type: string
+                    description: Human-readable explanation specific to this occurrence
+                    example: The provided JWT token has expired. Please refresh your authentication token.
+                  instance:
+                    type: string
+                    format: uri
+                    description: URI reference identifying this specific occurrence
+                    example: https://api.skeldir.com/api/attribution/revenue/realtime
+                  correlation_id:
+                    type: string
+                    format: uuid
+                    description: Request correlation ID for distributed tracing
+                    example: 550e8400-e29b-41d4-a716-446655440000
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: ISO 8601 timestamp when the error occurred
+                    example: '2025-11-11T14:32:00Z'
+                  errors:
+                    type: array
+                    description: Optional array of specific validation errors
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: email
+                        message:
+                          type: string
+                          example: Invalid email format
+                        code:
+                          type: string
+                          example: INVALID_FORMAT
+  /webhooks/shopify/orders/paid:
+    post:
+      summary: Shopify order paid webhook
+      description: Triggered when a Shopify order transitions to paid
+      operationId: shopifyOrderPaid
+      tags:
+        - Shopify Webhooks
+      parameters:
+        - name: X-Shopify-Hmac-SHA256
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Shopify-Shop-Domain
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Shopify-Topic
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - orders/paid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: *ref_0
+              properties: *ref_1
+            example:
+              id: 820982911946154500
+              order_number: 1001
+              total_price: '199.99'
+              currency: USD
+              created_at: '2025-11-26T14:35:00Z'
+              financial_status: paid
+              note_attributes:
+                - name: skeldir_session_id
+                  value: sess_def456
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_2
+                properties: *ref_3
+  /webhooks/shopify/refunds/create:
+    post:
+      summary: Shopify refund created webhook
+      description: Triggered when a refund is issued for a Shopify order
+      operationId: shopifyRefundCreate
+      tags:
+        - Shopify Webhooks
+      parameters:
+        - name: X-Shopify-Hmac-SHA256
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Shopify-Shop-Domain
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Shopify-Topic
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - refunds/create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: &ref_6
+                - id
+                - order_id
+                - transactions
+              properties: &ref_7
+                id:
+                  type: integer
+                  format: int64
+                  description: Refund ID
+                order_id:
+                  type: integer
+                  format: int64
+                  description: Associated order ID
+                currency:
+                  type: string
+                  pattern: ^[A-Z]{3}$
+                  description: Refund currency
+                  example: USD
+                transactions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        format: int64
+                      amount:
+                        type: string
+                        description: Refund amount
+                      currency:
+                        type: string
+                        pattern: ^[A-Z]{3}$
+                      kind:
+                        type: string
+                        enum:
+                          - refund
+                      parent_id:
+                        type: integer
+                        format: int64
+            example:
+              id: 230982911946154500
+              order_id: 820982911946154500
+              transactions:
+                - id: 389274982374
+                  amount: '50.00'
+                  kind: refund
+                  currency: USD
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_2
+                properties: *ref_3
+  /webhooks/shopify/checkouts/update:
+    post:
+      summary: Shopify checkout updated webhook
+      description: Triggered when a checkout is updated in Shopify
+      operationId: shopifyCheckoutUpdated
+      tags:
+        - Shopify Webhooks
+      parameters:
+        - name: X-Shopify-Hmac-SHA256
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Shopify-Shop-Domain
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Shopify-Topic
+          in: header
+          required: true
+          schema:
+            type: string
+            enum:
+              - checkouts/update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: &ref_4
+                - token
+                - total_price
+              properties: &ref_5
+                token:
+                  type: string
+                  description: Checkout token
+                total_price:
+                  type: string
+                  description: Total checkout price
+                subtotal_price:
+                  type: string
+                currency:
+                  type: string
+                  pattern: ^[A-Z]{3}$
+                abandoned_checkout_url:
+                  type: string
+                  format: uri
+                note_attributes:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        type: string
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_2
+                properties: *ref_3
+components:
+  schemas:
+    ShopifyOrder:
+      type: object
+      required: *ref_0
+      properties: *ref_1
+    ShopifyCheckout:
+      type: object
+      required: *ref_4
+      properties: *ref_5
+    ShopifyRefund:
+      type: object
+      required: *ref_6
+      properties: *ref_7
+    SuccessResponse:
+      type: object
+      required: *ref_2
+      properties: *ref_3
+    ProblemDetails:
+      type: object
+      description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+      required: *ref_8
+      properties: *ref_9
+  responses:
+    ServerError:
+      description: Internal server error
+      headers: *ref_10
+      content: *ref_11

@@ -176,6 +176,7 @@ components:
           example: 0
         currency:
           type: string
+          pattern: '^[a-z]{3}$'
           description: Three-letter currency code
           example: usd
         status:
