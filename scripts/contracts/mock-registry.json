@@ -1,6 +1,6 @@
 {
   "version": "2.0.0",
-  "baseline": "74a3019",
+  "baseline": "28b165c",
   "contracts": {
     "core": [
       { "name": "auth", "port": 4010, "contract": "auth.yaml" },
