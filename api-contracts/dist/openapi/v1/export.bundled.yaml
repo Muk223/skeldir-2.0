@@ -1,0 +1,394 @@
+openapi: 3.1.0
+info:
+  title: Skeldir Export API
+  version: 2.0.0
+  description: |
+    Data export functionality for CSV, JSON, and Excel formats.
+    Supports scheduled exports and custom date ranges.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
+servers:
+  - url: http://localhost:4013
+    description: Prism Mock Server (Export)
+security:
+  - bearerAuth: []
+tags:
+  - name: Export
+    description: Data export functionality for CSV, JSON, and Excel formats
+paths:
+  /api/export/revenue:
+    get:
+      summary: Export revenue data
+      description: Export revenue and attribution data in specified format
+      operationId: exportRevenue
+      tags:
+        - Export
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: &ref_2
+            type: string
+            format: uuid
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: &ref_3
+            type: string
+          description: Bearer token for authentication (format - Bearer <token>)
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - csv
+              - json
+              - xlsx
+            default: csv
+          description: Export file format
+        - name: start_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Start date for export range
+        - name: end_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: End date for export range
+        - name: channels
+          in: query
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+          description: Filter by specific channels
+      responses:
+        '200':
+          description: Export file
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+            Content-Disposition:
+              schema:
+                type: string
+              description: Attachment filename
+          content:
+            text/csv:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: object
+                required: &ref_6
+                  - generated_at
+                  - date_range
+                  - data
+                properties: &ref_7
+                  generated_at:
+                    type: string
+                    format: date-time
+                    description: When the export was generated
+                  date_range:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date
+                      end:
+                        type: string
+                        format: date
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                        channel:
+                          type: string
+                        revenue:
+                          type: number
+                          format: float
+                        conversions:
+                          type: integer
+                        confidence:
+                          type: number
+                          format: float
+                  summary:
+                    type: object
+                    properties:
+                      total_revenue:
+                        type: number
+                        format: double
+                        minimum: 0
+                      total_conversions:
+                        type: integer
+                      average_confidence:
+                        type: number
+                        format: double
+                        minimum: 0
+                        maximum: 1
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Bad Request - validation failed
+          headers: &ref_8
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content: &ref_9
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: &ref_0
+                  - type
+                  - title
+                  - status
+                  - detail
+                  - instance
+                  - correlation_id
+                  - timestamp
+                properties: &ref_1
+                  type:
+                    type: string
+                    format: uri
+                    description: URI reference identifying the problem type
+                    example: https://api.skeldir.com/problems/authentication-failed
+                  title:
+                    type: string
+                    description: Short, human-readable summary of the problem
+                    example: Authentication Failed
+                  status:
+                    type: integer
+                    description: HTTP status code
+                    example: 401
+                  detail:
+                    type: string
+                    description: Human-readable explanation specific to this occurrence
+                    example: The provided JWT token has expired. Please refresh your authentication token.
+                  instance:
+                    type: string
+                    format: uri
+                    description: URI reference identifying this specific occurrence
+                    example: https://api.skeldir.com/api/attribution/revenue/realtime
+                  correlation_id:
+                    type: string
+                    format: uuid
+                    description: Request correlation ID for distributed tracing
+                    example: 550e8400-e29b-41d4-a716-446655440000
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: ISO 8601 timestamp when the error occurred
+                    example: '2025-11-11T14:32:00Z'
+                  errors:
+                    type: array
+                    description: Optional array of specific validation errors
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: email
+                        message:
+                          type: string
+                          example: Invalid email format
+                        code:
+                          type: string
+                          example: INVALID_FORMAT
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: &ref_4
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID for distributed tracing
+          content: &ref_5
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: *ref_0
+                properties: *ref_1
+  /api/export/csv:
+    get:
+      summary: Export data as CSV
+      description: Export attribution data in CSV format
+      operationId: exportCSV
+      tags:
+        - Export
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: *ref_2
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: *ref_3
+          description: Bearer token for authentication (format - Bearer <token>)
+      responses:
+        '200':
+          description: CSV file
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+            Content-Disposition:
+              schema:
+                type: string
+              example: attachment; filename="skeldir-export-2025-11-26.csv"
+          content:
+            text/csv:
+              schema:
+                type: string
+              example: |
+                date,channel,revenue,conversions,confidence
+                2025-11-25,Meta,15230.50,127,0.92
+                2025-11-25,Google,12450.00,98,0.89
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: *ref_4
+          content: *ref_5
+  /api/export/json:
+    get:
+      summary: Export data as JSON
+      description: Export attribution data in JSON format
+      operationId: exportJSON
+      tags:
+        - Export
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: *ref_2
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: *ref_3
+          description: Bearer token for authentication (format - Bearer <token>)
+      responses:
+        '200':
+          description: JSON data
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_6
+                properties: *ref_7
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: *ref_4
+          content: *ref_5
+  /api/export/excel:
+    get:
+      summary: Export data as Excel
+      description: Export attribution data in Excel (XLSX) format
+      operationId: exportExcel
+      tags:
+        - Export
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: *ref_2
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: *ref_3
+          description: Bearer token for authentication (format - Bearer <token>)
+      responses:
+        '200':
+          description: Excel file
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+            Content-Disposition:
+              schema:
+                type: string
+              example: attachment; filename="skeldir-export-2025-11-26.xlsx"
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: *ref_4
+          content: *ref_5
+components:
+  schemas:
+    ExportData:
+      type: object
+      required: *ref_6
+      properties: *ref_7
+    ProblemDetails:
+      type: object
+      description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+      required: *ref_0
+      properties: *ref_1
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token authentication
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: true
+      schema: *ref_2
+      description: Unique request correlation ID for distributed tracing
+    Authorization:
+      name: Authorization
+      in: header
+      required: true
+      schema: *ref_3
+      description: Bearer token for authentication (format - Bearer <token>)
+  responses:
+    ValidationError:
+      description: Bad Request - validation failed
+      headers: *ref_8
+      content: *ref_9
+    UnauthorizedError:
+      description: Unauthorized - invalid or missing authentication
+      headers: *ref_4
+      content: *ref_5

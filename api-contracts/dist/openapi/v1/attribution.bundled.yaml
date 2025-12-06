@@ -1,0 +1,535 @@
+openapi: 3.1.0
+info:
+  title: Skeldir Attribution API
+  version: 2.0.0
+  description: |
+    Attribution Intelligence API - Realtime Revenue Counter and Attribution Data.
+    Provides verified revenue metrics with statistical confidence scoring.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
+servers:
+  - url: http://localhost:4011
+    description: Prism Mock Server (Attribution)
+security:
+  - bearerAuth: []
+tags:
+  - name: Attribution
+    description: Attribution and revenue tracking endpoints
+  - name: LLM Explanation
+    description: LLM-powered natural language explanations for attribution data
+paths:
+  /api/attribution/revenue/realtime:
+    get:
+      summary: Get Realtime Revenue Counter
+      description: |
+        Polls realtime revenue metrics with 30-second cache TTL.
+        Supports ETag-based caching with If-None-Match header for bandwidth optimization.
+      operationId: getRealtimeRevenue
+      tags:
+        - Attribution
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: &ref_2
+            type: string
+            format: uuid
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: &ref_3
+            type: string
+          description: Bearer token for authentication (format - Bearer <token>)
+        - name: If-None-Match
+          in: header
+          required: false
+          schema: &ref_14
+            type: string
+          description: ETag from previous response for cache validation
+      responses:
+        '200':
+          description: Revenue counter data returned successfully
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID echoed back
+            ETag:
+              schema:
+                type: string
+              description: Entity tag for cache validation
+            Cache-Control:
+              schema:
+                type: string
+              description: Cache control directives
+              example: max-age=30
+          content:
+            application/json:
+              schema:
+                type: object
+                required: &ref_8
+                  - total_revenue
+                  - event_count
+                  - last_updated
+                  - data_freshness_seconds
+                  - verified
+                properties: &ref_9
+                  total_revenue:
+                    type: number
+                    format: double
+                    minimum: 0
+                    description: Total verified revenue amount in USD
+                    example: 125430.5
+                  event_count:
+                    type: integer
+                    description: Number of revenue events tracked
+                    minimum: 0
+                    example: 1247
+                  last_updated:
+                    type: string
+                    format: date-time
+                    description: ISO 8601 timestamp of last data update
+                    example: '2025-11-26T14:32:00Z'
+                  data_freshness_seconds:
+                    type: integer
+                    description: Seconds since data was last refreshed
+                    minimum: 0
+                    example: 5
+                  verified:
+                    type: boolean
+                    description: Whether revenue is verified through payment reconciliation
+                    example: true
+                  confidence_score:
+                    type: number
+                    format: double
+                    minimum: 0
+                    maximum: 1
+                    description: Statistical confidence score (0-1) for attribution accuracy
+                    example: 0.94
+                  upgrade_notice:
+                    type: string
+                    nullable: true
+                    description: Optional message about upgrading for more features
+                    example: Upgrade to Pro for historical analytics
+              example:
+                total_revenue: 125430.5
+                event_count: 1247
+                last_updated: '2025-11-26T14:32:00Z'
+                data_freshness_seconds: 5
+                verified: true
+                confidence_score: 0.94
+                upgrade_notice: null
+        '304':
+          description: Not Modified - ETag matches, use cached data
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+            ETag:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: &ref_4
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID for distributed tracing
+          content: &ref_5
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: &ref_0
+                  - type
+                  - title
+                  - status
+                  - detail
+                  - instance
+                  - correlation_id
+                  - timestamp
+                properties: &ref_1
+                  type:
+                    type: string
+                    format: uri
+                    description: URI reference identifying the problem type
+                    example: https://api.skeldir.com/problems/authentication-failed
+                  title:
+                    type: string
+                    description: Short, human-readable summary of the problem
+                    example: Authentication Failed
+                  status:
+                    type: integer
+                    description: HTTP status code
+                    example: 401
+                  detail:
+                    type: string
+                    description: Human-readable explanation specific to this occurrence
+                    example: The provided JWT token has expired. Please refresh your authentication token.
+                  instance:
+                    type: string
+                    format: uri
+                    description: URI reference identifying this specific occurrence
+                    example: https://api.skeldir.com/api/attribution/revenue/realtime
+                  correlation_id:
+                    type: string
+                    format: uuid
+                    description: Request correlation ID for distributed tracing
+                    example: 550e8400-e29b-41d4-a716-446655440000
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: ISO 8601 timestamp when the error occurred
+                    example: '2025-11-11T14:32:00Z'
+                  errors:
+                    type: array
+                    description: Optional array of specific validation errors
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: email
+                        message:
+                          type: string
+                          example: Invalid email format
+                        code:
+                          type: string
+                          example: INVALID_FORMAT
+        '429':
+          description: Too Many Requests - rate limit exceeded
+          headers: &ref_15
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
+          content: &ref_16
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: *ref_0
+                properties: *ref_1
+        '500':
+          description: Internal server error
+          headers: &ref_6
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content: &ref_7
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: *ref_0
+                properties: *ref_1
+  /api/attribution/channels:
+    get:
+      summary: Get Channel Attribution Data
+      description: Returns attribution data broken down by marketing channel
+      operationId: getChannelAttribution
+      tags:
+        - Attribution
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: *ref_2
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: *ref_3
+          description: Bearer token for authentication (format - Bearer <token>)
+        - name: start_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Start date for attribution window
+        - name: end_date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: End date for attribution window
+      responses:
+        '200':
+          description: Channel attribution data
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - channels
+                  - total_revenue
+                  - date_range
+                properties:
+                  channels:
+                    type: array
+                    items:
+                      type: object
+                      required: &ref_10
+                        - channel_name
+                        - revenue
+                        - conversion_count
+                        - confidence_score
+                      properties: &ref_11
+                        channel_name:
+                          type: string
+                          enum:
+                            - Meta
+                            - Google
+                            - TikTok
+                            - LinkedIn
+                            - Organic
+                            - Direct
+                            - Email
+                            - Referral
+                          description: Marketing channel name
+                        revenue:
+                          type: number
+                          format: double
+                          minimum: 0
+                          description: Attributed revenue for this channel
+                        conversion_count:
+                          type: integer
+                          description: Number of conversions attributed to this channel
+                        confidence_score:
+                          type: number
+                          format: double
+                          minimum: 0
+                          maximum: 1
+                          description: Statistical confidence in attribution accuracy
+                        spend:
+                          type: number
+                          format: float
+                          description: Marketing spend on this channel
+                        roas:
+                          type: number
+                          format: float
+                          description: Return on Ad Spend (revenue/spend)
+                  total_revenue:
+                    type: number
+                    format: double
+                    minimum: 0
+                  date_range:
+                    type: object
+                    properties:
+                      start:
+                        type: string
+                        format: date
+                      end:
+                        type: string
+                        format: date
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: *ref_4
+          content: *ref_5
+  /api/attribution/explain/{entity_type}/{entity_id}:
+    get:
+      summary: Get natural language explanation for attribution entities
+      description: |
+        Fast RAG endpoint for interactive explanations. Centaur architecture:
+        retrieves deterministic attribution data, synthesizes via LLM.
+        Target latency: <500ms p95.
+      operationId: explainAttributionEntity
+      tags:
+        - Attribution
+        - LLM Explanation
+      parameters:
+        - name: entity_type
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - attribution_score
+              - channel_performance
+              - reconciliation_discrepancy
+          description: Type of entity to explain
+        - name: entity_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique identifier for the entity
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: *ref_2
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: *ref_3
+          description: Bearer token for authentication (format - Bearer <token>)
+      responses:
+        '200':
+          description: Explanation with citations and confidence scoring
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID echoed back
+          content:
+            application/json:
+              schema:
+                type: object
+                required: &ref_12
+                  - explanation
+                  - citations
+                  - confidence
+                  - generated_at
+                properties: &ref_13
+                  explanation:
+                    type: string
+                    minLength: 150
+                    maxLength: 500
+                    description: Natural language explanation of attribution result
+                    example: Your Facebook ROAS of $3.20 indicates strong performance because you have 90 days of stable conversion data with narrow confidence bounds ($2.95-$3.45).
+                  citations:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - metric
+                        - value
+                        - source
+                      properties:
+                        metric:
+                          type: string
+                          example: facebook_roas
+                        value:
+                          type: number
+                          example: 3.2
+                        source:
+                          type: string
+                          description: Database table.column reference
+                          example: attribution_results.channel_roas
+                  confidence:
+                    type: string
+                    enum:
+                      - high
+                      - medium
+                      - low
+                    description: Explanation confidence based on data quality
+                  generated_at:
+                    type: string
+                    format: date-time
+                  cost_cents:
+                    type: number
+                    format: float
+                    description: LLM API cost for this explanation
+                    example: 1.8
+                    x-internal: true
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: *ref_4
+          content: *ref_5
+        '404':
+          description: Resource not found
+          headers: &ref_17
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content: &ref_18
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: *ref_0
+                properties: *ref_1
+        '500':
+          description: Internal server error
+          headers: *ref_6
+          content: *ref_7
+      x-latency-requirement: 500ms
+      x-cost-budget: 0.02
+      x-complexity-score: 5
+components:
+  schemas:
+    RealtimeRevenueCounter:
+      type: object
+      required: *ref_8
+      properties: *ref_9
+    ChannelAttribution:
+      type: object
+      required: *ref_10
+      properties: *ref_11
+    AttributionExplanation:
+      type: object
+      required: *ref_12
+      properties: *ref_13
+    ProblemDetails:
+      type: object
+      description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+      required: *ref_0
+      properties: *ref_1
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token authentication
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: true
+      schema: *ref_2
+      description: Unique request correlation ID for distributed tracing
+    Authorization:
+      name: Authorization
+      in: header
+      required: true
+      schema: *ref_3
+      description: Bearer token for authentication (format - Bearer <token>)
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      schema: *ref_14
+      description: ETag from previous response for cache validation
+  responses:
+    UnauthorizedError:
+      description: Unauthorized - invalid or missing authentication
+      headers: *ref_4
+      content: *ref_5
+    RateLimitError:
+      description: Too Many Requests - rate limit exceeded
+      headers: *ref_15
+      content: *ref_16
+    ServerError:
+      description: Internal server error
+      headers: *ref_6
+      content: *ref_7
+    NotFoundError:
+      description: Resource not found
+      headers: *ref_17
+      content: *ref_18

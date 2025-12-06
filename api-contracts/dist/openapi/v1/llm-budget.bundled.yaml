@@ -1,0 +1,365 @@
+openapi: 3.1.0
+info:
+  title: Skeldir LLM Budget Optimization API
+  description: |
+    Budget Analyst hybrid workflow: deterministic optimization (Python linprog)
+    + LLM synthesis layer. Async job pattern.
+  version: 1.0.0
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
+servers:
+  - url: http://localhost:4025
+    description: Prism Mock Server (Budget)
+security:
+  - bearerAuth: []
+tags:
+  - name: Budget
+    description: Budget optimization with LLM synthesis
+paths:
+  /api/budget/optimize:
+    post:
+      summary: Generate budget optimization recommendation
+      description: |
+        Initiates a budget optimization job using hybrid deterministic + LLM workflow.
+        Returns a job ID for polling the recommendation status.
+      operationId: createBudgetOptimization
+      tags:
+        - Budget
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: &ref_0
+            type: string
+            format: uuid
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: &ref_1
+            type: string
+          description: Bearer token for authentication (format - Bearer <token>)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - total_budget
+                - optimization_goal
+              properties:
+                total_budget:
+                  type: number
+                  format: float
+                  minimum: 1000
+                  example: 50000
+                constraints:
+                  type: object
+                  properties:
+                    date_range:
+                      type: object
+                      properties:
+                        start_date:
+                          type: string
+                          format: date
+                        end_date:
+                          type: string
+                          format: date
+                    channel_minimums:
+                      type: object
+                      additionalProperties:
+                        type: number
+                    channel_maximums:
+                      type: object
+                      additionalProperties:
+                        type: number
+                optimization_goal:
+                  type: string
+                  enum:
+                    - maximize_roas
+                    - maximize_revenue
+                    - minimize_cpa
+      responses:
+        '202':
+          description: Optimization job started
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID echoed back
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - job_id
+                  - estimated_duration_seconds
+                  - status_url
+                properties:
+                  job_id:
+                    type: string
+                    format: uuid
+                  estimated_duration_seconds:
+                    type: integer
+                    minimum: 5
+                    maximum: 30
+                    example: 15
+                  status_url:
+                    type: string
+                    format: uri
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: &ref_8
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID for distributed tracing
+          content: &ref_9
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: &ref_2
+                  - type
+                  - title
+                  - status
+                  - detail
+                  - instance
+                  - correlation_id
+                  - timestamp
+                properties: &ref_3
+                  type:
+                    type: string
+                    format: uri
+                    description: URI reference identifying the problem type
+                    example: https://api.skeldir.com/problems/authentication-failed
+                  title:
+                    type: string
+                    description: Short, human-readable summary of the problem
+                    example: Authentication Failed
+                  status:
+                    type: integer
+                    description: HTTP status code
+                    example: 401
+                  detail:
+                    type: string
+                    description: Human-readable explanation specific to this occurrence
+                    example: The provided JWT token has expired. Please refresh your authentication token.
+                  instance:
+                    type: string
+                    format: uri
+                    description: URI reference identifying this specific occurrence
+                    example: https://api.skeldir.com/api/attribution/revenue/realtime
+                  correlation_id:
+                    type: string
+                    format: uuid
+                    description: Request correlation ID for distributed tracing
+                    example: 550e8400-e29b-41d4-a716-446655440000
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: ISO 8601 timestamp when the error occurred
+                    example: '2025-11-11T14:32:00Z'
+                  errors:
+                    type: array
+                    description: Optional array of specific validation errors
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: email
+                        message:
+                          type: string
+                          example: Invalid email format
+                        code:
+                          type: string
+                          example: INVALID_FORMAT
+      x-latency-requirement: 200ms
+      x-cost-budget: 0
+      x-complexity-score: 3
+  /api/budget/recommendations/{job_id}:
+    get:
+      summary: Get budget recommendation
+      description: |
+        Retrieves the budget optimization recommendation for a completed job.
+        Returns 202 if the job is still running, 200 when complete.
+      operationId: getBudgetRecommendation
+      tags:
+        - Budget
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: *ref_0
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: *ref_1
+          description: Bearer token for authentication (format - Bearer <token>)
+      responses:
+        '200':
+          description: Recommendation ready
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID echoed back
+          content:
+            application/json:
+              schema:
+                type: object
+                required: &ref_4
+                  - job_id
+                  - status
+                  - allocations
+                properties: &ref_5
+                  job_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum:
+                      - complete
+                      - running
+                      - failed
+                  allocations:
+                    type: array
+                    items:
+                      type: object
+                      required: &ref_6
+                        - channel
+                        - current_budget
+                        - recommended_budget
+                        - expected_roas
+                      properties: &ref_7
+                        channel:
+                          type: string
+                        current_budget:
+                          type: number
+                          format: float
+                        recommended_budget:
+                          type: number
+                          format: float
+                        expected_roas:
+                          type: number
+                          format: float
+                        confidence_range:
+                          type: object
+                          properties:
+                            min:
+                              type: number
+                            max:
+                              type: number
+                  synthesis:
+                    type: string
+                    description: LLM-generated strategic explanation
+                  metrics:
+                    type: object
+                    properties:
+                      deterministic_runtime_ms:
+                        type: integer
+                        x-internal: true
+                      llm_cost_usd:
+                        type: number
+                        format: float
+                        x-internal: true
+        '202':
+          description: Job still running
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - job_id
+                  - status
+                properties:
+                  job_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum:
+                      - running
+                  progress_percentage:
+                    type: integer
+                    minimum: 0
+                    maximum: 100
+        '404':
+          description: Resource not found
+          headers: &ref_10
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content: &ref_11
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: *ref_2
+                properties: *ref_3
+      x-latency-requirement: 200ms
+      x-cost-budget: 0
+      x-complexity-score: 2
+components:
+  schemas:
+    BudgetRecommendation:
+      type: object
+      required: *ref_4
+      properties: *ref_5
+    ChannelAllocation:
+      type: object
+      required: *ref_6
+      properties: *ref_7
+    ProblemDetails:
+      type: object
+      description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+      required: *ref_2
+      properties: *ref_3
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token authentication
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: true
+      schema: *ref_0
+      description: Unique request correlation ID for distributed tracing
+    Authorization:
+      name: Authorization
+      in: header
+      required: true
+      schema: *ref_1
+      description: Bearer token for authentication (format - Bearer <token>)
+  responses:
+    UnauthorizedError:
+      description: Unauthorized - invalid or missing authentication
+      headers: *ref_8
+      content: *ref_9
+    NotFoundError:
+      description: Resource not found
+      headers: *ref_10
+      content: *ref_11

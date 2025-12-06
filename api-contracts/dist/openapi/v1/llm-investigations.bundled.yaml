@@ -1,0 +1,366 @@
+openapi: 3.1.0
+info:
+  title: Skeldir LLM Investigations API
+  description: |
+    Bounded agent system for exploratory data analysis (Insights Detective).
+    60-second timeout, 10 tool call maximum, $0.30 cost ceiling per investigation.
+    Async job pattern with status polling.
+  version: 1.0.0
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
+servers:
+  - url: http://localhost:4024
+    description: Prism Mock Server (Investigations)
+security:
+  - bearerAuth: []
+tags:
+  - name: Investigations
+    description: Bounded agent investigations
+paths:
+  /api/investigations:
+    post:
+      summary: Start asynchronous investigation
+      description: |
+        Initiates a new bounded agent investigation. Returns a job ID for polling.
+        Investigations have a 60-second timeout and 10 tool call maximum.
+      operationId: createInvestigation
+      tags:
+        - Investigations
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: &ref_2
+            type: string
+            format: uuid
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: &ref_3
+            type: string
+          description: Bearer token for authentication (format - Bearer <token>)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - question
+              properties:
+                question:
+                  type: string
+                  minLength: 10
+                  maxLength: 500
+                  example: Why is Google Ads underperforming vs. last month?
+                context:
+                  type: object
+                  properties:
+                    date_range:
+                      type: object
+                      properties:
+                        start_date:
+                          type: string
+                          format: date
+                        end_date:
+                          type: string
+                          format: date
+                    channels:
+                      type: array
+                      items:
+                        type: string
+                    budget_constraints:
+                      type: object
+      responses:
+        '202':
+          description: Investigation queued
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID echoed back
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - investigation_id
+                  - status
+                  - estimated_duration_seconds
+                  - status_url
+                properties:
+                  investigation_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum:
+                      - queued
+                  estimated_duration_seconds:
+                    type: integer
+                    minimum: 30
+                    maximum: 60
+                    example: 45
+                  status_url:
+                    type: string
+                    format: uri
+                    example: http://localhost:4024/api/investigations/550e8400-e29b-41d4-a716-446655440000/status
+        '400':
+          description: Bad Request - validation failed
+          headers: &ref_8
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content: &ref_9
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: &ref_0
+                  - type
+                  - title
+                  - status
+                  - detail
+                  - instance
+                  - correlation_id
+                  - timestamp
+                properties: &ref_1
+                  type:
+                    type: string
+                    format: uri
+                    description: URI reference identifying the problem type
+                    example: https://api.skeldir.com/problems/authentication-failed
+                  title:
+                    type: string
+                    description: Short, human-readable summary of the problem
+                    example: Authentication Failed
+                  status:
+                    type: integer
+                    description: HTTP status code
+                    example: 401
+                  detail:
+                    type: string
+                    description: Human-readable explanation specific to this occurrence
+                    example: The provided JWT token has expired. Please refresh your authentication token.
+                  instance:
+                    type: string
+                    format: uri
+                    description: URI reference identifying this specific occurrence
+                    example: https://api.skeldir.com/api/attribution/revenue/realtime
+                  correlation_id:
+                    type: string
+                    format: uuid
+                    description: Request correlation ID for distributed tracing
+                    example: 550e8400-e29b-41d4-a716-446655440000
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: ISO 8601 timestamp when the error occurred
+                    example: '2025-11-11T14:32:00Z'
+                  errors:
+                    type: array
+                    description: Optional array of specific validation errors
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: email
+                        message:
+                          type: string
+                          example: Invalid email format
+                        code:
+                          type: string
+                          example: INVALID_FORMAT
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: &ref_10
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID for distributed tracing
+          content: &ref_11
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: *ref_0
+                properties: *ref_1
+      x-latency-requirement: 200ms
+      x-cost-budget: 0
+      x-complexity-score: 3
+  /api/investigations/{investigation_id}/status:
+    get:
+      summary: Poll investigation status
+      description: |
+        Returns the current status of an investigation including progress,
+        findings, and final synthesis when complete.
+      operationId: getInvestigationStatus
+      tags:
+        - Investigations
+      parameters:
+        - name: investigation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: *ref_2
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: *ref_3
+          description: Bearer token for authentication (format - Bearer <token>)
+      responses:
+        '200':
+          description: Investigation status
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID echoed back
+          content:
+            application/json:
+              schema:
+                type: object
+                required: &ref_4
+                  - investigation_id
+                  - status
+                  - elapsed_seconds
+                properties: &ref_5
+                  investigation_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum:
+                      - queued
+                      - running
+                      - complete
+                      - failed
+                      - timeout
+                  progress_percentage:
+                    type: integer
+                    minimum: 0
+                    maximum: 100
+                  current_step:
+                    type: string
+                    example: Analyzing channel performance data
+                  elapsed_seconds:
+                    type: integer
+                  findings:
+                    type: array
+                    items:
+                      type: object
+                      required: &ref_6
+                        - finding
+                        - evidence
+                        - confidence
+                      properties: &ref_7
+                        finding:
+                          type: string
+                        evidence:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              metric:
+                                type: string
+                              value:
+                                type: number
+                              source:
+                                type: string
+                        confidence:
+                          type: string
+                          enum:
+                            - high
+                            - medium
+                            - low
+                  synthesis:
+                    type: string
+                    description: Final synthesis (only when status=complete)
+                  cost_usd:
+                    type: number
+                    format: float
+                    description: Total LLM cost for investigation
+                    x-internal: true
+                  tool_calls_used:
+                    type: integer
+                    maximum: 10
+                    description: Number of tool calls (max 10)
+                    x-internal: true
+        '404':
+          description: Resource not found
+          headers: &ref_12
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content: &ref_13
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: *ref_0
+                properties: *ref_1
+      x-latency-requirement: 100ms
+      x-cost-budget: 0
+      x-complexity-score: 2
+components:
+  schemas:
+    InvestigationStatus:
+      type: object
+      required: *ref_4
+      properties: *ref_5
+    InvestigationFinding:
+      type: object
+      required: *ref_6
+      properties: *ref_7
+    ProblemDetails:
+      type: object
+      description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+      required: *ref_0
+      properties: *ref_1
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token authentication
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: true
+      schema: *ref_2
+      description: Unique request correlation ID for distributed tracing
+    Authorization:
+      name: Authorization
+      in: header
+      required: true
+      schema: *ref_3
+      description: Bearer token for authentication (format - Bearer <token>)
+  responses:
+    ValidationError:
+      description: Bad Request - validation failed
+      headers: *ref_8
+      content: *ref_9
+    UnauthorizedError:
+      description: Unauthorized - invalid or missing authentication
+      headers: *ref_10
+      content: *ref_11
+    NotFoundError:
+      description: Resource not found
+      headers: *ref_12
+      content: *ref_13

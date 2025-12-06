@@ -1,0 +1,341 @@
+openapi: 3.1.0
+info:
+  title: Skeldir Health Monitoring API
+  version: 2.0.0
+  description: |
+    System health and status monitoring endpoints.
+    Provides real-time health checks for all system components.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
+servers:
+  - url: http://localhost:4014
+    description: Prism Mock Server (Health)
+tags:
+  - name: Health
+    description: System health and status monitoring endpoints
+paths:
+  /api/health:
+    get:
+      summary: Get system health status
+      description: |
+        Returns overall system health and status of individual services.
+        No authentication required for basic health check.
+      operationId: getHealthStatus
+      tags:
+        - Health
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: &ref_2
+            type: string
+            format: uuid
+          description: Unique request correlation ID for distributed tracing
+      responses:
+        '200':
+          description: System is healthy
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                required: &ref_0
+                  - status
+                  - timestamp
+                  - services
+                properties: &ref_1
+                  status:
+                    type: string
+                    enum:
+                      - healthy
+                      - degraded
+                      - unhealthy
+                    description: Overall system health status
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: Health check timestamp
+                  version:
+                    type: string
+                    description: API version
+                    example: 2.0.0
+                  services:
+                    type: object
+                    description: Individual service statuses
+                    properties:
+                      database:
+                        type: string
+                        enum:
+                          - up
+                          - down
+                          - degraded
+                      api:
+                        type: string
+                        enum:
+                          - up
+                          - down
+                          - degraded
+                      cache:
+                        type: string
+                        enum:
+                          - up
+                          - down
+                          - degraded
+                      queue:
+                        type: string
+                        enum:
+                          - up
+                          - down
+                          - degraded
+                  uptime_seconds:
+                    type: integer
+                    description: Service uptime in seconds
+                    minimum: 0
+              example:
+                status: healthy
+                timestamp: '2025-11-26T14:30:00Z'
+                version: 2.0.0
+                services:
+                  database: up
+                  api: up
+                  cache: up
+                  queue: up
+                uptime_seconds: 86400
+        '503':
+          description: System is unhealthy
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_0
+                properties: *ref_1
+              example:
+                status: unhealthy
+                timestamp: '2025-11-26T14:30:00Z'
+                version: 2.0.0
+                services:
+                  database: down
+                  api: up
+                  cache: up
+                  queue: degraded
+                uptime_seconds: 3600
+  /api/health/detailed:
+    get:
+      summary: Get detailed system health
+      description: Returns detailed health information including metrics (requires authentication)
+      operationId: getDetailedHealth
+      tags:
+        - Health
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: *ref_2
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: &ref_6
+            type: string
+          description: Bearer token for authentication (format - Bearer <token>)
+      responses:
+        '200':
+          description: Detailed health information
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                allOf: &ref_3
+                  - type: object
+                    required: *ref_0
+                    properties: *ref_1
+                  - type: object
+                    properties:
+                      metrics:
+                        type: object
+                        properties:
+                          requests_per_minute:
+                            type: integer
+                          average_response_ms:
+                            type: number
+                            format: float
+                          error_rate:
+                            type: number
+                            format: float
+                            minimum: 0
+                            maximum: 1
+                          active_connections:
+                            type: integer
+                      database:
+                        type: object
+                        properties:
+                          pool_size:
+                            type: integer
+                          active_connections:
+                            type: integer
+                          query_latency_ms:
+                            type: number
+                            format: float
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: &ref_7
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID for distributed tracing
+          content: &ref_8
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: &ref_4
+                  - type
+                  - title
+                  - status
+                  - detail
+                  - instance
+                  - correlation_id
+                  - timestamp
+                properties: &ref_5
+                  type:
+                    type: string
+                    format: uri
+                    description: URI reference identifying the problem type
+                    example: https://api.skeldir.com/problems/authentication-failed
+                  title:
+                    type: string
+                    description: Short, human-readable summary of the problem
+                    example: Authentication Failed
+                  status:
+                    type: integer
+                    description: HTTP status code
+                    example: 401
+                  detail:
+                    type: string
+                    description: Human-readable explanation specific to this occurrence
+                    example: The provided JWT token has expired. Please refresh your authentication token.
+                  instance:
+                    type: string
+                    format: uri
+                    description: URI reference identifying this specific occurrence
+                    example: https://api.skeldir.com/api/attribution/revenue/realtime
+                  correlation_id:
+                    type: string
+                    format: uuid
+                    description: Request correlation ID for distributed tracing
+                    example: 550e8400-e29b-41d4-a716-446655440000
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: ISO 8601 timestamp when the error occurred
+                    example: '2025-11-11T14:32:00Z'
+                  errors:
+                    type: array
+                    description: Optional array of specific validation errors
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: email
+                        message:
+                          type: string
+                          example: Invalid email format
+                        code:
+                          type: string
+                          example: INVALID_FORMAT
+  /api/health/ready:
+    get:
+      summary: Kubernetes readiness probe
+      description: Indicates if the service is ready to accept traffic
+      operationId: readinessProbe
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ready:
+                    type: boolean
+                    example: true
+        '503':
+          description: Service is not ready
+  /api/health/live:
+    get:
+      summary: Kubernetes liveness probe
+      description: Indicates if the service is alive and should not be restarted
+      operationId: livenessProbe
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alive:
+                    type: boolean
+                    example: true
+        '503':
+          description: Service is not alive
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: *ref_0
+      properties: *ref_1
+    DetailedHealthResponse:
+      allOf: *ref_3
+    ProblemDetails:
+      type: object
+      description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+      required: *ref_4
+      properties: *ref_5
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token authentication
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: true
+      schema: *ref_2
+      description: Unique request correlation ID for distributed tracing
+    Authorization:
+      name: Authorization
+      in: header
+      required: true
+      schema: *ref_6
+      description: Bearer token for authentication (format - Bearer <token>)
+  responses:
+    UnauthorizedError:
+      description: Unauthorized - invalid or missing authentication
+      headers: *ref_7
+      content: *ref_8

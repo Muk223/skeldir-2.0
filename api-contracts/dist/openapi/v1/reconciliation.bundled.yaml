@@ -1,0 +1,396 @@
+openapi: 3.1.0
+info:
+  title: Skeldir Reconciliation API
+  version: 2.0.0
+  description: |
+    Platform reconciliation status endpoints.
+    Provides real-time connection status and data sync information for integrated platforms.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
+servers:
+  - url: http://localhost:4012
+    description: Prism Mock Server (Reconciliation)
+security:
+  - bearerAuth: []
+tags:
+  - name: Reconciliation
+    description: Platform reconciliation and data sync status endpoints
+paths:
+  /api/reconciliation/status:
+    get:
+      summary: Get reconciliation status for all platforms
+      description: |
+        Returns the current connection and sync status for all integrated platforms.
+        Includes verification status for payment providers.
+      operationId: getReconciliationStatus
+      tags:
+        - Reconciliation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: &ref_2
+            type: string
+            format: uuid
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: &ref_3
+            type: string
+          description: Bearer token for authentication (format - Bearer <token>)
+      responses:
+        '200':
+          description: Reconciliation status for all platforms
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                required: &ref_8
+                  - platforms
+                  - overall_status
+                properties: &ref_9
+                  platforms:
+                    type: array
+                    items:
+                      type: object
+                      required: &ref_4
+                        - platform_name
+                        - connection_status
+                        - last_sync
+                      properties: &ref_5
+                        platform_name:
+                          type: string
+                          enum:
+                            - Meta
+                            - Google
+                            - TikTok
+                            - LinkedIn
+                            - Shopify
+                            - WooCommerce
+                            - Stripe
+                            - PayPal
+                          description: Platform identifier
+                        connection_status:
+                          type: string
+                          enum:
+                            - verified
+                            - partial
+                            - pending
+                            - failed
+                            - disconnected
+                          description: Current connection status
+                        last_sync:
+                          type: string
+                          format: date-time
+                          description: Timestamp of last successful sync
+                        events_processed:
+                          type: integer
+                          minimum: 0
+                          description: Total events processed from this platform
+                        revenue_verified:
+                          type: number
+                          format: float
+                          description: Total verified revenue from this platform
+                        error_message:
+                          type: string
+                          description: Error description if connection is not fully verified
+                        next_scheduled_sync:
+                          type: string
+                          format: date-time
+                          description: When the next automatic sync is scheduled
+                  overall_status:
+                    type: string
+                    enum:
+                      - verified
+                      - partial
+                      - pending
+                      - failed
+                    description: Aggregate status across all platforms
+                  last_full_sync:
+                    type: string
+                    format: date-time
+                    description: Timestamp of last complete sync across all platforms
+              example:
+                platforms:
+                  - platform_name: Shopify
+                    connection_status: verified
+                    last_sync: '2025-11-26T14:30:00Z'
+                    events_processed: 1523
+                    revenue_verified: 45230
+                  - platform_name: Stripe
+                    connection_status: verified
+                    last_sync: '2025-11-26T14:28:00Z'
+                    events_processed: 892
+                    revenue_verified: 38120.5
+                  - platform_name: Meta
+                    connection_status: partial
+                    last_sync: '2025-11-26T12:00:00Z'
+                    error_message: API rate limit reached
+                overall_status: partial
+                last_full_sync: '2025-11-26T10:00:00Z'
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: &ref_6
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID for distributed tracing
+          content: &ref_7
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: &ref_0
+                  - type
+                  - title
+                  - status
+                  - detail
+                  - instance
+                  - correlation_id
+                  - timestamp
+                properties: &ref_1
+                  type:
+                    type: string
+                    format: uri
+                    description: URI reference identifying the problem type
+                    example: https://api.skeldir.com/problems/authentication-failed
+                  title:
+                    type: string
+                    description: Short, human-readable summary of the problem
+                    example: Authentication Failed
+                  status:
+                    type: integer
+                    description: HTTP status code
+                    example: 401
+                  detail:
+                    type: string
+                    description: Human-readable explanation specific to this occurrence
+                    example: The provided JWT token has expired. Please refresh your authentication token.
+                  instance:
+                    type: string
+                    format: uri
+                    description: URI reference identifying this specific occurrence
+                    example: https://api.skeldir.com/api/attribution/revenue/realtime
+                  correlation_id:
+                    type: string
+                    format: uuid
+                    description: Request correlation ID for distributed tracing
+                    example: 550e8400-e29b-41d4-a716-446655440000
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: ISO 8601 timestamp when the error occurred
+                    example: '2025-11-11T14:32:00Z'
+                  errors:
+                    type: array
+                    description: Optional array of specific validation errors
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: email
+                        message:
+                          type: string
+                          example: Invalid email format
+                        code:
+                          type: string
+                          example: INVALID_FORMAT
+        '500':
+          description: Internal server error
+          headers: &ref_10
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content: &ref_11
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: *ref_0
+                properties: *ref_1
+  /api/reconciliation/platform/{platform_id}:
+    get:
+      summary: Get detailed status for a specific platform
+      description: Returns detailed reconciliation information for a single platform
+      operationId: getPlatformReconciliationStatus
+      tags:
+        - Reconciliation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: *ref_2
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: *ref_3
+          description: Bearer token for authentication (format - Bearer <token>)
+        - name: platform_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Platform identifier
+      responses:
+        '200':
+          description: Detailed platform reconciliation status
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                required: *ref_4
+                properties: *ref_5
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: *ref_6
+          content: *ref_7
+        '404':
+          description: Resource not found
+          headers: &ref_12
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content: &ref_13
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: *ref_0
+                properties: *ref_1
+  /api/reconciliation/sync:
+    post:
+      summary: Trigger manual sync for platforms
+      description: Initiates a manual synchronization for specified platforms
+      operationId: triggerSync
+      tags:
+        - Reconciliation
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: *ref_2
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: *ref_3
+          description: Bearer token for authentication (format - Bearer <token>)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                platforms:
+                  type: array
+                  items:
+                    type: string
+                  description: List of platform IDs to sync (empty = all platforms)
+                full_sync:
+                  type: boolean
+                  default: false
+                  description: Whether to perform a full historical sync
+      responses:
+        '202':
+          description: Sync initiated
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - sync_id
+                  - status
+                  - estimated_completion
+                properties:
+                  sync_id:
+                    type: string
+                    format: uuid
+                  status:
+                    type: string
+                    enum:
+                      - queued
+                      - in_progress
+                  estimated_completion:
+                    type: string
+                    format: date-time
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: *ref_6
+          content: *ref_7
+components:
+  schemas:
+    ReconciliationStatusResponse:
+      type: object
+      required: *ref_8
+      properties: *ref_9
+    PlatformStatus:
+      type: object
+      required: *ref_4
+      properties: *ref_5
+    ProblemDetails:
+      type: object
+      description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+      required: *ref_0
+      properties: *ref_1
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token authentication
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: true
+      schema: *ref_2
+      description: Unique request correlation ID for distributed tracing
+    Authorization:
+      name: Authorization
+      in: header
+      required: true
+      schema: *ref_3
+      description: Bearer token for authentication (format - Bearer <token>)
+  responses:
+    UnauthorizedError:
+      description: Unauthorized - invalid or missing authentication
+      headers: *ref_6
+      content: *ref_7
+    ServerError:
+      description: Internal server error
+      headers: *ref_10
+      content: *ref_11
+    NotFoundError:
+      description: Resource not found
+      headers: *ref_12
+      content: *ref_13

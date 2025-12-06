@@ -1,0 +1,388 @@
+openapi: 3.1.0
+info:
+  title: Skeldir Authentication API
+  version: 2.0.0
+  description: |
+    User authentication and authorization endpoints.
+    Provides JWT-based authentication with secure token refresh.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
+servers:
+  - url: http://localhost:4010
+    description: Prism Mock Server (Auth)
+security:
+  - bearerAuth: []
+tags:
+  - name: Authentication
+    description: User authentication and authorization endpoints
+paths:
+  /api/auth/login:
+    post:
+      summary: User login
+      description: Authenticate user with email and password, returns JWT tokens
+      operationId: login
+      tags:
+        - Authentication
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: &ref_2
+            type: string
+            format: uuid
+          description: Unique request correlation ID for distributed tracing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+            example:
+              email: user@example.com
+              password: securepassword123
+      responses:
+        '200':
+          description: Login successful
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - access_token
+                  - refresh_token
+                  - expires_in
+                  - user
+                properties:
+                  access_token:
+                    type: string
+                    description: JWT access token
+                  refresh_token:
+                    type: string
+                    description: JWT refresh token for obtaining new access tokens
+                  expires_in:
+                    type: integer
+                    description: Token expiration time in seconds
+                    example: 3600
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      email:
+                        type: string
+                        format: email
+                      username:
+                        type: string
+              example:
+                access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                refresh_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                expires_in: 3600
+                user:
+                  id: 550e8400-e29b-41d4-a716-446655440000
+                  email: user@example.com
+                  username: testuser
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: &ref_3
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID for distributed tracing
+          content: &ref_4
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: &ref_0
+                  - type
+                  - title
+                  - status
+                  - detail
+                  - instance
+                  - correlation_id
+                  - timestamp
+                properties: &ref_1
+                  type:
+                    type: string
+                    format: uri
+                    description: URI reference identifying the problem type
+                    example: https://api.skeldir.com/problems/authentication-failed
+                  title:
+                    type: string
+                    description: Short, human-readable summary of the problem
+                    example: Authentication Failed
+                  status:
+                    type: integer
+                    description: HTTP status code
+                    example: 401
+                  detail:
+                    type: string
+                    description: Human-readable explanation specific to this occurrence
+                    example: The provided JWT token has expired. Please refresh your authentication token.
+                  instance:
+                    type: string
+                    format: uri
+                    description: URI reference identifying this specific occurrence
+                    example: https://api.skeldir.com/api/attribution/revenue/realtime
+                  correlation_id:
+                    type: string
+                    format: uuid
+                    description: Request correlation ID for distributed tracing
+                    example: 550e8400-e29b-41d4-a716-446655440000
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: ISO 8601 timestamp when the error occurred
+                    example: '2025-11-11T14:32:00Z'
+                  errors:
+                    type: array
+                    description: Optional array of specific validation errors
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: email
+                        message:
+                          type: string
+                          example: Invalid email format
+                        code:
+                          type: string
+                          example: INVALID_FORMAT
+        '429':
+          description: Too Many Requests - rate limit exceeded
+          headers: &ref_8
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
+          content: &ref_9
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: *ref_0
+                properties: *ref_1
+  /api/auth/refresh:
+    post:
+      summary: Refresh access token
+      description: Exchange a valid refresh token for a new access token
+      operationId: refreshToken
+      tags:
+        - Authentication
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: *ref_2
+          description: Unique request correlation ID for distributed tracing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+                  description: The refresh token from login response
+      responses:
+        '200':
+          description: Token refreshed successfully
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - access_token
+                  - expires_in
+                properties:
+                  access_token:
+                    type: string
+                    description: New JWT access token
+                  refresh_token:
+                    type: string
+                    description: New refresh token (token rotation)
+                  expires_in:
+                    type: integer
+                    description: Token expiration time in seconds
+              example:
+                access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                refresh_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                expires_in: 3600
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: *ref_3
+          content: *ref_4
+  /api/auth/logout:
+    post:
+      summary: User logout
+      description: Invalidate current session and tokens
+      operationId: logout
+      tags:
+        - Authentication
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: *ref_2
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: &ref_5
+            type: string
+          description: Bearer token for authentication (format - Bearer <token>)
+      responses:
+        '200':
+          description: Logout successful
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                required: &ref_6
+                  - success
+                  - correlation_id
+                properties: &ref_7
+                  success:
+                    type: boolean
+                  correlation_id:
+                    type: string
+                    format: uuid
+                  message:
+                    type: string
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: *ref_3
+          content: *ref_4
+  /api/auth/verify:
+    get:
+      summary: Verify token validity
+      description: Check if the current access token is valid
+      operationId: verifyToken
+      tags:
+        - Authentication
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: *ref_2
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: *ref_5
+          description: Bearer token for authentication (format - Bearer <token>)
+      responses:
+        '200':
+          description: Token is valid
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - valid
+                  - user_id
+                properties:
+                  valid:
+                    type: boolean
+                    example: true
+                  user_id:
+                    type: string
+                    format: uuid
+                  expires_at:
+                    type: string
+                    format: date-time
+              example:
+                valid: true
+                user_id: 550e8400-e29b-41d4-a716-446655440000
+                expires_at: '2025-11-26T15:30:00Z'
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: *ref_3
+          content: *ref_4
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token authentication
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: true
+      schema: *ref_2
+      description: Unique request correlation ID for distributed tracing
+    Authorization:
+      name: Authorization
+      in: header
+      required: true
+      schema: *ref_5
+      description: Bearer token for authentication (format - Bearer <token>)
+  schemas:
+    ProblemDetails:
+      type: object
+      description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+      required: *ref_0
+      properties: *ref_1
+    SuccessResponse:
+      type: object
+      required: *ref_6
+      properties: *ref_7
+  responses:
+    UnauthorizedError:
+      description: Unauthorized - invalid or missing authentication
+      headers: *ref_3
+      content: *ref_4
+    RateLimitError:
+      description: Too Many Requests - rate limit exceeded
+      headers: *ref_8
+      content: *ref_9

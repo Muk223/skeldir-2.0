@@ -1,0 +1,318 @@
+openapi: 3.1.0
+info:
+  title: Skeldir LLM Explanations API
+  version: 1.0.0
+  description: |
+    Fast RAG endpoints for interactive explanations with sub-500ms p95 latency.
+    Provides natural language explanations for attribution scores, budget recommendations,
+    reconciliation discrepancies, and channel performance with deterministic citations.
+  contact:
+    name: Skeldir Engineering
+    email: engineering@skeldir.com
+    url: https://skeldir.com
+servers:
+  - url: http://localhost:4026
+    description: Prism Mock Server (LLM Explanations)
+security:
+  - bearerAuth: []
+tags:
+  - name: LLM Explanations
+    description: Natural language explanations with deterministic citations
+paths:
+  /api/v1/explain/{entity_type}/{entity_id}:
+    get:
+      summary: Get natural language explanation for any entity
+      description: |
+        Fast RAG endpoint for interactive explanations. Centaur architecture:
+        retrieves deterministic data, synthesizes via LLM.
+        Target latency: <500ms p95.
+        Cost budget: $0.02 per explanation (Haiku-optimized).
+      operationId: getEntityExplanation
+      tags:
+        - LLM Explanations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: entity_type
+          in: path
+          required: true
+          description: Type of entity to explain
+          schema:
+            type: string
+            enum:
+              - attribution_score
+              - budget_recommendation
+              - reconciliation_discrepancy
+              - channel_performance
+        - name: entity_id
+          in: path
+          required: true
+          description: Unique identifier for the entity
+          schema:
+            type: string
+            format: uuid
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: &ref_8
+            type: string
+            format: uuid
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: &ref_9
+            type: string
+          description: Bearer token for authentication (format - Bearer <token>)
+      responses:
+        '200':
+          description: Explanation with citations and confidence scoring
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID echoed back
+          content:
+            application/json:
+              schema:
+                type: object
+                required: &ref_2
+                  - explanation
+                  - citations
+                  - confidence
+                  - generated_at
+                properties: &ref_3
+                  explanation:
+                    type: string
+                    minLength: 100
+                    maxLength: 500
+                    description: Natural language explanation of the entity (150-300 words typical)
+                    example: Your Facebook ROAS of $3.20 indicates strong performance because you have 90 days of stable conversion data with narrow confidence bounds ($2.95-$3.45).
+                  citations:
+                    type: array
+                    description: References to deterministic data sources backing the explanation
+                    items:
+                      type: object
+                      required: &ref_4
+                        - metric
+                        - value
+                        - source
+                      properties: &ref_5
+                        metric:
+                          type: string
+                          description: Name of the metric being cited
+                          example: facebook_roas
+                        value:
+                          type: number
+                          description: The actual value of the metric
+                          example: 3.2
+                        source:
+                          type: string
+                          description: Database table.column reference for auditability
+                          example: attribution_scores.roas
+                  confidence:
+                    type: string
+                    enum:
+                      - high
+                      - medium
+                      - low
+                    description: Explanation confidence based on data quality and recency
+                  generated_at:
+                    type: string
+                    format: date-time
+                    description: ISO 8601 timestamp when explanation was generated
+                  cost_cents:
+                    type: number
+                    format: float
+                    description: LLM API cost for this explanation (internal tracking)
+                    example: 1.8
+                    x-internal: true
+              example:
+                explanation: Your Facebook ROAS of $3.20 indicates strong performance because you have 90 days of stable conversion data with narrow confidence bounds ($2.95-$3.45). This outperforms your Google Ads ROAS of $2.10 by 52%.
+                citations:
+                  - metric: facebook_roas
+                    value: 3.2
+                    source: attribution_scores.roas
+                  - metric: google_roas
+                    value: 2.1
+                    source: attribution_scores.roas
+                confidence: high
+                generated_at: '2025-12-04T02:30:00Z'
+                cost_cents: 1.8
+        '400':
+          description: Invalid entity_type or entity_id format
+          content:
+            application/json:
+              schema:
+                type: object
+                required: &ref_6
+                  - error
+                  - message
+                properties: &ref_7
+                  error:
+                    type: string
+                    description: Error code
+                    example: invalid_entity_type
+                  message:
+                    type: string
+                    description: Human-readable error message
+                    example: 'entity_type must be one of: attribution_score, budget_recommendation, reconciliation_discrepancy, channel_performance'
+                  details:
+                    type: object
+                    description: Additional error context
+                    additionalProperties: true
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: &ref_10
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID for distributed tracing
+          content: &ref_11
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: &ref_0
+                  - type
+                  - title
+                  - status
+                  - detail
+                  - instance
+                  - correlation_id
+                  - timestamp
+                properties: &ref_1
+                  type:
+                    type: string
+                    format: uri
+                    description: URI reference identifying the problem type
+                    example: https://api.skeldir.com/problems/authentication-failed
+                  title:
+                    type: string
+                    description: Short, human-readable summary of the problem
+                    example: Authentication Failed
+                  status:
+                    type: integer
+                    description: HTTP status code
+                    example: 401
+                  detail:
+                    type: string
+                    description: Human-readable explanation specific to this occurrence
+                    example: The provided JWT token has expired. Please refresh your authentication token.
+                  instance:
+                    type: string
+                    format: uri
+                    description: URI reference identifying this specific occurrence
+                    example: https://api.skeldir.com/api/attribution/revenue/realtime
+                  correlation_id:
+                    type: string
+                    format: uuid
+                    description: Request correlation ID for distributed tracing
+                    example: 550e8400-e29b-41d4-a716-446655440000
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: ISO 8601 timestamp when the error occurred
+                    example: '2025-11-11T14:32:00Z'
+                  errors:
+                    type: array
+                    description: Optional array of specific validation errors
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: email
+                        message:
+                          type: string
+                          example: Invalid email format
+                        code:
+                          type: string
+                          example: INVALID_FORMAT
+        '404':
+          description: Resource not found
+          headers: &ref_12
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content: &ref_13
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: *ref_0
+                properties: *ref_1
+        '500':
+          description: Internal server error
+          headers: &ref_14
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content: &ref_15
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: *ref_0
+                properties: *ref_1
+      x-latency-requirement: 500ms
+      x-cost-budget: 0.02
+      x-complexity-score: 5
+      x-llm-usage: true
+      x-deterministic-guarantee: false
+      x-model-routing: haiku-first
+components:
+  schemas:
+    EntityExplanation:
+      type: object
+      required: *ref_2
+      properties: *ref_3
+    Citation:
+      type: object
+      required: *ref_4
+      properties: *ref_5
+    ExplanationError:
+      type: object
+      required: *ref_6
+      properties: *ref_7
+    ProblemDetails:
+      type: object
+      description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+      required: *ref_0
+      properties: *ref_1
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token authentication
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: true
+      schema: *ref_8
+      description: Unique request correlation ID for distributed tracing
+    Authorization:
+      name: Authorization
+      in: header
+      required: true
+      schema: *ref_9
+      description: Bearer token for authentication (format - Bearer <token>)
+  responses:
+    UnauthorizedError:
+      description: Unauthorized - invalid or missing authentication
+      headers: *ref_10
+      content: *ref_11
+    NotFoundError:
+      description: Resource not found
+      headers: *ref_12
+      content: *ref_13
+    ServerError:
+      description: Internal server error
+      headers: *ref_14
+      content: *ref_15
