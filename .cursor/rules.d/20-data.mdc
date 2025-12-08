@@ -1,0 +1,14 @@
+---
+description: "Data models, RLS, monetary fields, and DB patterns"
+globs:
+  - "backend/db/**"
+  - "backend/app/core/**"
+  - "backend/app/models/**"
+priority: 80
+model_preference: "claude-4.5-opus"
+---
+
+# Source of truth
+Data, RLS, monetary fields, and DB patterns are defined in `AGENTS.md`
+under Data & Models. This file exists to scope auto-attachment; `AGENTS.md`
+is the canonical reference.

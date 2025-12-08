@@ -1,0 +1,12 @@
+---
+description: "LLM governance, centaur UX, validation, and cost controls"
+globs:
+  - "**/*"
+priority: 70
+model_preference: "claude-4.5-opus"
+---
+
+# Source of truth
+LLM governance, centaur UX, validation, and cost controls are defined in
+`AGENTS.md` under LLM Governance. This file only directs auto-attach; use
+`AGENTS.md` as the canonical reference.

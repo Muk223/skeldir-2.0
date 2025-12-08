@@ -239,7 +239,7 @@ def enforce_data_retention_task(self):
     
     Related Documents:
     - docs/governance/PRIVACY_LIFECYCLE_IMPLEMENTATION.md (Phase 5)
-    - B0.3_FORENSIC_ANALYSIS_RESPONSE.md (retention gap identified)
+    - docs/archive/completed-phases/b0.3/B0.3_FORENSIC_ANALYSIS_RESPONSE.md (retention gap identified)
     
     Returns:
         dict: Deletion counts (events_deleted, allocations_deleted, dead_events_deleted)

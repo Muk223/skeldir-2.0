@@ -3,7 +3,7 @@ on:
   push:
     paths:
       - 'api-contracts/**'
-      - 'scripts/start-prism-mocks.sh'
+      - 'scripts/start-mocks.sh'
       - 'scripts/contracts/mock-registry.json'
       - '.github/workflows/mock-contract-validation.yml'
   workflow_dispatch:
@@ -56,11 +56,10 @@ jobs:
       
       - name: Start Prism mock servers
         run: |
-          chmod +x scripts/start-prism-mocks.sh
+          chmod +x scripts/start-mocks.sh
           export DIST_DIR=$(pwd)/api-contracts/dist/openapi/v1
-          bash scripts/start-prism-mocks.sh &
+          bash scripts/start-mocks.sh &
           sleep 5
-        timeout-minutes: 1
       
       - name: Validate mock endpoints
         run: |

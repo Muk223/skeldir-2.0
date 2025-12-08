@@ -1,0 +1,11 @@
+---
+description: "Global architecture + workflow rules (applies repo-wide)"
+globs:
+  - "**/*"
+priority: 100
+model_preference: "claude-4.5-opus"
+---
+
+# Source of truth
+All global architecture and workflow rules are defined in `AGENTS.md`.
+Use that file as the canonical, model-agnostic reference.

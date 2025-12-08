@@ -1,0 +1,12 @@
+---
+description: "Quality gates, prohibitions, observability, and testing"
+globs:
+  - "**/*"
+priority: 60
+model_preference: "claude-4.5-opus"
+---
+
+# Source of truth
+Prohibitions, quality/observability, and quality gates are defined in
+`AGENTS.md` under Prohibitions, Quality and Observability, and Quality Gates.
+This file scopes auto-attach only; `AGENTS.md` remains canonical.

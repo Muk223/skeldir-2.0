@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git tag:*)",
+      "Bash(npx @stoplight/spectral-cli lint:*)",
+      "Bash(npx oasdiff:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(cd:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(xargs:*)",
+      "Bash(test:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

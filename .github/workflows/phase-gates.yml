@@ -1,0 +1,204 @@
+name: Phase Gates
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  guard-zero-containers:
+    name: Zero Container Doctrine
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Enforce zero container references
+        run: python scripts/guard_no_docker.py
+
+  gate-b0_1:
+    name: Gate B0.1 - API Contract Definition
+    runs-on: ubuntu-latest
+    needs: guard-zero-containers
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Node dependencies
+        run: npm install
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -r backend/requirements-dev.txt
+
+      - name: Execute B0.1 validations
+        id: gate
+        run: python scripts/phase_gates/run_gate.py B0.1
+        continue-on-error: true
+
+      - name: Record B0.1 acknowledgement
+        if: always()
+        run: |
+          python scripts/phase_gates/record_ack.py \
+            --phase B0.1 \
+            --status "${{ steps.gate.outcome }}" \
+            --message "B0.1 contract validation"
+
+      - name: Upload B0.1 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b0-1-evidence
+          path: backend/validation/evidence/**
+          retention-days: 7
+
+      - name: Fail gate if validations unsuccessful
+        if: steps.gate.outcome != 'success'
+        run: |
+          echo "B0.1 gate failed - validations incomplete."
+          exit 1
+
+  gate-b0_2:
+    name: Gate B0.2 - Mock Server Deployment
+    runs-on: ubuntu-latest
+    needs: guard-zero-containers
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Node dependencies
+        run: npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -r backend/requirements-dev.txt
+
+      - name: Execute B0.2 validations
+        id: gate
+        run: python scripts/phase_gates/run_gate.py B0.2
+        continue-on-error: true
+
+      - name: Record B0.2 acknowledgement
+        if: always()
+        run: |
+          python scripts/phase_gates/record_ack.py \
+            --phase B0.2 \
+            --status "${{ steps.gate.outcome }}" \
+            --message "B0.2 mock validations"
+
+      - name: Upload B0.2 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b0-2-evidence
+          path: backend/validation/evidence/**
+          retention-days: 7
+
+      - name: Fail gate if validations unsuccessful
+        if: steps.gate.outcome != 'success'
+        run: |
+          echo "B0.2 gate failed - validations incomplete."
+          exit 1
+
+  gate-b0_3:
+    name: Gate B0.3 - Database Schema Foundation
+    runs-on: ubuntu-latest
+    needs: guard-zero-containers
+    env:
+      DATABASE_URL: postgresql://postgres@localhost/skeldir_b03
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql postgresql-client
+
+      - name: Start PostgreSQL and create database
+        run: |
+          sudo service postgresql start
+          sudo -u postgres psql -c "CREATE DATABASE skeldir_b03;"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -r backend/requirements-dev.txt
+
+      - name: Execute B0.3 validations
+        id: gate
+        run: python scripts/phase_gates/run_gate.py B0.3
+        continue-on-error: true
+
+      - name: Record B0.3 acknowledgement
+        if: always()
+        run: |
+          python scripts/phase_gates/record_ack.py \
+            --phase B0.3 \
+            --status "${{ steps.gate.outcome }}" \
+            --message "B0.3 database validations"
+
+      - name: Upload B0.3 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b0-3-evidence
+          path: backend/validation/evidence/**
+          retention-days: 7
+
+      - name: Fail gate if validations unsuccessful
+        if: steps.gate.outcome != 'success'
+        run: |
+          echo "B0.3 gate failed - validations incomplete."
+          exit 1
+
+  gate-b0_all:
+    name: Aggregate Phase Gates
+    runs-on: ubuntu-latest
+    needs: [gate-b0_1, gate-b0_2, gate-b0_3]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Write empirical chain manifest
+        run: python scripts/phase_gates/write_empirical_chain.py
+
+      - name: Upload empirical chain
+        uses: actions/upload-artifact@v4
+        with:
+          name: empirical-chain
+          path: backend/validation/evidence/EMPIRICAL_CHAIN.md
+          retention-days: 7
+
+  b0_4_ready:
+    name: B0.4 Entry Guard
+    runs-on: ubuntu-latest
+    needs: gate-b0_all
+    steps:
+      - name: Confirm upstream gates complete
+        run: |
+          echo "All B0.x gates are green. B0.4 work may proceed."

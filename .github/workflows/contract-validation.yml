@@ -230,8 +230,8 @@ jobs:
       - name: Validate Invariants
         run: |
           echo "Validating invariants registry..."
-          chmod +x scripts/governance/validate-invariants.py
-          python scripts/governance/validate-invariants.py --verbose
+          chmod +x scripts/governance/validate_invariants.py
+          python scripts/governance/validate_invariants.py --verbose
 
   generate-models:
     name: Generate Pydantic Models
@@ -477,7 +477,7 @@ jobs:
 
       - name: Validate contract coverage
         run: |
-          python scripts/governance/validate-contract-coverage.py
+          python scripts/governance/validate_contract_coverage.py
 
       - name: Validate coverage manifest
         run: |
@@ -502,4 +502,4 @@ jobs:
 
       - name: Validate integration mappings
         run: |
-          python scripts/governance/validate-integration-mappings.py
+          python scripts/governance/validate_integration_mappings.py
