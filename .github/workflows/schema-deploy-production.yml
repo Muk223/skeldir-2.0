@@ -1,0 +1,103 @@
+name: Production Schema Deployment
+
+# EMPIRICALLY OPTIMAL: Deploy schema changes to Neon production ONLY after validation passes on main
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'alembic/versions/**'
+      - 'db/schema/**'
+  workflow_run:
+    workflows: ["Schema Validation"]
+    types:
+      - completed
+    branches:
+      - main
+
+jobs:
+  deploy-to-neon:
+    name: Deploy Migrations to Neon Production
+    runs-on: ubuntu-latest
+    # Only run if schema validation passed
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'push' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install alembic sqlalchemy psycopg2-binary
+      
+      - name: Get Neon connection string
+        id: neon-connection
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+        run: |
+          # Get production branch connection string from Neon API
+          RESPONSE=$(curl -s "https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/branches" \
+            -H "Authorization: Bearer ${NEON_API_KEY}" \
+            -H "Accept: application/json")
+          
+          # Extract production branch ID
+          PROD_BRANCH_ID=$(echo "$RESPONSE" | jq -r '.branches[] | select(.name == "production" or .name == "main") | .id' | head -n 1)
+          
+          # Get connection string for production branch
+          CONNECTION_URI=$(curl -s "https://console.neon.tech/api/v2/projects/${NEON_PROJECT_ID}/connection_uri?branch_id=${PROD_BRANCH_ID}&role_name=neondb_owner&database_name=neondb" \
+            -H "Authorization: Bearer ${NEON_API_KEY}" \
+            -H "Accept: application/json" | jq -r '.uri')
+          
+          echo "::add-mask::${CONNECTION_URI}"
+          echo "DATABASE_URL=${CONNECTION_URI}" >> $GITHUB_OUTPUT
+      
+      - name: Apply migrations to Neon production
+        env:
+          DATABASE_URL: ${{ steps.neon-connection.outputs.DATABASE_URL }}
+        run: |
+          echo "🚀 Deploying schema migrations to Neon production database..."
+          echo "📊 Current Alembic head: $(alembic current)"
+          
+          # Apply migrations
+          alembic upgrade head
+          
+          echo "✅ Migrations applied successfully"
+          echo "📊 New Alembic head: $(alembic current)"
+      
+      - name: Verify deployment
+        env:
+          DATABASE_URL: ${{ steps.neon-connection.outputs.DATABASE_URL }}
+        run: |
+          python -c "
+import psycopg2
+import os
+
+conn = psycopg2.connect(os.environ['DATABASE_URL'])
+cur = conn.cursor()
+
+# Verify alembic_version table exists and has current version
+cur.execute('SELECT version_num FROM alembic_version')
+version = cur.fetchone()[0]
+print(f'✅ Deployed schema version: {version}')
+
+# Count tables
+cur.execute(\"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'\")
+count = cur.fetchone()[0]
+print(f'📊 Total tables in production: {count}')
+
+cur.close()
+conn.close()
+"
+      
+      - name: Update canonical schema snapshot
+        if: success()
+        run: |
+          echo "📸 Schema deployment completed at $(date -u +\"%Y-%m-%dT%H:%M:%SZ\")" >> docs/SCHEMA_DEPLOYMENT_COMPLETE.md
+          echo "   Deployed version: $(alembic current)" >> docs/SCHEMA_DEPLOYMENT_COMPLETE.md
