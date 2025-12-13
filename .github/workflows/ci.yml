@@ -198,7 +198,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
         run: |
           cd backend
-          pytest tests/test_b051_celery_foundation.py -q
+          pytest tests/test_b051_celery_foundation.py tests/test_b052_queue_topology_and_dlq.py -q
 
       - name: Upload observability evidence artifacts
         if: always()
@@ -290,16 +290,13 @@ jobs:
           set -eo pipefail
           git status
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
-            find alembic/versions -type f -name "*.py" | sort > migration_targets.txt
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            exit 0
+            CHANGED=$(git diff --name-only HEAD^ HEAD || true)
+          else
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD || true)
           fi
 
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD)
           echo "$CHANGED" > changed_files.txt
-          grep '^alembic/versions/' changed_files.txt || true
-
           TARGETS=$(grep '^alembic/versions/' changed_files.txt || true)
           if [[ -z "$TARGETS" ]]; then
             echo "run=false" >> "$GITHUB_OUTPUT"

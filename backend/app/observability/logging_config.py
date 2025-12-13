@@ -21,6 +21,10 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
+        # Surface common Celery/task fields when provided via logger extra.
+        for key in ("task_name", "task_id", "queue", "routing_key", "db_user"):
+            if hasattr(record, key):
+                log[key] = getattr(record, key)
         # Include correlation and tenant context if available
         cid_req = getattr(record, "correlation_id_request", None) or get_request_correlation_id()
         cid_bus = getattr(record, "correlation_id_business", None) or get_business_correlation_id()

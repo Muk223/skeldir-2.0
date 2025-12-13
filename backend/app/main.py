@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import routers
-from app.api import auth, attribution
+from app.api import auth, attribution, health
 
 # Import middleware - Phase G: Active Privacy Defense
 from app.middleware import PIIStrippingMiddleware
@@ -45,6 +45,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(attribution.router, prefix="/api/attribution", tags=["Attribution"])
+app.include_router(health.router, tags=["Health"])
 
 # Health check endpoint (out-of-scope per contract_scope.yaml)
 @app.get("/health")
@@ -66,4 +67,3 @@ async def root():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-

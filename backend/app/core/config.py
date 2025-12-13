@@ -5,9 +5,15 @@ This module centralizes environment-driven configuration using Pydantic
 BaseSettings to keep deployment configuration deterministic and validated.
 """
 
+import os
+from typing import Optional
+
+from dotenv import load_dotenv
 from pydantic import Field, PostgresDsn, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
+
+# Load local .env without overriding explicit environment variables.
+load_dotenv(dotenv_path=".env", override=False)
 
 
 class Settings(BaseSettings):
@@ -53,7 +59,7 @@ class Settings(BaseSettings):
     CELERY_METRICS_ADDR: str = Field("0.0.0.0", description="Bind address for Celery worker metrics/health server")
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=None,
         case_sensitive=True,
         extra="ignore",
     )
