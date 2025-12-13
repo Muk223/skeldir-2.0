@@ -1,0 +1,131 @@
+"""
+Async database session management with tenant-aware RLS context.
+
+This module exposes a pooled SQLAlchemy async engine and a session factory that
+applies the `app.current_tenant_id` session variable required for PostgreSQL
+row-level security enforcement.
+"""
+
+import ssl
+import os
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from uuid import UUID
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.core.config import settings
+
+
+# Normalize DSN to ensure asyncpg driver is used and map unsupported parameters to connect_args.
+def _build_async_database_url_and_args() -> tuple[str, dict]:
+    raw_url = settings.DATABASE_URL.unicode_string()
+    parsed = urlsplit(raw_url)
+    query_params = dict(parse_qsl(parsed.query))
+
+    ssl_mode = query_params.pop("sslmode", None)
+    channel_binding = query_params.pop("channel_binding", None)
+
+    sanitized = urlunsplit(
+        parsed._replace(query=urlencode(query_params))
+    )
+    if sanitized.startswith("postgresql://"):
+        sanitized = sanitized.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+    connect_args: dict = {}
+    if ssl_mode:
+        # asyncpg expects an SSL context rather than sslmode keyword.
+        connect_args["ssl"] = ssl.create_default_context()
+    if channel_binding:
+        connect_args.setdefault("server_settings", {})["channel_binding"] = channel_binding
+
+    return sanitized, connect_args
+
+
+_ASYNC_DATABASE_URL, _CONNECT_ARGS = _build_async_database_url_and_args()
+_USE_NULL_POOL = os.getenv("TESTING") == "1" or settings.ENVIRONMENT.lower() == "test"
+
+engine_kwargs = {
+    "connect_args": _CONNECT_ARGS,
+    "pool_pre_ping": True,
+    "echo": False,
+}
+
+if _USE_NULL_POOL:
+    engine_kwargs["poolclass"] = NullPool
+else:
+    engine_kwargs["pool_size"] = settings.DATABASE_POOL_SIZE
+    engine_kwargs["max_overflow"] = settings.DATABASE_MAX_OVERFLOW
+
+# Engine is configured for asyncpg with explicit pool sizing controls.
+engine = create_async_engine(
+    _ASYNC_DATABASE_URL,
+    **engine_kwargs,
+)
+
+# Factory for tenant-scoped async sessions.
+AsyncSessionLocal = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
+
+
+@asynccontextmanager
+async def get_session(tenant_id: UUID) -> AsyncGenerator[AsyncSession, None]:
+    """
+    Yield an async session with tenant context set for RLS enforcement.
+
+    The session variable `app.current_tenant_id` is set before yielding the
+    session so all subsequent queries evaluate row-level policies correctly.
+    Session lifecycle is managed automatically with rollback on exception and
+    closure on exit.
+    """
+    async with AsyncSessionLocal() as session:
+        await session.execute(
+            text(
+                "SELECT set_config('app.current_tenant_id', :tenant_id, false)"
+            ),
+            {"tenant_id": str(tenant_id)},
+        )
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
+async def validate_database_connection() -> None:
+    """
+    Execute a lightweight connectivity check against the database.
+
+    Intended for startup health checks; raises SQLAlchemyError on failure.
+    """
+    try:
+        async with engine.begin() as connection:
+            await connection.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        # Re-raise to allow caller to handle/log as appropriate.
+        raise
+
+
+async def set_tenant_guc(session: AsyncSession, tenant_id: UUID, local: bool = True) -> None:
+    """
+    Explicit helper to set tenant context (app.current_tenant_id) on an existing session.
+
+    Args:
+        session: AsyncSession to mutate
+        tenant_id: UUID tenant context value
+        local: use SET LOCAL (transaction-scoped) when True; otherwise session-scoped
+    """
+    await session.execute(
+        text("SELECT set_config('app.current_tenant_id', :tenant_id, :is_local)"),
+        {"tenant_id": str(tenant_id), "is_local": local},
+    )
