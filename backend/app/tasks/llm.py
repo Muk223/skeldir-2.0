@@ -33,7 +33,13 @@ def _prepare_context(model: LLMTaskPayload) -> str:
     return correlation
 
 
-@celery_app.task(bind=True, name="app.tasks.llm.route", max_retries=3, default_retry_delay=30)
+@celery_app.task(
+    bind=True,
+    name="app.tasks.llm.route",
+    routing_key="llm.task",
+    max_retries=3,
+    default_retry_delay=30,
+)
 @tenant_task
 def llm_routing_worker(self, payload: dict, tenant_id: UUID, correlation_id: Optional[str] = None, max_cost_cents: int = 0):
     model = LLMTaskPayload(tenant_id=tenant_id, correlation_id=correlation_id, prompt=payload, max_cost_cents=max_cost_cents)

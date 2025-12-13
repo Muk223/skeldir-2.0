@@ -41,6 +41,7 @@ async def _refresh_view(view_name: str, task_id: str) -> None:
 @celery_app.task(
     bind=True,
     name="app.tasks.maintenance.refresh_all_materialized_views",
+    routing_key="maintenance.task",
     max_retries=3,
     default_retry_delay=60,
 )

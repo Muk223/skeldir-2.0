@@ -73,7 +73,7 @@ def _fetch_db_user_sync(tenant_id: Optional[UUID] = None) -> str:
         conn.close()
 
 
-@celery_app.task(bind=True, name="app.tasks.housekeeping.ping")
+@celery_app.task(bind=True, name="app.tasks.housekeeping.ping", routing_key="housekeeping.task")
 def ping(self, fail: bool = False, tenant_id: Optional[str] = None) -> dict:
     """
     Dummy task for foundation validation.

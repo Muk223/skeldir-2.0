@@ -113,6 +113,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Remove repo .env for CI isolation
+        run: |
+          rm -f .env
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
