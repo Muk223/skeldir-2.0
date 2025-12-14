@@ -10,7 +10,29 @@ import pytest
 from sqlalchemy import text
 
 os.environ["TESTING"] = "1"
-os.environ["DATABASE_URL"] = "postgresql://app_user:Sk3ld1r_App_Pr0d_2025!@ep-lucky-base-aedv3gwo-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+
+# B0.5.2: CI-first DSN unification
+# Only set DATABASE_URL if not already provided by environment (e.g., CI, local override).
+# CI must fail fast if Neon DSN leaks into test execution.
+if "DATABASE_URL" not in os.environ:
+    # Local dev default (should be overridden by .env or explicit export in production/CI)
+    os.environ["DATABASE_URL"] = "postgresql://app_user:Sk3ld1r_App_Pr0d_2025!@ep-lucky-base-aedv3gwo-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+
+# B0.5.2: CI guardrail - fail fast if Neon DSN detected in CI
+if os.getenv("CI") == "true" and "neon.tech" in os.environ.get("DATABASE_URL", ""):
+    raise RuntimeError(
+        f"CI DSN MUST be localhost; resolved={os.environ['DATABASE_URL'].split('@')[1].split('/')[0]}"
+    )
+
+# B0.5.2: Diagnostic logging for CI DSN transparency
+if os.getenv("CI") == "true":
+    dsn = os.environ.get("DATABASE_URL", "NOT_SET")
+    # Sanitize: show only host portion
+    if "@" in dsn and "/" in dsn:
+        host = dsn.split('@')[1].split('/')[0]
+        print(f"[B0.5.2 DSN DIAGNOSTIC] Resolved DB host in CI: {host}")
+    else:
+        print(f"[B0.5.2 DSN DIAGNOSTIC] DATABASE_URL format unexpected: {dsn[:30]}...")
 
 from app.db.session import engine
 

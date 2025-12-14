@@ -200,6 +200,9 @@ jobs:
       - name: Run Celery foundation tests
         env:
           PYTHONPATH: ${{ github.workspace }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          CELERY_BROKER_URL: ${{ env.CELERY_BROKER_URL }}
+          CELERY_RESULT_BACKEND: ${{ env.CELERY_RESULT_BACKEND }}
         run: |
           cd backend
           pytest tests/test_b051_celery_foundation.py tests/test_b052_queue_topology_and_dlq.py -q
