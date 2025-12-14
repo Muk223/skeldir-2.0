@@ -200,7 +200,22 @@ def _on_task_failure(task_id=None, exception=None, args=None, kwargs=None, einfo
         url = url.set(query=query)
         if url.drivername.startswith("postgresql+"):
             url = url.set(drivername="postgresql")
-        dsn = str(url)
+
+        # G4-AUTH FIX: Manually construct DSN to preserve password
+        # str(url) may drop password after multiple .set() calls
+        dsn_parts = ["postgresql://"]
+        if url.username:
+            dsn_parts.append(url.username)
+            if url.password:
+                dsn_parts.append(":")
+                dsn_parts.append(url.password)
+            dsn_parts.append("@")
+        dsn_parts.append(url.host or "localhost")
+        if url.port:
+            dsn_parts.append(f":{url.port}")
+        if url.database:
+            dsn_parts.append(f"/{url.database}")
+        dsn = "".join(dsn_parts)
 
         # G4-AUTH DIAGNOSTIC: Log final DSN (password redacted)
         if os.getenv("CI") == "true":
