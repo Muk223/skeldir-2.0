@@ -271,7 +271,6 @@ Makefile
 - Node.js 20+ (for Prism, bundler)
 - Python 3.11+ (for validators)
 - PostgreSQL (for schema validation)
-- Docker (optional, for component testing)
 
 ---
 

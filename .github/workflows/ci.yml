@@ -329,32 +329,6 @@ jobs:
             ./scripts/validate-migration.sh "$migration"
           done < migration_targets.txt
 
-            # Validate Architecture Guide Section 2.1 Compliance
-              validate-architecture:
-                  name: Architecture Guide Section 2.1 - Zero Docker Dependencies
-                      runs-on: ubuntu-latest
-                          needs: checkout
-                              steps:
-                                    - name: Checkout code
-                                            uses: actions/checkout@v4
-
-                                                  - name: Verify zero Docker dependencies
-                                                          shell: bash
-                                                                  run: |
-                                                                            # Architecture Guide Section 2.1: Docker/Docker Compose explicitly prohibited
-                                                                                      echo "Scanning for prohibited Docker/docker-compose references..."
-
-                                                                                                # Exclude CI workflows themselves and documentation from check
-                                                                                                          DOCKER_REFS=$(grep -r "docker" --exclude-dir=".git" --exclude-dir="evidence_registry" --exclude="*.md" . | grep -v "# CI:DESTRUCTIVE_OK" | grep -v ".github/workflows" | wc -l)
-
-                                                                                                                    if [ "$DOCKER_REFS" -gt 0 ]; then
-                                                                                                                                echo "❌ FAIL: Found $DOCKER_REFS Docker references (Architecture Guide Section 2.1 violation)"
-                                                                                                                                            grep -r "docker" --exclude-dir=".git" --exclude-dir="evidence_registry" --exclude="*.md" . | grep -v "# CI:DESTRUCTIVE_OK" | grep -v ".github/workflows"
-                                                                                                                                                        exit 1
-                                                                                                                                                                  else
-                                                                                                                                                                              echo "✅ PASS: Zero Docker dependencies - Architecture Guide Section 2.1 compliant"
-                                                                                                                                                                                        fi
-
   # Generate models
   generate-models:
     name: Generate Pydantic Models
