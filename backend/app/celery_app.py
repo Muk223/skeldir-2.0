@@ -277,12 +277,27 @@ def _on_task_failure(task_id=None, exception=None, args=None, kwargs=None, einfo
                 except (ValueError, TypeError):
                     pass
 
+        # B0.5.3.1: Convert UUIDs to strings for JSON serialization
+        def _serialize_for_json(obj):
+            """Recursively convert UUIDs to strings for JSON serialization."""
+            if isinstance(obj, UUID):
+                return str(obj)
+            elif isinstance(obj, dict):
+                return {k: _serialize_for_json(v) for k, v in obj.items()}
+            elif isinstance(obj, (list, tuple)):
+                return [_serialize_for_json(item) for item in obj]
+            return obj
+
         # G4-LOOP/G4-JSON: Sync persistence with proper JSONB encoding
         # B0.5.3.1: Write to canonical worker_failed_jobs table
         conn = psycopg2.connect(dsn)
         try:
             cur = conn.cursor()
             # G4-JSON: Use psycopg2.extras.Json for JSONB columns to prevent encoding defects
+            # B0.5.3.1: Serialize UUIDs to strings before JSON encoding
+            serialized_args = _serialize_for_json(args if args else [])
+            serialized_kwargs = _serialize_for_json(kwargs if kwargs else {})
+
             cur.execute("""
                 INSERT INTO worker_failed_jobs (
                     id, task_id, task_name, queue, worker,
@@ -301,8 +316,8 @@ def _on_task_failure(task_id=None, exception=None, args=None, kwargs=None, einfo
                 task_name,
                 queue,
                 worker_name,
-                psycopg2.extras.Json(args if args else []),  # G4-JSON: Explicit JSONB encoding
-                psycopg2.extras.Json(kwargs if kwargs else {}),  # G4-JSON: Explicit JSONB encoding
+                psycopg2.extras.Json(serialized_args),  # G4-JSON: Explicit JSONB encoding with UUID serialization
+                psycopg2.extras.Json(serialized_kwargs),  # G4-JSON: Explicit JSONB encoding with UUID serialization
                 str(tenant_id) if tenant_id else None,
                 error_type,
                 exception.__class__.__name__ if exception else "Unknown",
