@@ -454,6 +454,107 @@ jobs:
 
           python3 /tmp/preflight_async.py
 
+      - name: Gate 2A - DSN Fingerprint Diagnostic (Pre-Pytest)
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL_ASYNC }}  # Use async driver for tests
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: |
+          cd backend
+          echo "=== Gate 2A: DSN Fingerprint Diagnostic (Pre-Pytest Env State) ==="
+          echo ""
+          echo "Job-level env vars:"
+          echo "  DATABASE_URL_SYNC: ${{ env.DATABASE_URL_SYNC }}" | sed 's/:[^@]*@/:***@/'
+          echo "  DATABASE_URL_ASYNC: ${{ env.DATABASE_URL_ASYNC }}" | sed 's/:[^@]*@/:***@/'
+          echo ""
+          echo "Step-level env vars (as seen by this step):"
+          echo "  DATABASE_URL: ${DATABASE_URL}" | sed 's/:[^@]*@/:***@/'
+          echo "  PYTHONPATH: ${PYTHONPATH}"
+          echo ""
+          echo "Password hash prefixes (for comparison):"
+          DB_URL_SYNC_PASS=$(echo "${{ env.DATABASE_URL_SYNC }}" | sed 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/')
+          DB_URL_ASYNC_PASS=$(echo "${{ env.DATABASE_URL_ASYNC }}" | sed 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/')
+          STEP_DB_URL_PASS=$(echo "${DATABASE_URL}" | sed 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/')
+
+          echo "  DATABASE_URL_SYNC password hash: $(echo -n "$DB_URL_SYNC_PASS" | sha256sum | cut -c1-8)"
+          echo "  DATABASE_URL_ASYNC password hash: $(echo -n "$DB_URL_ASYNC_PASS" | sha256sum | cut -c1-8)"
+          echo "  DATABASE_URL (step) password hash: $(echo -n "$STEP_DB_URL_PASS" | sha256sum | cut -c1-8)"
+          echo ""
+          echo ".env file content (if exists):"
+          if [ -f .env ]; then
+            echo "  .env EXISTS - showing DATABASE_URL line (sanitized):"
+            grep "^DATABASE_URL=" .env | sed 's/:[^@]*@/:***@/' || echo "  (no DATABASE_URL line found)"
+
+            DOTENV_DB_URL=$(grep "^DATABASE_URL=" .env | cut -d'=' -f2-)
+            DOTENV_PASS=$(echo "$DOTENV_DB_URL" | sed 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/')
+            echo "  .env DATABASE_URL password hash: $(echo -n "$DOTENV_PASS" | sha256sum | cut -c1-8)"
+          else
+            echo "  .env DOES NOT EXIST"
+          fi
+          echo ""
+          echo "✓ Gate 2A complete: DSN fingerprints logged for comparison"
+
+      - name: Gate 2B - In-Test DSN Instrumentation
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL_ASYNC }}  # Use async driver for tests
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: |
+          cd backend
+          echo "=== Gate 2B: In-Test DSN Instrumentation ==="
+
+          # Create temporary instrumentation script
+          cat > /tmp/test_dsn_probe.py << 'EOF'
+          import os
+          import sys
+
+          # Show env var as seen by Python at import time
+          db_url = os.environ.get('DATABASE_URL', '<NOT SET>')
+          print(f"Gate 2B - DATABASE_URL at Python import time: {db_url.split('@')[0] if '@' in db_url else db_url}@...")
+
+          # Extract and hash password
+          if '://' in db_url and '@' in db_url:
+              try:
+                  # Format: postgresql+asyncpg://user:pass@host...
+                  creds_part = db_url.split('://')[1].split('@')[0]
+                  if ':' in creds_part:
+                      password = creds_part.split(':')[1]
+                      import hashlib
+                      pass_hash = hashlib.sha256(password.encode()).hexdigest()[:8]
+                      print(f"Gate 2B - DATABASE_URL password hash: {pass_hash}")
+              except Exception as e:
+                  print(f"Gate 2B - Could not extract password: {e}")
+
+          # Now check what settings.DATABASE_URL becomes after config loading
+          from app.core.config import settings
+          settings_url = str(settings.DATABASE_URL)
+          print(f"Gate 2B - settings.DATABASE_URL after config load: {settings_url.split('@')[0] if '@' in settings_url else settings_url}@...")
+
+          # Extract and hash password from settings
+          if '://' in settings_url and '@' in settings_url:
+              try:
+                  creds_part = settings_url.split('://')[1].split('@')[0]
+                  if ':' in creds_part:
+                      password = creds_part.split(':')[1]
+                      import hashlib
+                      pass_hash = hashlib.sha256(password.encode()).hexdigest()[:8]
+                      print(f"Gate 2B - settings.DATABASE_URL password hash: {pass_hash}")
+
+                      # Check if they match
+                      env_pass = os.environ.get('DATABASE_URL', '').split('://')[1].split('@')[0].split(':')[1] if '://' in os.environ.get('DATABASE_URL', '') else ''
+                      if env_pass:
+                          env_hash = hashlib.sha256(env_pass.encode()).hexdigest()[:8]
+                          if pass_hash == env_hash:
+                              print("✓ Gate 2B: PASSWORD MATCH - settings.DATABASE_URL uses same password as env var")
+                          else:
+                              print("✗ Gate 2B: PASSWORD MISMATCH - settings.DATABASE_URL uses DIFFERENT password than env var!")
+                              print(f"  This explains the auth failure: .env file overrode the CI env var")
+              except Exception as e:
+                  print(f"Gate 2B - Could not compare passwords: {e}")
+          EOF
+
+          python3 /tmp/test_dsn_probe.py
+          echo ""
+          echo "✓ Gate 2B complete: In-test DSN fingerprints logged"
+
       - name: R5-5 / Gate G5 - Run B0.5.3.3 contract tests (2 tests must pass)
         env:
           DATABASE_URL: ${{ env.DATABASE_URL_ASYNC }}  # Use async driver for tests

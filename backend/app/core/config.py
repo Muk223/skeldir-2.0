@@ -13,7 +13,9 @@ from pydantic import Field, PostgresDsn, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Load local .env without overriding explicit environment variables.
-load_dotenv(dotenv_path=".env", override=False)
+# Skip in CI environments (CI=true) to prevent local dev credentials from interfering.
+if os.getenv("CI") != "true":
+    load_dotenv(dotenv_path=".env", override=False)
 
 
 class Settings(BaseSettings):
