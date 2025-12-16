@@ -272,23 +272,55 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-      - name: Prepare database and roles (R2 - Deterministic role creation)
+      - name: R5-1 - Password diagnostic (masked)
+        run: |
+          echo "=== R5-1: Password Diagnostic (Masked) ==="
+
+          # Mask password immediately
+          echo "::add-mask::${{ env.APP_USER_PASSWORD }}"
+
+          # Log safe metadata: length + hash prefix
+          PASSWORD="${{ env.APP_USER_PASSWORD }}"
+          PASSWORD_LENGTH=${#PASSWORD}
+          PASSWORD_HASH=$(echo -n "$PASSWORD" | sha256sum | cut -c1-8)
+
+          echo "Password length: $PASSWORD_LENGTH"
+          echo "Password hash prefix (sha256): $PASSWORD_HASH"
+
+          if [ "$PASSWORD_LENGTH" -eq 0 ]; then
+            echo "ERROR: Password length is 0 (empty password)"
+            exit 1
+          fi
+
+          echo "✓ R5-1 MET: Password has length > 0 and hash prefix logged"
+
+      - name: R5-2 - Prepare database and roles (deterministic with proper quoting)
         env:
           PGPASSWORD: postgres
+          APP_USER_PASSWORD: ${{ env.APP_USER_PASSWORD }}
         run: |
-          echo "=== R2: Creating database roles with deterministic credentials ==="
+          echo "=== R5-2: Creating database roles with deterministic credentials ==="
 
           # Idempotent role creation - DROP + CREATE to ensure clean state
           psql -h localhost -U postgres -c "DROP ROLE IF EXISTS app_user;" || true
           psql -h localhost -U postgres -c "DROP ROLE IF EXISTS app_rw;" || true
           psql -h localhost -U postgres -c "DROP ROLE IF EXISTS app_ro;" || true
 
-          # Create roles with explicit LOGIN and password from env vars
-          psql -h localhost -U postgres -c "CREATE ROLE ${{ env.APP_USER }} WITH LOGIN PASSWORD '${{ env.APP_USER_PASSWORD }}';"
+          # Create roles with explicit LOGIN and password from shell env vars
+          # Use shell variable (not GitHub expression) to ensure proper interpolation
+          psql -h localhost -U postgres -c "CREATE ROLE ${{ env.APP_USER }} WITH LOGIN PASSWORD '$APP_USER_PASSWORD';"
           psql -h localhost -U postgres -c "CREATE ROLE app_rw WITH LOGIN PASSWORD 'app_rw';"
           psql -h localhost -U postgres -c "CREATE ROLE app_ro WITH LOGIN PASSWORD 'app_ro';"
 
-          echo "✓ Roles created with deterministic credentials"
+          echo "✓ Roles created with deterministic credentials (shell env interpolation)"
+
+          # Verify role exists and has login capability
+          ROLE_EXISTS=$(psql -h localhost -U postgres -t -c "SELECT COUNT(*) FROM pg_roles WHERE rolname = '${{ env.APP_USER }}' AND rolcanlogin = true;")
+          if [ "$ROLE_EXISTS" -ne 1 ]; then
+            echo "ERROR: app_user role not created or cannot login"
+            exit 1
+          fi
+          echo "✓ R5-2 MET: app_user role exists with rolcanlogin = true"
 
           # Create database
           psql -h localhost -U postgres -c "DROP DATABASE IF EXISTS ${{ env.DB_NAME }};" || true
@@ -305,6 +337,17 @@ jobs:
 
           echo "✓ Database setup complete with ${{ env.APP_USER }} as owner"
 
+      - name: R5-3 - Immediate post-creation auth proof
+        env:
+          PGPASSWORD: ${{ env.APP_USER_PASSWORD }}
+        run: |
+          echo "=== R5-3: Immediate Post-Creation Auth Proof ==="
+          echo "Testing app_user can authenticate immediately after role creation..."
+
+          psql -h "${{ env.DB_HOST }}" -p "${{ env.DB_PORT }}" -U "${{ env.APP_USER }}" -d "${{ env.DB_NAME }}" -c "SELECT 1 AS app_user_auth_ok;"
+
+          echo "✓ R5-3 MET: app_user authenticated successfully (app_user_auth_ok result row)"
+
       - name: Run migrations to skeldir_foundation@head (Gate G3)
         env:
           DATABASE_URL: ${{ env.DATABASE_URL_SYNC }}  # Use sync driver for Alembic
@@ -315,15 +358,20 @@ jobs:
           alembic upgrade skeldir_foundation@head
           echo "✓ Migrations complete (skeldir_foundation@head reached)"
 
-      - name: Verify schema (Gate G4 - Migration Reality Check)
+      - name: R5-4 / Gate G4 - Verify schema with canonical DSN
+        env:
+          PGPASSWORD: ${{ env.APP_USER_PASSWORD }}
         run: |
-          echo "=== G4: Revenue Ledger Schema Verification ==="
+          echo "=== R5-4 / G4: Revenue Ledger Schema Verification (Canonical DSN) ==="
           echo "Verifying revenue_ledger table structure at skeldir_foundation@head..."
-          PGPASSWORD=app_user psql -h localhost -U app_user -d skeldir_validation -c "\d+ revenue_ledger"
+          echo "Using canonical credentials from DATABASE_URL_SYNC source-of-truth"
+
+          # Use canonical DSN via psql connection parameters
+          psql -h "${{ env.DB_HOST }}" -p "${{ env.DB_PORT }}" -U "${{ env.APP_USER }}" -d "${{ env.DB_NAME }}" -c "\d+ revenue_ledger"
 
           echo ""
           echo "Counting columns in revenue_ledger..."
-          COLUMN_COUNT=$(PGPASSWORD=app_user psql -h localhost -U app_user -d skeldir_validation -t -c "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'revenue_ledger';")
+          COLUMN_COUNT=$(psql -h "${{ env.DB_HOST }}" -p "${{ env.DB_PORT }}" -U "${{ env.APP_USER }}" -d "${{ env.DB_NAME }}" -t -c "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'revenue_ledger';")
           echo "Column count: $COLUMN_COUNT"
 
           if [ "$COLUMN_COUNT" -ne 8 ]; then
@@ -331,7 +379,7 @@ jobs:
             exit 1
           fi
 
-          echo "✓ Schema verification passed: 8 columns confirmed"
+          echo "✓ R5-4 MET / G4 PASSED: Schema verification passed with 8 columns confirmed (using canonical credentials)"
 
       - name: Verify Contract B code-path integrity (Gate G6 - Part 1)
         run: |
@@ -398,15 +446,19 @@ jobs:
 
           python3 /tmp/preflight_async.py
 
-      - name: Run B0.5.3.3 contract tests (Gate G5 / R4)
+      - name: R5-5 / Gate G5 - Run B0.5.3.3 contract tests (2 tests must pass)
         env:
           DATABASE_URL: ${{ env.DATABASE_URL_ASYNC }}  # Use async driver for tests
           PYTHONPATH: ${{ github.workspace }}/backend
         run: |
           cd backend
-          echo "=== G5: Running B0.5.3.3 Revenue Contract Tests ==="
+          echo "=== R5-5 / G5: Running B0.5.3.3 Revenue Contract Tests ==="
           echo "DATABASE_URL (async): postgresql+asyncpg://app_user:***@127.0.0.1:5432/skeldir_validation"
+          echo "Expected: 2 passed (test_empty_ledger_deterministic_allocations, test_populated_ledger_ignored_identical_results)"
+
           pytest tests/test_b0533_revenue_input_contract.py -v --tb=short
+
+          echo "✓ R5-5 MET / G5 PASSED: Contract tests executed (see pytest output above for pass/fail status)"
 
   # Frontend tests (when frontend exists)
   test-frontend:
