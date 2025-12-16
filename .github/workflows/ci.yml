@@ -418,10 +418,11 @@ jobs:
 
           echo "✓ Sync connection successful (psql with app_user)"
 
-      - name: Preflight auth probe - async (R3 Part 2)
+      - name: Preflight auth probe - async (R3 Part 2 - DSN compatibility fix)
         run: |
-          echo "=== R3 Part 2: Async Connection Preflight ==="
-          echo "Testing asyncpg connection with DATABASE_URL_ASYNC..."
+          echo "=== R3 Part 2: Async Connection Preflight (DSN Compatibility Fix) ==="
+          echo "DATABASE_URL_ASYNC (SQLAlchemy dialect): postgresql+asyncpg://..."
+          echo "Stripping +asyncpg for direct asyncpg.connect() call..."
 
           cd backend
           cat > /tmp/preflight_async.py << 'EOF'
@@ -432,7 +433,14 @@ jobs:
 
           async def test_async_connection():
               try:
-                  conn = await asyncpg.connect(os.environ['DATABASE_URL_ASYNC'])
+                  # SQLAlchemy uses postgresql+asyncpg://, but asyncpg.connect() expects postgresql://
+                  # Strip the +asyncpg dialect suffix for direct asyncpg usage
+                  sqlalchemy_dsn = os.environ['DATABASE_URL_ASYNC']
+                  asyncpg_dsn = sqlalchemy_dsn.replace('postgresql+asyncpg://', 'postgresql://', 1)
+
+                  print(f'Connecting with asyncpg-native DSN: {asyncpg_dsn.split("@")[0]}@...')
+
+                  conn = await asyncpg.connect(asyncpg_dsn)
                   result = await conn.fetchval('SELECT 1')
                   await conn.close()
                   print(f'✓ Async connection successful: SELECT 1 returned {result}')
