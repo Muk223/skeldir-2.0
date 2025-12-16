@@ -243,9 +243,15 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      # Dual-URL strategy (H2): sync for Alembic, async for tests
-      DATABASE_URL_SYNC: postgresql://app_user:app_user@127.0.0.1:5432/skeldir_validation
-      DATABASE_URL_ASYNC: postgresql+asyncpg://app_user:app_user@127.0.0.1:5432/skeldir_validation
+      # R1: Single source of truth for credentials
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_NAME: skeldir_validation
+      APP_USER: app_user
+      APP_USER_PASSWORD: app_user_ci_ephemeral_2025
+      # Dual-URL strategy constructed from single credential source
+      DATABASE_URL_SYNC: postgresql://app_user:app_user_ci_ephemeral_2025@127.0.0.1:5432/skeldir_validation
+      DATABASE_URL_ASYNC: postgresql+asyncpg://app_user:app_user_ci_ephemeral_2025@127.0.0.1:5432/skeldir_validation
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -266,17 +272,38 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
-      - name: Prepare database and roles
+      - name: Prepare database and roles (R2 - Deterministic role creation)
+        env:
+          PGPASSWORD: postgres
         run: |
-          echo "Creating database roles and skeldir_validation database..."
-          PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE USER app_user WITH PASSWORD 'app_user';"
-          PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE USER app_rw WITH PASSWORD 'app_rw';"
-          PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE USER app_ro WITH PASSWORD 'app_ro';"
-          PGPASSWORD=postgres psql -h localhost -U postgres -c "CREATE DATABASE skeldir_validation OWNER app_user;"
-          PGPASSWORD=postgres psql -h localhost -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE skeldir_validation TO app_user;"
-          PGPASSWORD=postgres psql -h localhost -U postgres -d skeldir_validation -c "GRANT ALL ON SCHEMA public TO app_user;"
-          PGPASSWORD=postgres psql -h localhost -U postgres -d skeldir_validation -c "ALTER DATABASE skeldir_validation SET app.current_tenant_id = '00000000-0000-0000-0000-000000000000';"
-          echo "Database setup complete"
+          echo "=== R2: Creating database roles with deterministic credentials ==="
+
+          # Idempotent role creation - DROP + CREATE to ensure clean state
+          psql -h localhost -U postgres -c "DROP ROLE IF EXISTS app_user;" || true
+          psql -h localhost -U postgres -c "DROP ROLE IF EXISTS app_rw;" || true
+          psql -h localhost -U postgres -c "DROP ROLE IF EXISTS app_ro;" || true
+
+          # Create roles with explicit LOGIN and password from env vars
+          psql -h localhost -U postgres -c "CREATE ROLE ${{ env.APP_USER }} WITH LOGIN PASSWORD '${{ env.APP_USER_PASSWORD }}';"
+          psql -h localhost -U postgres -c "CREATE ROLE app_rw WITH LOGIN PASSWORD 'app_rw';"
+          psql -h localhost -U postgres -c "CREATE ROLE app_ro WITH LOGIN PASSWORD 'app_ro';"
+
+          echo "✓ Roles created with deterministic credentials"
+
+          # Create database
+          psql -h localhost -U postgres -c "DROP DATABASE IF EXISTS ${{ env.DB_NAME }};" || true
+          psql -h localhost -U postgres -c "CREATE DATABASE ${{ env.DB_NAME }} OWNER ${{ env.APP_USER }};"
+
+          # Grant privileges
+          psql -h localhost -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE ${{ env.DB_NAME }} TO ${{ env.APP_USER }};"
+          psql -h localhost -U postgres -d ${{ env.DB_NAME }} -c "GRANT ALL ON SCHEMA public TO ${{ env.APP_USER }};"
+          psql -h localhost -U postgres -d ${{ env.DB_NAME }} -c "GRANT ALL ON SCHEMA public TO app_rw;"
+          psql -h localhost -U postgres -d ${{ env.DB_NAME }} -c "GRANT USAGE ON SCHEMA public TO app_ro;"
+
+          # Set tenant context
+          psql -h localhost -U postgres -d ${{ env.DB_NAME }} -c "ALTER DATABASE ${{ env.DB_NAME }} SET app.current_tenant_id = '00000000-0000-0000-0000-000000000000';"
+
+          echo "✓ Database setup complete with ${{ env.APP_USER }} as owner"
 
       - name: Run migrations to skeldir_foundation@head (Gate G3)
         env:
@@ -332,7 +359,46 @@ jobs:
 
           echo "✓ Doc coherence check complete (all allocation_id references are qualified)"
 
-      - name: Run B0.5.3.3 contract tests (Gate G5)
+      - name: Preflight auth probe - sync (R3 Part 1)
+        env:
+          PGPASSWORD: ${{ env.APP_USER_PASSWORD }}
+        run: |
+          echo "=== R3 Part 1: Sync Connection Preflight ==="
+          echo "Testing psql connection with app_user credentials..."
+
+          psql -h ${{ env.DB_HOST }} -p ${{ env.DB_PORT }} -U ${{ env.APP_USER }} -d ${{ env.DB_NAME }} -c "SELECT 1 AS preflight_sync_ok;"
+
+          echo "✓ Sync connection successful (psql with app_user)"
+
+      - name: Preflight auth probe - async (R3 Part 2)
+        run: |
+          echo "=== R3 Part 2: Async Connection Preflight ==="
+          echo "Testing asyncpg connection with DATABASE_URL_ASYNC..."
+
+          cd backend
+          cat > /tmp/preflight_async.py << 'EOF'
+          import asyncio
+          import asyncpg
+          import sys
+          import os
+
+          async def test_async_connection():
+              try:
+                  conn = await asyncpg.connect(os.environ['DATABASE_URL_ASYNC'])
+                  result = await conn.fetchval('SELECT 1')
+                  await conn.close()
+                  print(f'✓ Async connection successful: SELECT 1 returned {result}')
+                  return 0
+              except Exception as e:
+                  print(f'ERROR: Async connection failed: {e}', file=sys.stderr)
+                  return 1
+
+          sys.exit(asyncio.run(test_async_connection()))
+          EOF
+
+          python3 /tmp/preflight_async.py
+
+      - name: Run B0.5.3.3 contract tests (Gate G5 / R4)
         env:
           DATABASE_URL: ${{ env.DATABASE_URL_ASYNC }}  # Use async driver for tests
           PYTHONPATH: ${{ github.workspace }}/backend
