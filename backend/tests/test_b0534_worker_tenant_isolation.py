@@ -107,13 +107,13 @@ class TestWorkerTenantIsolation:
                 window_start=window_start,
                 window_end=window_end,
                 correlation_id=str(uuid4()),
-            ).get()
+            ).get(disable_sync_subtasks=False)
             result_b = recompute_window.delay(
                 tenant_id=tenant_b,
                 window_start=window_start,
                 window_end=window_end,
                 correlation_id=str(uuid4()),
-            ).get()
+            ).get(disable_sync_subtasks=False)
 
             assert result_a["status"] == "succeeded"
             assert result_b["status"] == "succeeded"
@@ -124,6 +124,7 @@ class TestWorkerTenantIsolation:
                     text("SELECT set_config('app.current_tenant_id', :tenant_id, true)"),
                     {"tenant_id": str(tenant_a)},
                 )
+                await conn.execute(text("SET LOCAL ROLE app_rw"))
                 alloc_a = await conn.execute(
                     text(
                         """
@@ -212,13 +213,13 @@ class TestWorkerTenantIsolation:
                 window_start=window_start,
                 window_end=window_end,
                 model_version=model_version,
-            ).get()
+            ).get(disable_sync_subtasks=False)
             recompute_window.delay(
                 tenant_id=tenant_id,
                 window_start=window_start,
                 window_end=window_end,
                 model_version=model_version,
-            ).get()
+            ).get(disable_sync_subtasks=False)
 
             async with engine.begin() as conn:
                 await conn.execute(
@@ -299,7 +300,7 @@ class TestWorkerTenantIsolation:
                 tenant_id=tenant_id,
                 window_start=window_start,
                 window_end=window_end,
-            ).get()
+            ).get(disable_sync_subtasks=False)
 
         try:
             loop = asyncio.get_event_loop()
@@ -366,7 +367,7 @@ class TestWorkerTenantIsolation:
                 recompute_window.delay(
                     window_start="2025-06-15T00:00:00Z",
                     window_end="2025-06-16T00:00:00Z",
-                ).get(propagate=True)
+                ).get(propagate=True, disable_sync_subtasks=False)
 
             async with engine.begin() as conn:
                 dlq_result = await conn.execute(
