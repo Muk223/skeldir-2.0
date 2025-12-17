@@ -11,28 +11,49 @@ from sqlalchemy import text
 
 os.environ["TESTING"] = "1"
 
-# B0.5.2: CI-first DSN unification
-# Only set DATABASE_URL if not already provided by environment (e.g., CI, local override).
-# CI must fail fast if Neon DSN leaks into test execution.
-if "DATABASE_URL" not in os.environ:
-    # Local dev default (should be overridden by .env or explicit export in production/CI)
-    os.environ["DATABASE_URL"] = "postgresql://app_user:Sk3ld1r_App_Pr0d_2025!@ep-lucky-base-aedv3gwo-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-
-# B0.5.2: CI guardrail - fail fast if Neon DSN detected in CI
-if os.getenv("CI") == "true" and "neon.tech" in os.environ.get("DATABASE_URL", ""):
-    raise RuntimeError(
-        f"CI DSN MUST be localhost; resolved={os.environ['DATABASE_URL'].split('@')[1].split('/')[0]}"
-    )
-
-# B0.5.2: Diagnostic logging for CI DSN transparency
+# B0.5.3.3 Gate C: CI-first credential coherence (MUST execute before any imports)
+# In CI, DATABASE_URL MUST be provided by step env vars - no fallbacks, no defaults.
 if os.getenv("CI") == "true":
-    dsn = os.environ.get("DATABASE_URL", "NOT_SET")
-    # Sanitize: show only host portion
+    if "DATABASE_URL" not in os.environ:
+        raise RuntimeError(
+            "[B0.5.3.3 Gate C] CI FAILURE: DATABASE_URL not set in environment. "
+            "pytest step MUST explicitly set DATABASE_URL env var before test execution. "
+            "This prevents conftest from setting stale fallback credentials that cause "
+            "Celery broker/result backend auth failures (psycopg2.OperationalError)."
+        )
+
+    # Validate CI DSN is localhost (not Neon production)
+    if "neon.tech" in os.environ["DATABASE_URL"]:
+        raise RuntimeError(
+            f"[B0.5.3.3 Gate C] CI DSN MUST be localhost; "
+            f"resolved={os.environ['DATABASE_URL'].split('@')[1].split('/')[0]}"
+        )
+
+    # Diagnostic logging for CI DSN transparency
+    dsn = os.environ["DATABASE_URL"]
     if "@" in dsn and "/" in dsn:
         host = dsn.split('@')[1].split('/')[0]
-        print(f"[B0.5.2 DSN DIAGNOSTIC] Resolved DB host in CI: {host}")
+        print(f"[B0.5.3.3 Gate C] CI DATABASE_URL host: {host}")
+        # Log password fingerprint for credential coherence validation
+        import hashlib
+        if "://" in dsn and "@" in dsn:
+            try:
+                creds = dsn.split('://')[1].split('@')[0]
+                if ':' in creds:
+                    password = creds.split(':')[1]
+                    pass_hash = hashlib.sha256(password.encode()).hexdigest()[:8]
+                    print(f"[B0.5.3.3 Gate C] CI DATABASE_URL password hash: {pass_hash}")
+            except Exception:
+                pass
     else:
-        print(f"[B0.5.2 DSN DIAGNOSTIC] DATABASE_URL format unexpected: {dsn[:30]}...")
+        print(f"[B0.5.3.3 Gate C] DATABASE_URL format unexpected: {dsn[:30]}...")
+
+else:
+    # Local dev fallback (only when NOT in CI)
+    if "DATABASE_URL" not in os.environ:
+        # Local dev default (should be overridden by .env or explicit export)
+        os.environ["DATABASE_URL"] = "postgresql://app_user:Sk3ld1r_App_Pr0d_2025!@ep-lucky-base-aedv3gwo-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+        print("[B0.5.3.3 Gate C] Local dev: Using Neon DSN fallback (override with DATABASE_URL env var)")
 
 from app.db.session import engine
 
