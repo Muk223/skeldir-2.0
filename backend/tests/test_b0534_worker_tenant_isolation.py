@@ -36,8 +36,8 @@ async def _insert_events(conn, tenant_id, events):
             """
             INSERT INTO attribution_events (id, tenant_id, occurred_at, revenue_cents, raw_payload)
             VALUES
-                (:id1, :tenant_id, :ts1::timestamptz, :rev1, '{}'::jsonb),
-                (:id2, :tenant_id, :ts2::timestamptz, :rev2, '{}'::jsonb)
+                (:id1, :tenant_id, CAST(:ts1 AS timestamptz), :rev1, '{}'::jsonb),
+                (:id2, :tenant_id, CAST(:ts2 AS timestamptz), :rev2, '{}'::jsonb)
             ON CONFLICT DO NOTHING
             """
         ),
