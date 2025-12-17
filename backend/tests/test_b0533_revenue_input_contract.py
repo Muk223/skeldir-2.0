@@ -175,9 +175,10 @@ class TestRevenueInputContract:
             f"Expected 6 allocations (2 events × 3 channels), got {len(allocations)}"
 
         # Verify allocation values are deterministic (equal split across channels)
-        expected_ratio = 1.0 / 3.0  # BASELINE_CHANNELS = ["google_search", "direct", "email"]
+        from decimal import Decimal
+        expected_ratio = Decimal("1.0") / Decimal("3.0")  # BASELINE_CHANNELS = ["google_search", "direct", "email"]
         for event_id, channel, ratio, revenue in allocations:
-            assert abs(ratio - expected_ratio) < 0.00001, \
+            assert abs(ratio - expected_ratio) < Decimal("0.00001"), \
                 f"Allocation ratio must be {expected_ratio}, got {ratio}"
 
         # CRITICAL: Ledger count unchanged (worker doesn't write ledger)
