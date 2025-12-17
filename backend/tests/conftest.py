@@ -57,6 +57,11 @@ else:
 
 from app.db.session import engine
 
+# B0.5.3.3 Gate C: Trigger Celery configuration AFTER DATABASE_URL validation
+# This ensures settings is imported with validated credentials
+from app.celery_app import _ensure_celery_configured
+_ensure_celery_configured()
+
 
 @pytest.fixture(scope="function")
 async def test_tenant():

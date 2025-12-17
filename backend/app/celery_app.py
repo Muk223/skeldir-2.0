@@ -11,12 +11,26 @@ from typing import Optional
 from celery import Celery, signals
 from sqlalchemy.engine.url import make_url
 
-from app.core.config import settings
+# B0.5.3.3 Gate C: Defer settings import to prevent premature initialization
+# Import settings ONLY when Celery config is actually built, not at module load time
+# from app.core.config import settings  # REMOVED - now imported in _get_settings()
+
 from app.observability import metrics
 from app.observability.logging_config import configure_logging
 from app.observability.worker_monitoring import start_worker_http_server
 
 logger = logging.getLogger(__name__)
+
+
+def _get_settings():
+    """
+    B0.5.3.3 Gate C: Lazy settings import to ensure conftest validation runs first.
+
+    By deferring settings import until Celery config build time, we guarantee
+    that pytest conftest.py can validate/set DATABASE_URL before settings reads it.
+    """
+    from app.core.config import settings
+    return settings
 
 
 def _sync_sqlalchemy_url(raw_url: str) -> str:
@@ -40,6 +54,7 @@ def _build_broker_url() -> str:
     Build broker URL using SQLAlchemy transport over Postgres (sqla+postgresql://...).
     Defaults to DATABASE_URL-derived sync DSN when CELERY_BROKER_URL is unset.
     """
+    settings = _get_settings()  # B0.5.3.3 Gate C: Lazy settings access
     if settings.CELERY_BROKER_URL:
         return settings.CELERY_BROKER_URL
     base = _sync_sqlalchemy_url(settings.DATABASE_URL.unicode_string())
@@ -51,53 +66,72 @@ def _build_result_backend() -> str:
     Build result backend URL using Celery database backend over Postgres (db+postgresql://...).
     Defaults to DATABASE_URL-derived sync DSN when CELERY_RESULT_BACKEND is unset.
     """
+    settings = _get_settings()  # B0.5.3.3 Gate C: Lazy settings access
     if settings.CELERY_RESULT_BACKEND:
         return settings.CELERY_RESULT_BACKEND
     base = _sync_sqlalchemy_url(settings.DATABASE_URL.unicode_string())
     return f"db+{base}"
 
 
+# B0.5.3.3 Gate C: Create Celery app but defer configuration until first use
+# This prevents premature settings import at module load time
 celery_app = Celery("skeldir_backend")
+_celery_configured = False
 
-# B0.5.2: Explicit queue topology for deterministic routing
-from kombu import Queue
 
-celery_app.conf.update(
-    broker_url=_build_broker_url(),
-    result_backend=_build_result_backend(),
-    task_serializer="json",
-    result_serializer="json",
-    accept_content=["json"],
-    enable_utc=True,
-    timezone="UTC",
-    task_track_started=True,
-    broker_transport_options={"pool_recycle": 300},
-    worker_send_task_events=True,
-    worker_hijack_root_logger=False,
-    include=[
-        "app.tasks.housekeeping",
-        "app.tasks.maintenance",
-        "app.tasks.llm",
-        "app.tasks.attribution",
-    ],
-    # B0.5.2: Fixed queue topology
-    # B0.5.3.1: Added attribution queue for deterministic routing
-    task_queues=[
-        Queue('housekeeping', routing_key='housekeeping.#'),
-        Queue('maintenance', routing_key='maintenance.#'),
-        Queue('llm', routing_key='llm.#'),
-        Queue('attribution', routing_key='attribution.#'),
-    ],
-    task_routes={
-        'app.tasks.housekeeping.*': {'queue': 'housekeeping', 'routing_key': 'housekeeping.task'},
-        'app.tasks.maintenance.*': {'queue': 'maintenance', 'routing_key': 'maintenance.task'},
-        'app.tasks.llm.*': {'queue': 'llm', 'routing_key': 'llm.task'},
-        'app.tasks.attribution.*': {'queue': 'attribution', 'routing_key': 'attribution.task'},
-    },
-    task_default_queue='housekeeping',
-    task_default_exchange='tasks',
-    task_default_routing_key='housekeeping.task',
-)
+def _ensure_celery_configured():
+    """
+    B0.5.3.3 Gate C: Lazy Celery configuration to prevent premature DB connections.
+
+    By deferring broker/backend configuration until first actual use, we ensure
+    pytest conftest validation runs before settings is imported and DB connections
+    are attempted.
+
+    This function is idempotent - safe to call multiple times.
+    """
+    global _celery_configured
+    if _celery_configured:
+        return
+
+    from kombu import Queue
+
+    celery_app.conf.update(
+        broker_url=_build_broker_url(),
+        result_backend=_build_result_backend(),
+        task_serializer="json",
+        result_serializer="json",
+        accept_content=["json"],
+        enable_utc=True,
+        timezone="UTC",
+        task_track_started=True,
+        broker_transport_options={"pool_recycle": 300},
+        worker_send_task_events=True,
+        worker_hijack_root_logger=False,
+        include=[
+            "app.tasks.housekeeping",
+            "app.tasks.maintenance",
+            "app.tasks.llm",
+            "app.tasks.attribution",
+        ],
+        # B0.5.2: Fixed queue topology
+        # B0.5.3.1: Added attribution queue for deterministic routing
+        task_queues=[
+            Queue('housekeeping', routing_key='housekeeping.#'),
+            Queue('maintenance', routing_key='maintenance.#'),
+            Queue('llm', routing_key='llm.#'),
+            Queue('attribution', routing_key='attribution.#'),
+        ],
+        task_routes={
+            'app.tasks.housekeeping.*': {'queue': 'housekeeping', 'routing_key': 'housekeeping.task'},
+            'app.tasks.maintenance.*': {'queue': 'maintenance', 'routing_key': 'maintenance.task'},
+            'app.tasks.llm.*': {'queue': 'llm', 'routing_key': 'llm.task'},
+            'app.tasks.attribution.*': {'queue': 'attribution', 'routing_key': 'attribution.task'},
+        },
+        task_default_queue='housekeeping',
+        task_default_exchange='tasks',
+        task_default_routing_key='housekeeping.task',
+    )
+    _celery_configured = True
 
 
 @signals.worker_process_init.connect
@@ -105,6 +139,7 @@ def _configure_worker_logging(**kwargs):
     """
     Ensure structured logging is configured inside each worker process.
     """
+    settings = _get_settings()  # B0.5.3.3 Gate C: Lazy settings access
     configure_logging(settings.LOG_LEVEL)
     start_worker_http_server(
         celery_app,
@@ -156,7 +191,9 @@ def _on_task_failure(task_id=None, exception=None, args=None, kwargs=None, einfo
         import psycopg2.extras
         from uuid import UUID, uuid4
         from sqlalchemy.engine.url import make_url
-        from app.core.config import settings
+
+        # B0.5.3.3 Gate C: Lazy settings access in DLQ handler
+        settings = _get_settings()
 
         # G4-AUTH: Build sync DSN with 127.0.0.1 normalization for CI determinism
         # Step 1: Get raw DATABASE_URL from settings
