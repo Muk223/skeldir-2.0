@@ -11,6 +11,11 @@ from sqlalchemy import text
 
 os.environ["TESTING"] = "1"
 
+# B0.5.3.3 Gate B: Install forensic instrumentation BEFORE any other imports
+# This must be the FIRST import to capture the initial psycopg2.connect() call
+if os.getenv("CI") == "true":
+    import conftest_instrumentation  # noqa: F401
+
 # B0.5.3.3 Gate C: CI-first credential coherence (MUST execute before any imports)
 # In CI, DATABASE_URL MUST be provided by step env vars - no fallbacks, no defaults.
 if os.getenv("CI") == "true":
