@@ -28,9 +28,12 @@ def _normalize_tenant_id(value: Any) -> UUID:
 
 async def _set_tenant_guc_global(tenant_id: UUID) -> None:
     async with engine.begin() as conn:
-        await set_tenant_guc(conn, tenant_id, local=False)
-        # Guardrail: read back to prove it stuck for this connection
-        await conn.execute(text("SELECT current_setting('app.current_tenant_id')"))
+        # Use SET LOCAL semantics so the value is scoped to this transaction only.
+        # This prevents connection pool reuse from leaking a previous tenant_id into
+        # a subsequent task when the same connection is returned to the pool.
+        await set_tenant_guc(conn, tenant_id, local=True)
+        # Guardrail: read back to prove the GUC is set for this transaction
+        await conn.execute(text("SELECT current_setting('app.current_tenant_id', true)"))
 
 
 def tenant_task(task_fn: Callable) -> Callable:

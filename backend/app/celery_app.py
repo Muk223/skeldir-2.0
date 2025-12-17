@@ -334,6 +334,12 @@ def _on_task_failure(task_id=None, exception=None, args=None, kwargs=None, einfo
                     correlation_id = UUID(str(correlation_id_val))
                 except (ValueError, TypeError):
                     pass
+        # Correlation must be present for DLQ diagnostics; fall back to task_id when missing.
+        if correlation_id is None and task_id:
+            try:
+                correlation_id = UUID(str(task_id))
+            except (ValueError, TypeError):
+                correlation_id = None
 
         # B0.5.3.1: Convert UUIDs to strings for JSON serialization
         def _serialize_for_json(obj):

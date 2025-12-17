@@ -16,10 +16,10 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
 
 from app.celery_app import celery_app
 from app.core.db import engine
+from app.db.session import set_tenant_guc
 from app.observability.context import set_request_correlation_id, set_tenant_id
 from app.tasks.context import tenant_task
 
@@ -157,6 +157,8 @@ async def _upsert_job_identity(
         Exception: On database errors
     """
     async with engine.begin() as conn:
+        # Ensure tenant-scoped RLS context for this transaction
+        await set_tenant_guc(conn, tenant_id, local=True)
         # Attempt INSERT to create new job identity
         # If UNIQUE constraint violation occurs, UPDATE existing row instead
         result = await conn.execute(
@@ -230,6 +232,8 @@ async def _mark_job_status(
         error_message: Error message (if status=failed)
     """
     async with engine.begin() as conn:
+        # Ensure tenant-scoped RLS context for this transaction
+        await set_tenant_guc(conn, tenant_id, local=True)
         await conn.execute(
             text("""
                 UPDATE attribution_recompute_jobs
@@ -281,7 +285,7 @@ async def _compute_allocations_deterministic_baseline(
     """
     async with engine.begin() as conn:
         # Set tenant context for RLS policy
-        await conn.execute(text(f"SET LOCAL app.current_tenant_id = '{tenant_id}'"))
+        await set_tenant_guc(conn, tenant_id, local=True)
 
         # Step 1: Read events in window (read-only, append-only table)
         events_result = await conn.execute(

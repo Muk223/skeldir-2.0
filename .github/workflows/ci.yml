@@ -5,6 +5,7 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  workflow_dispatch:
 
 jobs:
   # Single git checkout - Schmidt's key requirement
@@ -568,6 +569,20 @@ jobs:
           pytest tests/test_b0533_revenue_input_contract.py -v --tb=short
 
           echo "✓ R5-5 MET / G5 PASSED: Contract tests executed (see pytest output above for pass/fail status)"
+
+      - name: R5-6 / B0.5.3.4 - Worker tenant isolation tests
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL_ASYNC }}  # Use async driver for tests
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: |
+          cd backend
+          echo "=== R5-6 / B0.5.3.4: Worker tenant isolation tests ==="
+          echo "DATABASE_URL (async): postgresql+asyncpg://app_user:***@127.0.0.1:5432/skeldir_validation"
+          echo "Expected: 4 tests (Gate A isolation + idempotency + concurrency + Gate B DLQ)"
+
+          pytest tests/test_b0534_worker_tenant_isolation.py -q
+
+          echo "✓ R5-6 MET / B0.5.3.4 PASSED: Worker tenant isolation tests executed"
 
   # Frontend tests (when frontend exists)
   test-frontend:
