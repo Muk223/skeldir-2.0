@@ -25,12 +25,21 @@ async def _insert_tenant(conn, tenant_id):
     )
 
 
+from datetime import datetime, timezone
+
+
+def _to_dt(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+
+
 async def _insert_events(conn, tenant_id, events):
     # RLS requires the tenant GUC to be set for writes.
     await conn.execute(
         text("SELECT set_config('app.current_tenant_id', :tenant_id, true)"),
         {"tenant_id": str(tenant_id)},
     )
+    ts1 = _to_dt(events[0][1])
+    ts2 = _to_dt(events[1][1])
     await conn.execute(
         text(
             """
@@ -45,8 +54,8 @@ async def _insert_events(conn, tenant_id, events):
             "id1": events[0][0],
             "id2": events[1][0],
             "tenant_id": tenant_id,
-            "ts1": events[0][1],
-            "ts2": events[1][1],
+            "ts1": ts1,
+            "ts2": ts2,
             "rev1": events[0][2],
             "rev2": events[1][2],
         },
