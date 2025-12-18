@@ -25,6 +25,9 @@ from app.tasks.context import tenant_task
 
 logger = logging.getLogger(__name__)
 
+# B0.5.3.6: Canonical deterministic channel ordering for baseline allocations
+BASELINE_CHANNELS = ["direct", "email", "google_search"]
+
 
 def _run_async(coro_factory, *args, **kwargs):
     """
@@ -318,8 +321,7 @@ async def _compute_allocations_deterministic_baseline(
             return {"event_count": 0, "allocation_count": 0}
 
         # Step 2: Deterministic baseline allocation logic
-        # Fixed channels for deterministic output (real model would use ML/rules)
-        BASELINE_CHANNELS = ["google_search", "direct", "email"]
+        # Fixed channels for deterministic output (alphabetical ordering enforced)
         allocation_ratio = 1.0 / len(BASELINE_CHANNELS)  # Equal split
 
         allocation_count = 0

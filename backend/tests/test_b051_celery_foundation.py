@@ -1,4 +1,5 @@
 import os
+import logging
 import sys
 import time
 import subprocess
@@ -73,11 +74,14 @@ def _wait_for_worker(timeout: int = 60) -> None:
     backend = celery_app.conf.result_backend
     _log_app_identity(logger)
 
+    original_eager = celery_app.conf.task_always_eager
+    celery_app.conf.task_always_eager = False
+
     async def _result_row_status(task_id: str):
         async with engine.begin() as conn:
             row = await conn.execute(
                 text(
-                    "SELECT status FROM celery_taskmeta WHERE task_id = :tid"
+                    "SELECT status, result, traceback FROM celery_taskmeta WHERE task_id = :tid"
                 ),
                 {"tid": task_id},
             )
@@ -85,61 +89,71 @@ def _wait_for_worker(timeout: int = 60) -> None:
 
     deadline = time.time() + timeout
     last_exc: Exception | None = None
-    while time.time() < deadline:
-        try:
-            # Data-plane readiness: enqueue task to housekeeping queue (registry-independent)
+    try:
+        while time.time() < deadline:
+            result = None
             try:
-                result = ping.delay()
-                logger.warning("[readiness-debug] published ping task_id=%s via delay()", result.id)
-            except NotRegistered as exc:
-                logger.warning("[readiness-debug] ping.delay NotRegistered (%s); falling back to send_task", exc)
+                # Data-plane readiness: publish by name to avoid local registry dependence
                 result = celery_app.send_task(
                     "app.tasks.housekeeping.ping",
-                    kwargs={},
+                    kwargs={"fail": False},
                     queue="housekeeping",
                 )
-                logger.warning("[readiness-debug] published ping task_id=%s via send_task()", result.id)
-
-            # Block until task completes or 10s timeout
-            result.get(timeout=10)
-            logger.warning(
-                "[readiness-debug] ping task_id=%s completed via result backend", result.id
-            )
-            # Success: worker consumed from broker and persisted to result backend
-            return
-        except Exception as exc:
-            last_exc = exc
-            # Worker not ready yet, retry after checking DB for persisted result
-            try:
-                rec = asyncio.run(_result_row_status(result.id))
-                if rec:
-                    status = rec[0]
-                    logger.warning(
-                        "[readiness-debug] taskmeta status for %s = %s", result.id, status
-                    )
-                    if status == states.SUCCESS:
-                        logger.warning(
-                            "[readiness-debug] ping task_id=%s marked SUCCESS in DB despite get() error (%s); treating as ready",
-                            result.id,
-                            exc,
-                        )
-                        return
-                    if status == states.FAILURE:
-                        logger.warning(
-                            "[readiness-debug] ping task_id=%s marked FAILURE in DB; retrying readiness",
-                            result.id,
-                        )
-            except Exception as db_exc:
                 logger.warning(
-                    "[readiness-debug] DB probe failed for task_id=%s: %s",
+                    "[readiness-debug] published ping task_id=%s via send_task() state=%s",
                     result.id,
-                    db_exc,
+                    result.state,
                 )
-            logger.warning("[readiness-debug] ping attempt failed (%s); retrying...", exc)
-        time.sleep(2)
-    raise RuntimeError(
-        f"Celery worker not ready: data-plane task execution failed (last_error={last_exc}, broker={broker}, backend={backend})"
-    )
+
+                # Block until task completes or 10s timeout
+                result.get(timeout=10)
+                logger.warning(
+                    "[readiness-debug] ping task_id=%s completed via result backend", result.id
+                )
+                # Success: worker consumed from broker and persisted to result backend
+                return
+            except Exception as exc:
+                last_exc = exc
+                # Worker not ready yet, retry after checking DB for persisted result
+                try:
+                    if result:
+                        rec = asyncio.run(_result_row_status(result.id))
+                        if rec:
+                            status, res_payload, traceback_text = rec
+                            logger.warning(
+                                "[readiness-debug] taskmeta status for %s = %s result=%s",
+                                result.id,
+                                status,
+                                res_payload,
+                            )
+                            if status == states.SUCCESS:
+                                logger.warning(
+                                    "[readiness-debug] ping task_id=%s marked SUCCESS in DB despite get() error (%s); treating as ready",
+                                    result.id,
+                                    exc,
+                                )
+                                return
+                            if status == states.FAILURE:
+                                logger.warning(
+                                    "[readiness-debug] ping task_id=%s marked FAILURE (result=%s traceback=%s); aborting readiness attempt",
+                                    result.id,
+                                    res_payload,
+                                    traceback_text,
+                                )
+                                # Failure means the task executed and failed (e.g., fail=True). Keep last_exc and retry.
+                except Exception as db_exc:
+                    logger.warning(
+                        "[readiness-debug] DB probe failed for task_id=%s: %s",
+                        result.id if result else "<none>",
+                        db_exc,
+                    )
+                logger.warning("[readiness-debug] ping attempt failed (%s); retrying...", exc)
+            time.sleep(2)
+        raise RuntimeError(
+            f"Celery worker not ready: data-plane task execution failed (last_error={last_exc}, broker={broker}, backend={backend})"
+        )
+    finally:
+        celery_app.conf.task_always_eager = original_eager
 
 
 async def _fetch_taskmeta_row(task_id: str):
@@ -172,6 +186,8 @@ def celery_worker_proc():
         "solo",
         "-c",
         "1",
+        "-Q",
+        "housekeeping,maintenance,llm,attribution",
         "--loglevel=INFO",
     ]
     proc = subprocess.Popen(
@@ -204,6 +220,7 @@ def test_celery_config_uses_postgres_sqla():
 @pytest.mark.asyncio
 async def test_ping_task_runs_and_persists_result(celery_worker_proc):
     # Publish by name to avoid local registry dependence
+    _log_app_identity(logging.getLogger(__name__))
     result = celery_app.send_task("app.tasks.housekeeping.ping", queue="housekeeping", kwargs={})
     payload = result.get(timeout=30)
     assert payload["status"] == "ok"
@@ -256,11 +273,15 @@ async def test_metrics_exposed_via_fastapi(monkeypatch):
 
 def test_worker_logs_are_structured(caplog):
     configure_logging()
+    original = celery_app.conf.task_always_eager
     celery_app.conf.task_always_eager = True
     caplog.set_level("INFO")
-    ping.delay()
-    with pytest.raises(ValueError):
-        ping.delay(fail=True).get(propagate=True)
+    try:
+        ping.delay()
+        with pytest.raises(ValueError):
+            ping.delay(fail=True).get(propagate=True)
+    finally:
+        celery_app.conf.task_always_eager = original
 
     parsed = []
     for record in caplog.records:
