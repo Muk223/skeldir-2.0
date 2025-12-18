@@ -9,6 +9,7 @@ import asyncio
 import functools
 import logging
 import threading
+import time
 import uuid
 from typing import Any, Awaitable, Callable, Optional
 from uuid import UUID
@@ -22,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 # Dedicated worker event loop reused for all async DB bridge calls from Celery tasks.
 _WORKER_LOOP: asyncio.AbstractEventLoop | None = None
+_WORKER_LOOP_THREAD: threading.Thread | None = None
 _WORKER_LOOP_LOCK = threading.Lock()
 
 
@@ -33,13 +35,24 @@ def get_worker_event_loop() -> asyncio.AbstractEventLoop:
     different loops across sequential Celery tasks.
     """
     global _WORKER_LOOP
+    global _WORKER_LOOP_THREAD
     with _WORKER_LOOP_LOCK:
         if _WORKER_LOOP is None or _WORKER_LOOP.is_closed():
             _WORKER_LOOP = asyncio.new_event_loop()
-            try:
-                asyncio.get_running_loop()
-            except RuntimeError:
-                asyncio.set_event_loop(_WORKER_LOOP)
+            def _runner(loop: asyncio.AbstractEventLoop) -> None:
+                asyncio.set_event_loop(loop)
+                loop.run_forever()
+
+            _WORKER_LOOP_THREAD = threading.Thread(
+                target=_runner,
+                args=(_WORKER_LOOP,),
+                name="worker-event-loop",
+                daemon=True,
+            )
+            _WORKER_LOOP_THREAD.start()
+    # Ensure the loop is running before returning
+    while _WORKER_LOOP is not None and not _WORKER_LOOP.is_running():
+        time.sleep(0.01)
     return _WORKER_LOOP
 
 
@@ -51,14 +64,12 @@ def run_in_worker_loop(coro: Awaitable[Any]) -> Any:
     Future failure) while keeping execution synchronous for the caller.
     """
     loop = get_worker_event_loop()
-    if loop.is_running():
-        future = asyncio.run_coroutine_threadsafe(coro, loop)
-        return future.result(timeout=60)
     logger.info(
         "tenant_guc_event_loop_selected",
         extra={"loop_id": id(loop), "loop_running": loop.is_running()},
     )
-    return loop.run_until_complete(coro)
+    future = asyncio.run_coroutine_threadsafe(coro, loop)
+    return future.result(timeout=60)
 
 
 def _normalize_tenant_id(value: Any) -> UUID:
