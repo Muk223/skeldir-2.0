@@ -9,6 +9,8 @@ from uuid import UUID, uuid4
 import pytest
 import pytest_asyncio
 import httpx
+from celery import current_app as celery_current_app, states
+from celery.exceptions import NotRegistered
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import text
 from sqlalchemy.engine.url import make_url
@@ -38,6 +40,22 @@ from app.observability.logging_config import configure_logging  # noqa: E402
 
 # Ensure Celery is configured and tasks are registered for worker + test processes.
 _ensure_celery_configured()
+celery_app.set_default()
+celery_app.set_current()
+
+
+def _log_app_identity(logger):
+    logger.warning(
+        "[readiness-debug] app_id=%s default_app=%s main=%s default_main=%s broker=%s backend=%s queues=%s registry_has_ping=%s",
+        id(celery_app),
+        id(celery_current_app._get_current_object()),
+        celery_app.main,
+        celery_current_app.main,
+        celery_app.conf.broker_url,
+        celery_app.conf.result_backend,
+        [q.name for q in celery_app.conf.task_queues or []],
+        "app.tasks.housekeeping.ping" in celery_app.tasks,
+    )
 
 def _wait_for_worker(timeout: int = 60) -> None:
     """
@@ -53,16 +71,9 @@ def _wait_for_worker(timeout: int = 60) -> None:
     logger = logging.getLogger(__name__)
     broker = celery_app.conf.broker_url
     backend = celery_app.conf.result_backend
-    queues = [q.name for q in celery_app.conf.task_queues or []]
-    logger.warning(
-        "[readiness-debug] broker=%s result_backend=%s queues=%s app=%s",
-        broker,
-        backend,
-        queues,
-        celery_app.main,
-    )
+    _log_app_identity(logger)
 
-    async def _result_row_exists(task_id: str) -> bool:
+    async def _result_row_status(task_id: str):
         async with engine.begin() as conn:
             row = await conn.execute(
                 text(
@@ -70,16 +81,25 @@ def _wait_for_worker(timeout: int = 60) -> None:
                 ),
                 {"tid": task_id},
             )
-            rec = row.first()
-            return bool(rec)
+            return row.first()
 
     deadline = time.time() + timeout
     last_exc: Exception | None = None
     while time.time() < deadline:
         try:
-            # Data-plane readiness: enqueue task to housekeeping queue
-            result = ping.delay()
-            logger.warning("[readiness-debug] published ping task_id=%s", result.id)
+            # Data-plane readiness: enqueue task to housekeeping queue (registry-independent)
+            try:
+                result = ping.delay()
+                logger.warning("[readiness-debug] published ping task_id=%s via delay()", result.id)
+            except NotRegistered as exc:
+                logger.warning("[readiness-debug] ping.delay NotRegistered (%s); falling back to send_task", exc)
+                result = celery_app.send_task(
+                    "app.tasks.housekeeping.ping",
+                    kwargs={},
+                    queue="housekeeping",
+                )
+                logger.warning("[readiness-debug] published ping task_id=%s via send_task()", result.id)
+
             # Block until task completes or 10s timeout
             result.get(timeout=10)
             logger.warning(
@@ -91,13 +111,24 @@ def _wait_for_worker(timeout: int = 60) -> None:
             last_exc = exc
             # Worker not ready yet, retry after checking DB for persisted result
             try:
-                if asyncio.run(_result_row_exists(result.id)):
+                rec = asyncio.run(_result_row_status(result.id))
+                if rec:
+                    status = rec[0]
                     logger.warning(
-                        "[readiness-debug] ping task_id=%s persisted despite get() error (%s); treating as ready",
-                        result.id,
-                        exc,
+                        "[readiness-debug] taskmeta status for %s = %s", result.id, status
                     )
-                    return
+                    if status == states.SUCCESS:
+                        logger.warning(
+                            "[readiness-debug] ping task_id=%s marked SUCCESS in DB despite get() error (%s); treating as ready",
+                            result.id,
+                            exc,
+                        )
+                        return
+                    if status == states.FAILURE:
+                        logger.warning(
+                            "[readiness-debug] ping task_id=%s marked FAILURE in DB; retrying readiness",
+                            result.id,
+                        )
             except Exception as db_exc:
                 logger.warning(
                     "[readiness-debug] DB probe failed for task_id=%s: %s",
@@ -172,17 +203,9 @@ def test_celery_config_uses_postgres_sqla():
 
 @pytest.mark.asyncio
 async def test_ping_task_runs_and_persists_result(celery_worker_proc):
-    result = ping.delay()
-    try:
-        payload = result.get(timeout=30)
-    except Exception as exc:
-        # If Celery cannot deserialize locally, fall back to DB ground truth
-        meta_row = await _fetch_taskmeta_row(result.id)
-        assert meta_row is not None, f"result missing for task_id={result.id}"
-        assert meta_row.status == "SUCCESS", f"unexpected status {meta_row.status}"
-        payload = meta_row.result or {}
-        # Ensure readiness failure reasons are visible for debugging
-        print(f"[ping-debug] result.get failed ({exc}); used DB row instead")
+    # Publish by name to avoid local registry dependence
+    result = celery_app.send_task("app.tasks.housekeeping.ping", queue="housekeeping", kwargs={})
+    payload = result.get(timeout=30)
     assert payload["status"] == "ok"
     expected_user = make_url(os.environ["CELERY_RESULT_BACKEND"].replace("db+", "")).username
     assert payload["db_user"] == expected_user
