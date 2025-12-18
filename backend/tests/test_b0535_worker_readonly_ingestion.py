@@ -52,29 +52,52 @@ async def _seed_channel(conn):
     )
 
 
-async def _insert_attribution_event(conn, tenant_id) -> uuid.UUID:
-    cols = await _get_columns(conn, "attribution_events")
-    await _seed_channel(conn)
-    col_values = {
-        "id": "gen_random_uuid()",
-        "tenant_id": ":tenant_id",
-        "occurred_at": "now()",
-        "external_event_id": "'ext'",
-        "correlation_id": "gen_random_uuid()",
-        "session_id": "gen_random_uuid()",
-        "revenue_cents": "0",
-        "raw_payload": "'{}'::jsonb",
-        "idempotency_key": ":idempotency_key",
-        "event_type": "'conversion'",
-        "channel": "'direct'",
-        "campaign_id": "NULL",
-        "conversion_value_cents": "NULL",
-        "currency": "'USD'",
-        "event_timestamp": "now()",
-        "processing_status": "'pending'",
-        "retry_count": "0",
-    }
+ATTRIBUTION_COL_VALUES = {
+    "id": "gen_random_uuid()",
+    "tenant_id": ":tenant_id",
+    "occurred_at": "now()",
+    "external_event_id": "'ext'",
+    "correlation_id": "gen_random_uuid()",
+    "session_id": "gen_random_uuid()",
+    "revenue_cents": "0",
+    "raw_payload": "'{}'::jsonb",
+    "idempotency_key": ":idempotency_key",
+    "event_type": "'conversion'",
+    "channel": "'direct'",
+    "campaign_id": "NULL",
+    "conversion_value_cents": "NULL",
+    "currency": "'USD'",
+    "event_timestamp": "now()",
+    "processing_status": "'pending'",
+    "retry_count": "0",
+}
 
+
+DEAD_EVENTS_COL_VALUES = {
+    "id": "gen_random_uuid()",
+    "tenant_id": ":tenant_id",
+    "ingested_at": "now()",
+    "source": "'test-source'",
+    "error_code": "'VALIDATION_ERROR'",
+    "error_detail": "'{}'::jsonb",
+    "raw_payload": "'{}'::jsonb",
+    "correlation_id": "gen_random_uuid()",
+    "external_event_id": "'ext'",
+    "event_type": "'conversion'",
+    "error_type": "'validation_error'",
+    "error_message": "'test message'",
+    "retry_count": "0",
+    "last_retry_at": "NULL",
+    "remediation_status": "'pending'",
+    "remediation_notes": "NULL",
+    "resolved_at": "NULL",
+}
+
+
+async def _build_insert_sql(
+    conn, table_name: str, col_values: dict[str, str], params: dict, *, returning: bool = False
+) -> tuple[str, dict]:
+    cols = await _get_columns(conn, table_name)
     insert_cols: List[str] = []
     values: List[str] = []
     for col in col_values:
@@ -82,16 +105,30 @@ async def _insert_attribution_event(conn, tenant_id) -> uuid.UUID:
             insert_cols.append(col)
             values.append(col_values[col])
 
+    sql = f"""
+        INSERT INTO {table_name} ({', '.join(insert_cols)})
+        VALUES ({', '.join(values)})
+    """
+    if returning:
+        sql = f"{sql} RETURNING id"
+    return sql, params
+
+
+async def _insert_attribution_event(conn, tenant_id) -> uuid.UUID:
+    await _seed_channel(conn)
+
     params = {
         "tenant_id": str(tenant_id),
         "idempotency_key": f"idem-{uuid.uuid4()}",
     }
 
-    sql = f"""
-        INSERT INTO attribution_events ({', '.join(insert_cols)})
-        VALUES ({', '.join(values)})
-        RETURNING id
-    """
+    sql, params = await _build_insert_sql(
+        conn,
+        "attribution_events",
+        ATTRIBUTION_COL_VALUES,
+        params,
+        returning=True,
+    )
     res = await conn.execute(
         text(sql),
         params,
@@ -100,41 +137,15 @@ async def _insert_attribution_event(conn, tenant_id) -> uuid.UUID:
 
 
 async def _insert_dead_event(conn, tenant_id) -> uuid.UUID:
-    cols = await _get_columns(conn, "dead_events")
-    col_values = {
-        "id": "gen_random_uuid()",
-        "tenant_id": ":tenant_id",
-        "ingested_at": "now()",
-        "source": "'test-source'",
-        "error_code": "'VALIDATION_ERROR'",
-        "error_detail": "'{}'::jsonb",
-        "raw_payload": "'{}'::jsonb",
-        "correlation_id": "gen_random_uuid()",
-        "external_event_id": "'ext'",
-        "event_type": "'conversion'",
-        "error_type": "'validation_error'",
-        "error_message": "'test message'",
-        "retry_count": "0",
-        "last_retry_at": "NULL",
-        "remediation_status": "'pending'",
-        "remediation_notes": "NULL",
-        "resolved_at": "NULL",
-    }
-
-    insert_cols: List[str] = []
-    values: List[str] = []
-    for col in col_values:
-        if col in cols:
-            insert_cols.append(col)
-            values.append(col_values[col])
-
     params = {"tenant_id": str(tenant_id)}
 
-    sql = f"""
-        INSERT INTO dead_events ({', '.join(insert_cols)})
-        VALUES ({', '.join(values)})
-        RETURNING id
-    """
+    sql, params = await _build_insert_sql(
+        conn,
+        "dead_events",
+        DEAD_EVENTS_COL_VALUES,
+        params,
+        returning=True,
+    )
     res = await conn.execute(
         text(sql),
         params,
@@ -165,21 +176,19 @@ async def test_worker_context_blocks_attribution_events_mutation(test_tenant):
     tenant_id = test_tenant
 
     async with engine.begin() as conn:
+        insert_sql, insert_params = await _build_insert_sql(
+            conn,
+            "attribution_events",
+            ATTRIBUTION_COL_VALUES,
+            {"tenant_id": str(tenant_id), "idempotency_key": f"idem-{uuid.uuid4()}"},
+        )
+
+    async with engine.begin() as conn:
         # Baseline row inserted outside worker context (ingestion/API path)
         await set_tenant_guc(conn, tenant_id, local=True)
         event_id = await _insert_attribution_event(conn, tenant_id)
 
-    await _expect_blocked(
-        tenant_id,
-        """
-        INSERT INTO attribution_events (id, tenant_id, occurred_at, external_event_id, correlation_id, session_id,
-                                        revenue_cents, raw_payload, idempotency_key, event_type, channel,
-                                        campaign_id, conversion_value_cents, currency, event_timestamp, processing_status, retry_count)
-        VALUES (gen_random_uuid(), :tenant_id, now(), 'ext', gen_random_uuid(), gen_random_uuid(),
-                0, '{}'::jsonb, :idempotency_key, 'conversion', 'direct', NULL, NULL, 'USD', now(), 'pending', 0)
-        """,
-        {"tenant_id": str(tenant_id), "idempotency_key": f"idem-{uuid.uuid4()}"},
-    )
+    await _expect_blocked(tenant_id, insert_sql, insert_params)
     await _expect_blocked(
         tenant_id,
         "UPDATE attribution_events SET revenue_cents = revenue_cents + 1 WHERE id = :event_id",
@@ -198,17 +207,18 @@ async def test_worker_context_blocks_dead_events_mutation(test_tenant):
     tenant_id = test_tenant
 
     async with engine.begin() as conn:
+        insert_sql, insert_params = await _build_insert_sql(
+            conn,
+            "dead_events",
+            DEAD_EVENTS_COL_VALUES,
+            {"tenant_id": str(tenant_id)},
+        )
+
+    async with engine.begin() as conn:
         await set_tenant_guc(conn, tenant_id, local=True)
         dead_id = await _insert_dead_event(conn, tenant_id)
 
-    await _expect_blocked(
-        tenant_id,
-        """
-        INSERT INTO dead_events (id, tenant_id, source, error_code, error_detail, raw_payload, event_type, error_type, error_message, retry_count, remediation_status)
-        VALUES (gen_random_uuid(), :tenant_id, 'test-source', 'VALIDATION_ERROR', '{}'::jsonb, '{}'::jsonb, 'conversion', 'validation_error', 'test insert block', 0, 'pending')
-        """,
-        {"tenant_id": str(tenant_id)},
-    )
+    await _expect_blocked(tenant_id, insert_sql, insert_params)
     await _expect_blocked(
         tenant_id,
         "UPDATE dead_events SET retry_count = retry_count + 1 WHERE id = :dead_id",
