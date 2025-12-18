@@ -15,6 +15,7 @@ pytest_plugins = ["tests.test_b051_celery_foundation"]
 from app.celery_app import celery_app  # noqa: E402
 from app.db.session import engine, set_tenant_guc  # noqa: E402
 from app.services.attribution import schedule_recompute_window  # noqa: E402
+from tests.test_b051_celery_foundation import celery_worker_proc as foundation_worker_proc  # noqa: E402
 
 DEFAULT_SYNC_DSN = os.environ.get(
     "TEST_SYNC_DSN", "postgresql://app_user:app_user@localhost:5432/skeldir_validation"
@@ -33,6 +34,11 @@ WINDOW_START = "2025-06-01T00:00:00Z"
 WINDOW_END = "2025-06-01T23:59:59.999999Z"
 MODEL_VERSION = "1.0.0"
 EXPECTED_ALLOCATION_RATIO = round(1.0 / 3.0, 6)
+
+
+@pytest.fixture(scope="session")
+def celery_worker_proc(foundation_worker_proc):
+    return foundation_worker_proc
 
 
 async def _prepare_facts():
