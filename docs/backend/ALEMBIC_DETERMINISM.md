@@ -43,8 +43,19 @@ Use the provided wrapper script that enforces correct environment:
 
 The wrapper validates:
 1. Working directory is repository root (checks for `alembic.ini`)
-2. `DATABASE_URL` environment variable is set
-3. `DATABASE_URL` uses sync driver (`postgresql://`), not async (`postgresql+asyncpg://`)
+2. `MIGRATION_DATABASE_URL` environment variable is set (Policy P1-A)
+3. `MIGRATION_DATABASE_URL` uses sync driver (`postgresql://`), not async (`postgresql+asyncpg://`)
+
+### Migration Execution Policy (P1-A)
+
+- Migrations must run with a dedicated migration role that bypasses RLS (BYPASSRLS or superuser) to avoid data backfill failures under row security.
+- Set `MIGRATION_DATABASE_URL` to the migration role connection string (sync driver only, `postgresql://...`). The wrapper temporarily sets `DATABASE_URL` to this value while running Alembic and then restores the original value.
+- Example:
+
+  ```powershell
+  $env:MIGRATION_DATABASE_URL='postgresql://migration_role:password@localhost:5432/skeldir_validation'
+  .\scripts\run_alembic.ps1 upgrade head
+  ```
 
 ## Manual Invocation Requirements
 
