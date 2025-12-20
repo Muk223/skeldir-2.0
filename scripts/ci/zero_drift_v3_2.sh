@@ -17,6 +17,7 @@ PGSUPER_PASS="${PGSUPER_PASS:-postgres}"
 export MIGRATION_DATABASE_URL_FRESH="${MIGRATION_DATABASE_URL_FRESH:-postgresql://${PGSUPER_USER}:${PGSUPER_PASS}@${PGHOST}:${PGPORT}/skeldir_zg_fresh}"
 export MIGRATION_DATABASE_URL_EXISTING="${MIGRATION_DATABASE_URL_EXISTING:-postgresql://${PGSUPER_USER}:${PGSUPER_PASS}@${PGHOST}:${PGPORT}/skeldir_zg_existing}"
 export RUNTIME_DATABASE_URL="${RUNTIME_DATABASE_URL:-postgresql://app_user:app_user@${PGHOST}:${PGPORT}/skeldir_zg_fresh}"
+export ZG_BEAT_TEST_INTERVAL_SECONDS="${ZG_BEAT_TEST_INTERVAL_SECONDS:-1}"
 
 psql_super() {
   PGPASSWORD="${PGSUPER_PASS}" psql -h "${PGHOST}" -p "${PGPORT}" -U "${PGSUPER_USER}" "$@"
@@ -60,6 +61,13 @@ create_roles
 recreate_db "skeldir_zg_fresh"
 recreate_db "skeldir_zg_existing"
 
+echo "== ZG-0.1: maintenance import sanity check =="
+python - <<'PY'
+import importlib
+mod = importlib.import_module("app.tasks.maintenance")
+print(f"import_ok={mod is not None}")
+PY
+
 echo "== ZG-1: fresh DB upgrade to head =="
 run_alembic "${MIGRATION_DATABASE_URL_FRESH}" "upgrade head"
 run_alembic "${MIGRATION_DATABASE_URL_FRESH}" "current"
@@ -94,6 +102,7 @@ export DATABASE_URL="${RUNTIME_DATABASE_URL}"
 export CELERY_BROKER_URL="sqla+postgresql://app_user:app_user@${PGHOST}:${PGPORT}/skeldir_zg_fresh"
 export CELERY_RESULT_BACKEND="db+postgresql://app_user:app_user@${PGHOST}:${PGPORT}/skeldir_zg_fresh"
 cd backend
+echo "ZG_BEAT_TEST_INTERVAL_SECONDS=${ZG_BEAT_TEST_INTERVAL_SECONDS}"
 python - <<'PY'
 from app.celery_app import celery_app
 import json
@@ -105,6 +114,8 @@ print(json.dumps({
 PY
 timeout 20 celery -A app.celery_app.celery_app beat --loglevel=INFO --pidfile= --schedule=/tmp/zg_beat_schedule --max-interval=2 > /tmp/zg_beat.log 2>&1 || true
 cat /tmp/zg_beat.log
+echo "---- beat dispatch lines ----"
+grep -n "Sending due task" /tmp/zg_beat.log || true
 
 echo "== ZG-6: serialization enforced in refresh path =="
 python - <<'PY'

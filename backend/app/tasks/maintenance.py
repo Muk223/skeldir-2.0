@@ -12,7 +12,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 from uuid import UUID, uuid4
 
-from celery.schedules import crontab
 from sqlalchemy import text
 
 from app.celery_app import celery_app
@@ -273,23 +272,3 @@ def enforce_data_retention_task(self, tenant_id: UUID, correlation_id: Optional[
             extra={"tenant_id": str(tenant_id), "task_id": self.request.id, "correlation_id": correlation_id},
         )
         raise self.retry(exc=exc, countdown=60)
-
-
-# Celery Beat schedule configuration (reference)
-BEAT_SCHEDULE = {
-    "refresh-matviews-every-5-min": {
-        "task": "app.tasks.maintenance.refresh_all_matviews_global_legacy",
-        "schedule": 300.0,  # 5 minutes
-        "options": {"expires": 300},
-    },
-    "pii-audit-scanner": {
-        "task": "app.tasks.maintenance.scan_for_pii_contamination",
-        "schedule": crontab(hour=4, minute=0),
-        "options": {"expires": 3600},
-    },
-    "enforce-data-retention": {
-        "task": "app.tasks.maintenance.enforce_data_retention",
-        "schedule": crontab(hour=3, minute=0),
-        "options": {"expires": 3600},
-    },
-}

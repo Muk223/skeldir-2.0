@@ -154,7 +154,7 @@ def _ensure_celery_configured():
     )
 
     # B0.5.4.0: Load Beat schedule (closes G11 drift - beat not deployed)
-    from app.tasks.maintenance import BEAT_SCHEDULE
+    from app.tasks.beat_schedule import BEAT_SCHEDULE
     celery_app.conf.beat_schedule = BEAT_SCHEDULE
 
     logger.info(
