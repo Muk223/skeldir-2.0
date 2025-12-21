@@ -7,13 +7,13 @@
 **0.1 Repo identity (current)**
 ```
 $ git rev-parse HEAD
-afc639ee0e1e9b07b9757d69826aa06f5f24c0ac
+5ef5f44b408cf559a4d6911f9a5c5fa209b35024
 
 $ git status -sb
 ## b0540-zero-drift-v3-proofpack
 
 $ git log -1 --oneline
-afc639e Update soundness evidence with clean state and actions
+5ef5f44 Refresh evidence with latest commit SHA
 ```
 
 **0.2 Environment baseline**
@@ -38,7 +38,7 @@ $ psql -U app_user -d skeldir_validation -c "SELECT current_database(), current_
 ## 1) Hypotheses → Evidence → Adjudication
 
 ### H-REPO-01 — Repo state reproducible
-- Working tree is clean at commit `afc639e...`; evidence updated accordingly.
+- Working tree is clean at commit `5ef5f44...`; evidence updated accordingly.
 - **Adjudication:** REFUTED (clean).
 
 ### H-MIG-01 — Non-empty DB upgrades deterministically to head
@@ -136,7 +136,7 @@ REFRESH MATERIALIZED VIEW
 
 ## 2) Hard Soundness Exit Gates (current status)
 
-- **GATE-S0 Repo truth sealed:** **PASS** — clean tree at `afc639e...`; evidence recorded.
+- **GATE-S0 Repo truth sealed:** **PASS** — clean tree at `5ef5f44...`; evidence recorded.
 - **GATE-S1 Migration determinism on non-empty DB:** **PASS** — scratch DB upgrade succeeds; `null_idempotency_key=0`; RLS re-enabled.
 - **GATE-S2 Refresh executor hardening:** **PASS** — rg shows no unsafe patterns; tests reject malicious identifiers; schema-qualified executor in place.
 - **GATE-S3 Canonical matview contract + refresh privilege:** **PASS** — pg_matviews = canonical 5; unique indexes; refresh as app_user succeeds.
@@ -145,7 +145,7 @@ REFRESH MATERIALIZED VIEW
 ---
 
 ## 3) Next Required Actions to Exit Soundness Phase
-1) Push commit `afc639e...` to `b0540-zero-drift-v3-proofpack`.
+1) Push commit `5ef5f44...` to `b0540-zero-drift-v3-proofpack`.
 2) Trigger CI (`.github/workflows/ci.yml`, zero-drift job) on that commit; capture run URL + log anchors showing registry list, pg_matviews list, equality assertion, refresh proof.
 3) Update this evidence file with the CI run URL/log anchors and flip GATE-S4 to PASS.
 
