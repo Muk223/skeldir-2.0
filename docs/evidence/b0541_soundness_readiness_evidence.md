@@ -1,19 +1,19 @@
 ## B0.5.4.1 Soundness Readiness Evidence (Backend Only)
 
-> Scope: soundness remediation only (no frontend). CI artifact pending after push/dispatch.
+> Scope: soundness remediation only (no frontend).
 
 ### 0) Evidence Pack Header
 
-**0.1 Repo identity (current)**
+**0.1 Repo identity (commit under test / CI run)**
 ```
 $ git rev-parse HEAD
-5ef5f44b408cf559a4d6911f9a5c5fa209b35024
+a5c5e6d3923693f33903f8962c942db2de0e659b
 
 $ git status -sb
 ## b0540-zero-drift-v3-proofpack
 
 $ git log -1 --oneline
-5ef5f44 Refresh evidence with latest commit SHA
+a5c5e6d Pin evidence to current HEAD
 ```
 
 **0.2 Environment baseline**
@@ -38,18 +38,17 @@ $ psql -U app_user -d skeldir_validation -c "SELECT current_database(), current_
 ## 1) Hypotheses → Evidence → Adjudication
 
 ### H-REPO-01 — Repo state reproducible
-- Working tree is clean at commit `5ef5f44...`; evidence updated accordingly.
+- Working tree clean at `a5c5e6d...`; evidence captured for this commit and CI run triggered on it.
 - **Adjudication:** REFUTED (clean).
 
 ### H-MIG-01 — Non-empty DB upgrades deterministically to head
-- Migration touching `idempotency_key`: `alembic/versions/003_data_governance/202511151410_realign_attribution_events.py` (adds column, backfills, then SET NOT NULL). Amended to disable/enable RLS around backfill.
+- Migration `alembic/versions/003_data_governance/202511151410_realign_attribution_events.py` amended to disable/enable RLS during backfill.
 - Scratch repro (post-fix):
   ```
   $ psql -U postgres -c "DROP DATABASE IF EXISTS skeldir_migprobe; CREATE DATABASE skeldir_migprobe OWNER app_user;"
   $ DATABASE_URL=postgresql://app_user@localhost:5432/skeldir_migprobe alembic upgrade 202511151400
   $ psql -U app_user -d skeldir_migprobe -v ON_ERROR_STOP=1 -c "SET app.current_tenant_id='11111111-1111-1111-1111-111111111111'; INSERT INTO tenants (...); INSERT INTO attribution_events (...revenue_cents=0, raw_payload='{}');"
   $ DATABASE_URL=postgresql://app_user@localhost:5432/skeldir_migprobe alembic upgrade head
-  ... (completes to 202512201000)
   $ DATABASE_URL=postgresql://app_user@localhost:5432/skeldir_migprobe alembic current
   202512201000 (head)
   $ psql -U app_user -d skeldir_migprobe -c "SELECT version_num FROM alembic_version; SELECT COUNT(*) AS null_idempotency_key FROM attribution_events WHERE idempotency_key IS NULL; SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname='attribution_events';"
@@ -63,7 +62,7 @@ $ psql -U app_user -d skeldir_validation -c "SELECT current_database(), current_
   ----------------+---------------------
    t              | t
   ```
-- **Adjudication:** CONFIRMED (prior failure) → RESOLVED by RLS disable/enable in migration; upgrade succeeds on non-empty DB and RLS is re-enabled.
+- **Adjudication:** CONFIRMED (prior failure) → RESOLVED via RLS disable/enable; upgrade succeeds on non-empty DB; RLS restored.
 
 ### H-MV-01 — Canonical matview inventory exists and refreshable as app_user
 ```
@@ -81,12 +80,10 @@ $ psql -U app_user -d skeldir_validation -c "REFRESH MATERIALIZED VIEW CONCURREN
 REFRESH MATERIALIZED VIEW
 REFRESH MATERIALIZED VIEW
 ```
-- **Adjudication:** REFUTED (no drift); canonical 5 present and refreshable as app_user.
+- **Adjudication:** REFUTED (canonical 5 present, refreshable).
 
 ### H-INJ-01 / H-QUAL-01 — Refresh executor injection/schema safety
-- Executor: `backend/app/tasks/maintenance.py`
-  - `_qualified_matview_identifier` → `public.<quoted_view>` using `IdentifierPreparer`.
-  - `_refresh_view` executes `text("REFRESH MATERIALIZED VIEW CONCURRENTLY " + qualified_view)` after registry validation.
+- Executor: `backend/app/tasks/maintenance.py` `_qualified_matview_identifier` → `public.<quoted_view>` using `IdentifierPreparer`; `_refresh_view` executes `text("REFRESH MATERIALIZED VIEW CONCURRENTLY " + qualified_view)` after registry validation.
 - Ripgrep checks:
   ```
   $ rg -n 'text\(f"REFRESH MATERIALIZED VIEW' backend   # no matches
@@ -100,17 +97,17 @@ REFRESH MATERIALIZED VIEW
 - **Adjudication:** REFUTED (injection surface removed; schema-qualified, registry-enforced).
 
 ### H-LOCK-01 — Serialization semantics
-- Lock key derivation: `backend/app/core/pg_locks.py` uses `lock_str = f"matview_refresh:{view_name}:{tenant_str}"`; tenant_str="GLOBAL" when tenant_id is None.
-- Current refresh tasks are global (tenant_id=None), so locks are per view globally.
+- Lock key: `backend/app/core/pg_locks.py` uses `matview_refresh:{view}:{tenant_str}`; tenant_str="GLOBAL" when tenant_id is None.
+- Current refresh tasks are global (tenant_id=None) so lock is per view globally.
 - Concurrency proof:
   ```
   $ DATABASE_URL=postgresql+asyncpg://app_user@localhost:5432/skeldir_validation python backend/test_eg6_serialization.py
   ... one success, one skipped_already_running; lock acquired/skipped/released ...
   ```
-- **Adjudication:** REFUTED (locks behave as intended for global refresh; semantics explicitly global).
+- **Adjudication:** REFUTED (locks align with global semantics).
 
 ### H-OBS-01 — Observability live
-- Startup command:
+- Startup:
   ```
   cd backend &&
   DATABASE_URL=postgresql+asyncpg://app_user@localhost:5432/skeldir_validation \
@@ -136,17 +133,16 @@ REFRESH MATERIALIZED VIEW
 
 ## 2) Hard Soundness Exit Gates (current status)
 
-- **GATE-S0 Repo truth sealed:** **PASS** — clean tree at `5ef5f44...`; evidence recorded.
+- **GATE-S0 Repo truth sealed:** **PASS** — clean tree at `a5c5e6d...` (commit under test).
 - **GATE-S1 Migration determinism on non-empty DB:** **PASS** — scratch DB upgrade succeeds; `null_idempotency_key=0`; RLS re-enabled.
 - **GATE-S2 Refresh executor hardening:** **PASS** — rg shows no unsafe patterns; tests reject malicious identifiers; schema-qualified executor in place.
 - **GATE-S3 Canonical matview contract + refresh privilege:** **PASS** — pg_matviews = canonical 5; unique indexes; refresh as app_user succeeds.
-- **GATE-S4 CI truth-layer validation:** **FAIL (pending)** — must trigger CI workflow_dispatch on committed SHA and capture run URL/logs.
+- **GATE-S4 CI truth-layer validation:** **PARTIAL** — workflow_dispatch https://github.com/Muk223/skeldir-2.0/actions/runs/20416606252 on commit `a5c5e6d` with Zero-Drift job SUCCESS (job URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20416606252/job/58661206192; log anchor shows `MATVIEW INVENTORY OK (registry == pg_matviews)` at 2025-12-21T22:17:49Z). Overall workflow failed due to unrelated Playwright/revenue jobs. If a fully green CI run is required, rerun after addressing those jobs.
 
 ---
 
 ## 3) Next Required Actions to Exit Soundness Phase
-1) Push commit `5ef5f44...` to `b0540-zero-drift-v3-proofpack`.
-2) Trigger CI (`.github/workflows/ci.yml`, zero-drift job) on that commit; capture run URL + log anchors showing registry list, pg_matviews list, equality assertion, refresh proof.
-3) Update this evidence file with the CI run URL/log anchors and flip GATE-S4 to PASS.
+1) (Optional if required) Re-run CI to achieve all-green workflow; Zero-Drift job already passes on `a5c5e6d`.
+2) If a rerun is performed, update this evidence with new CI URL/log anchors and flip GATE-S4 to PASS.
 
-Only after the above are done is B0.5.4.1 registry work authorized.
+Only after GATE-S4 is fully PASS is B0.5.4.1 registry work authorized.
