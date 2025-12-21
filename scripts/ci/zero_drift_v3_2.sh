@@ -87,17 +87,17 @@ run_alembic "${MIGRATION_DATABASE_URL_EXISTING}" "upgrade head"
 psql_super -d skeldir_zg_existing -c "SELECT id, idempotency_key, event_timestamp, conversion_value_cents FROM attribution_events;"
 
 echo "== ZG-3: matview inventory determinism (fresh) =="
-pg_matviews=$(psql_app -d skeldir_zg_fresh -t -A -c "SELECT matviewname FROM pg_matviews WHERE schemaname='public' ORDER BY matviewname;")
-echo "$pg_matviews"
-export PG_MATVIEWS="$pg_matviews"
+psql_app -d skeldir_zg_fresh -t -A -c "SELECT matviewname FROM pg_matviews WHERE schemaname='public' ORDER BY matviewname;" > /tmp/pg_matviews.txt
+cat /tmp/pg_matviews.txt
 echo "Registry from code:"
 python - <<'PY'
 from app.core.matview_registry import MATERIALIZED_VIEWS
 print(MATERIALIZED_VIEWS)
 PY
 python - <<'PY'
+from pathlib import Path
 from app.core.matview_registry import MATERIALIZED_VIEWS
-db_list = """$pg_matviews""".strip().splitlines()
+db_list = [line.strip() for line in Path("/tmp/pg_matviews.txt").read_text().splitlines() if line.strip()]
 reg_set, db_set = set(MATERIALIZED_VIEWS), set(db_list)
 print(f"registry={sorted(reg_set)}")
 print(f"db={sorted(db_set)}")
