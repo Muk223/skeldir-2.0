@@ -146,7 +146,7 @@ jobs:
       matrix:
         phase: ${{ fromJson(needs.validate-phase-manifest.outputs.phases) }}
     env:
-      DATABASE_URL: postgresql+asyncpg://app_user:app_user@127.0.0.1:5432/skeldir_phase
+      DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/skeldir_phase
       MIGRATION_DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/skeldir_phase
       PYTHONPATH: ${{ github.workspace }}
       CI: "true"
@@ -218,7 +218,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql+asyncpg://app_user:app_user@127.0.0.1:5432/skeldir_phase
+      DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/skeldir_phase
       MIGRATION_DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/skeldir_phase
       PYTHONPATH: ${{ github.workspace }}
       CI: "true"

@@ -137,24 +137,26 @@ def upgrade() -> None:
             END IF;
             
             -- Enforce PII guardrail on revenue_ledger (metadata) - only if NOT NULL
-            IF TG_TABLE_NAME = 'revenue_ledger' AND NEW.metadata IS NOT NULL THEN
-                IF fn_detect_pii_keys(NEW.metadata) THEN
-                    -- Find first PII key for error message
-                    SELECT key INTO detected_key
-                    FROM jsonb_object_keys(NEW.metadata) key
-                    WHERE key IN (
-                        'email', 'email_address', 
-                        'phone', 'phone_number', 
-                        'ssn', 'social_security_number', 
-                        'ip_address', 'ip', 
-                        'first_name', 'last_name', 'full_name', 
-                        'address', 'street_address'
-                    )
-                    LIMIT 1;
-                    
-                    RAISE EXCEPTION 'PII key detected in revenue_ledger.metadata. Write blocked by database policy (Layer 2 guardrail). Key found: %. Reference: ADR-003-PII-Defense-Strategy.md. Action: Remove PII key from metadata before retry.', 
-                        detected_key
-                    USING ERRCODE = '23514';  -- check_violation
+            IF TG_TABLE_NAME = 'revenue_ledger' THEN
+                IF NEW.metadata IS NOT NULL THEN
+                    IF fn_detect_pii_keys(NEW.metadata) THEN
+                        -- Find first PII key for error message
+                        SELECT key INTO detected_key
+                        FROM jsonb_object_keys(NEW.metadata) key
+                        WHERE key IN (
+                            'email', 'email_address', 
+                            'phone', 'phone_number', 
+                            'ssn', 'social_security_number', 
+                            'ip_address', 'ip', 
+                            'first_name', 'last_name', 'full_name', 
+                            'address', 'street_address'
+                        )
+                        LIMIT 1;
+                        
+                        RAISE EXCEPTION 'PII key detected in revenue_ledger.metadata. Write blocked by database policy (Layer 2 guardrail). Key found: %. Reference: ADR-003-PII-Defense-Strategy.md. Action: Remove PII key from metadata before retry.', 
+                            detected_key
+                        USING ERRCODE = '23514';  -- check_violation
+                    END IF;
                 END IF;
             END IF;
             
@@ -235,4 +237,3 @@ def downgrade() -> None:
     
     # Drop detection function
     op.execute("DROP FUNCTION IF EXISTS fn_detect_pii_keys(JSONB)")
-
