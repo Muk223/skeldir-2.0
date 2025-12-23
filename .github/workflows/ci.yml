@@ -186,6 +186,13 @@ jobs:
       - name: Run phase gate
         run: |
           python scripts/phase_gates/run_phase.py ${{ matrix.phase }}
+      - name: Upload phase evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-${{ matrix.phase }}-evidence
+          path: backend/validation/evidence/**
+          retention-days: 7
 
   phase-chain:
     name: Phase Chain (B0.4 target)
@@ -242,6 +249,13 @@ jobs:
       - name: Run phase chain to B0.4
         run: |
           python scripts/phase_gates/run_chain.py B0.4
+      - name: Upload phase chain evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-chain-evidence
+          path: backend/validation/evidence/**
+          retention-days: 7
   # Backend tests (when backend exists)
   test-backend:
     name: Test Backend
