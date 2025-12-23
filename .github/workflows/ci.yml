@@ -60,7 +60,7 @@ jobs:
       
       - name: Install oasdiff
         run: |
-          go install github.com/oasdiff/oasdiff/cmd/oasdiff@v1.11.7
+          go install github.com/oasdiff/oasdiff@v1.11.7
       
       - name: Detect breaking changes
         run: |
@@ -142,6 +142,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     strategy:
+      fail-fast: false
       matrix:
         phase: ${{ fromJson(needs.validate-phase-manifest.outputs.phases) }}
     env:
@@ -172,7 +173,7 @@ jobs:
           npx playwright install --with-deps chromium
           pip install -r backend/requirements.txt
           pip install -r backend/requirements-dev.txt
-          go install github.com/oasdiff/oasdiff/cmd/oasdiff@v1.11.7
+          go install github.com/oasdiff/oasdiff@v1.11.7
 
       - name: Prepare database and role
         env:
@@ -230,7 +231,7 @@ jobs:
           npx playwright install --with-deps chromium
           pip install -r backend/requirements.txt
           pip install -r backend/requirements-dev.txt
-          go install github.com/oasdiff/oasdiff/cmd/oasdiff@v1.11.7
+          go install github.com/oasdiff/oasdiff@v1.11.7
       - name: Prepare database and role
         env:
           PGPASSWORD: postgres

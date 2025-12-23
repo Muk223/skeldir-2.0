@@ -109,7 +109,7 @@ jobs:
 
       - name: Install oasdiff
         run: |
-          go install github.com/oasdiff/oasdiff/cmd/oasdiff@v1.11.7
+          go install github.com/oasdiff/oasdiff@v1.11.7
 
       - name: Check breaking changes
         run: |
