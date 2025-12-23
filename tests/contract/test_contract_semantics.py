@@ -174,6 +174,9 @@ def test_auth_login_happy_path():
     assert "access_token" in data, "Missing access_token in response"
     assert "refresh_token" in data, "Missing refresh_token in response"
     assert "expires_in" in data, "Missing expires_in in response"
+    assert "user" in data, "Missing user in response"
+    assert isinstance(data["user"], dict), "user must be an object"
+    assert {"id", "email", "username"}.issubset(data["user"].keys()), "user must include id, email, username"
     assert "token_type" in data, "Missing token_type in response"
     assert data["token_type"] == "Bearer", "Expected token_type to be 'Bearer'"
 

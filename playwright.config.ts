@@ -33,14 +33,15 @@ export default defineConfig({
   ],
 
   /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'echo "Mock servers should be started manually with ./scripts/start-mocks.sh"',
-    url: 'http://localhost:4014/api/health',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
+  webServer: process.env.CI
+    ? undefined
+    : {
+        command: 'echo "Mock servers should be started manually with ./scripts/start-mocks.sh"',
+        url: 'http://localhost:4014/api/health',
+        reuseExistingServer: true,
+        timeout: 120 * 1000,
+      },
 });
-
 
 
 

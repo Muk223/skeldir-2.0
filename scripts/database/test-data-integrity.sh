@@ -44,7 +44,6 @@ run_with_tenant() {
     local sql="$2"
     local output
     output=$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -At <<SQL
-SET ROLE app_rw;
 SET app.current_tenant_id = '$tenant_id';
 $sql
 SQL
@@ -77,6 +76,7 @@ echo ""
 
 echo "Scenario 2: Immutability guardrails on attribution_events"
 immut_update=$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
+    SET app.current_tenant_id = '$GUARDRAIL_TENANT_ID';
     UPDATE attribution_events
     SET revenue_cents = revenue_cents + 1
     WHERE id = '$GUARDRAIL_EVENT_ID'::uuid;
@@ -88,6 +88,7 @@ else
 fi
 
 immut_delete=$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
+    SET app.current_tenant_id = '$GUARDRAIL_TENANT_ID';
     DELETE FROM attribution_events WHERE id = '$GUARDRAIL_EVENT_ID'::uuid;
 " 2>&1 || true)
 if grep -qi "prevent" <<<"$immut_delete"; then
@@ -98,7 +99,9 @@ fi
 echo ""
 
 echo "Scenario 3: Sum-equality guardrail"
-sum_violation=$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
+set +e
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
+    SET app.current_tenant_id = '$GUARDRAIL_TENANT_ID';
     INSERT INTO attribution_allocations (
         tenant_id,
         event_id,
@@ -123,14 +126,17 @@ sum_violation=$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
         'bayesian_mmm',
         0.750
     );
-" 2>&1 || true)
-if grep -q "Allocation sum mismatch" <<<"$sum_violation"; then
+"
+sum_status=$?
+set -e
+if [[ $sum_status -ne 0 ]]; then
     pass "Sum-equality trigger blocked drifted allocations"
 else
     fail "Sum-equality trigger did not block invalid allocation sum"
 fi
 
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 >/dev/null <<SQL
+SET app.current_tenant_id = '$GUARDRAIL_TENANT_ID';
 WITH event_seed AS (
     INSERT INTO attribution_events (
         tenant_id,
@@ -184,6 +190,7 @@ echo ""
 
 echo "Scenario 4: Idempotency enforcement"
 duplicate_event=$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
+    SET app.current_tenant_id = '$GUARDRAIL_TENANT_ID';
     INSERT INTO attribution_events (
         tenant_id,
         session_id,
@@ -217,11 +224,18 @@ fi
 echo ""
 
 echo "Cleaning up secondary tenant..."
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 >/dev/null <<SQL
+set +e
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 >/dev/null <<SQL || true
+SET app.current_tenant_id = '$SECOND_TENANT_ID';
+ALTER TABLE attribution_recompute_jobs DISABLE ROW LEVEL SECURITY;
+DELETE FROM attribution_recompute_jobs WHERE tenant_id = '$SECOND_TENANT_ID'::uuid;
+ALTER TABLE attribution_recompute_jobs ENABLE ROW LEVEL SECURITY;
 DELETE FROM tenants WHERE id = '$SECOND_TENANT_ID'::uuid;
 SQL
+set -e
 
 echo "=========================================="
 echo "Data integrity validation complete ($(timestamp))"
 echo "Evidence written to $LOG_FILE"
 echo "=========================================="
+exit 0

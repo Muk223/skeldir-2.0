@@ -16,12 +16,14 @@ If integrity passes but provider fails -> Implementation divergence
 """
 
 import json
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlencode
+
 import pytest
 import requests
-from pathlib import Path
-from typing import Dict, List, Any, Optional
 import yaml
-import time
 
 
 # Configuration
@@ -75,20 +77,91 @@ def extract_operations(bundle: Dict[str, Any]) -> List[Dict[str, Any]]:
     paths = bundle.get('paths', {})
     
     for path, path_item in paths.items():
+        common_parameters = path_item.get('parameters', [])
         for method in ['get', 'post', 'put', 'delete', 'patch']:
             if method in path_item:
                 operation = path_item[method]
+                parameters = common_parameters + operation.get('parameters', [])
                 operations.append({
                     'path': path,
                     'method': method.upper(),
                     'operation_id': operation.get('operationId', f"{method}_{path}"),
                     'operation': operation,
-                    'parameters': operation.get('parameters', []),
+                    'parameters': parameters,
                     'requestBody': operation.get('requestBody', {}),
                     'responses': operation.get('responses', {})
                 })
     
     return operations
+
+
+def generate_sample_from_schema(schema: Dict[str, Any]) -> Any:
+    """Recursively generate sample data that satisfies the provided schema."""
+    if schema is None:
+        return None
+
+    if 'example' in schema:
+        return schema['example']
+
+    enum_values = schema.get('enum')
+    if enum_values:
+        return enum_values[0]
+
+    schema_type = schema.get('type')
+    if schema.get('format') == 'uuid':
+        return "00000000-0000-0000-0000-000000000000"
+    if schema.get('format') == 'date':
+        return "2025-01-01"
+    if schema.get('format') == 'date-time':
+        return "2025-01-01T00:00:00Z"
+
+    if schema_type == 'object':
+        properties = schema.get('properties', {}) or {}
+        required = schema.get('required', []) or []
+        obj: Dict[str, Any] = {}
+        for prop in required:
+            if prop in properties:
+                obj[prop] = generate_sample_from_schema(properties[prop])
+        return obj
+
+    if schema_type == 'array':
+        items = schema.get('items', {}) or {}
+        return [generate_sample_from_schema(items)]
+
+    if schema_type == 'integer':
+        return 0
+
+    if schema_type == 'number':
+        return 0
+
+    if schema_type == 'boolean':
+        return True
+
+    return "test-value"
+
+
+def generate_param_value(param: Dict[str, Any]) -> Any:
+    """Generate a parameter value from examples, enums, or schema defaults."""
+    schema = param.get('schema', {}) or {}
+    if 'example' in param:
+        return param['example']
+    if 'example' in schema:
+        return schema['example']
+    if schema.get('enum'):
+        return schema['enum'][0]
+    if schema.get('format') == 'uuid':
+        return "00000000-0000-0000-0000-000000000000"
+    if schema.get('format') == 'date':
+        return "2025-01-01"
+    if schema.get('format') == 'date-time':
+        return "2025-01-01T00:00:00Z"
+    if schema.get('format') == 'uri':
+        return "https://example.com/cert"
+    if schema.get('type') in ('integer', 'number'):
+        return 1
+    if schema.get('type') == 'boolean':
+        return True
+    return "test-value"
 
 
 def generate_request_data(operation: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -112,30 +185,39 @@ def generate_request_data(operation: Dict[str, Any]) -> Optional[Dict[str, Any]]
             if 'value' in first_example:
                 return first_example['value']
     
-    # Fallback: generate minimal data from schema
+    # Fallback: generate minimal data from schema (recursive)
     schema = json_content.get('schema', {})
-    if schema.get('type') == 'object':
-        properties = schema.get('properties', {})
-        required = schema.get('required', [])
-        data = {}
-        for prop in required:
-            if prop in properties:
-                prop_schema = properties[prop]
-                prop_type = prop_schema.get('type', 'string')
-                example = prop_schema.get('example')
-                
-                if example is not None:
-                    data[prop] = example
-                elif prop_type == 'string':
-                    data[prop] = 'test-value'
-                elif prop_type == 'integer':
-                    data[prop] = 0
-                elif prop_type == 'boolean':
-                    data[prop] = True
-        
-        return data if data else None
+    if schema:
+        return generate_sample_from_schema(schema)
     
     return None
+
+
+def build_url(base_url: str, path: str, parameters: List[Dict[str, Any]]) -> str:
+    """Populate path/query parameters using examples or sensible defaults."""
+    path_params: Dict[str, Any] = {}
+    query_params: Dict[str, Any] = {}
+
+    for param in parameters:
+        location = param.get('in')
+        name = param.get('name')
+        if not location or not name:
+            continue
+
+        value = generate_param_value(param)
+
+        if location == 'path':
+            path_params[name] = value
+        elif location == 'query':
+            query_params[name] = value
+
+    populated_path = path
+    for name, value in path_params.items():
+        populated_path = populated_path.replace(f"{{{name}}}", str(value))
+
+    if query_params:
+        return f"{base_url}{populated_path}?{urlencode(query_params, doseq=True)}"
+    return f"{base_url}{populated_path}"
 
 
 def make_request_with_retry(method: str, url: str, **kwargs) -> requests.Response:
@@ -149,6 +231,20 @@ def make_request_with_retry(method: str, url: str, **kwargs) -> requests.Respons
                 time.sleep(RETRY_DELAY * (attempt + 1))
             else:
                 raise
+
+
+def choose_accept_header(responses: Dict[str, Any]) -> str:
+    """Select an Accept header based on available response content types."""
+    preferred_statuses = ['200', '201', '202', 'default']
+    for status in preferred_statuses:
+        if status in responses:
+            response_spec = responses.get(status) or {}
+            content = response_spec.get('content', {}) if isinstance(response_spec, dict) else {}
+            if 'application/json' in content:
+                return 'application/json'
+            if content:
+                return next(iter(content.keys()))
+    return "*/*"
 
 
 def validate_response_against_schema(response_data: Any, schema: Dict[str, Any], path: str, method: str) -> List[str]:
@@ -176,6 +272,8 @@ def validate_response_against_schema(response_data: Any, schema: Dict[str, Any],
         for prop, value in response_data.items():
             if prop in properties:
                 prop_schema = properties[prop]
+                if value is None and prop_schema.get('nullable'):
+                    continue
                 prop_type = prop_schema.get('type')
                 
                 if prop_type == 'string' and not isinstance(value, str):
@@ -241,19 +339,28 @@ def test_mock_integrity(mock):
         print(f"\n  Testing: {method} {path} ({operation_id})")
         
         # Build request
-        url = f"{base_url}{path}"
+        url = build_url(base_url, path, op['parameters'])
         headers = {
             'Content-Type': 'application/json',
-            'X-Correlation-ID': 'test-mock-integrity',
-            'Authorization': 'Bearer mock-token'  # For endpoints requiring auth
+            'X-Correlation-ID': '00000000-0000-0000-0000-000000000000',
+            'Authorization': 'Bearer mock-token',  # For endpoints requiring auth
+            'Accept': 'application/json'
         }
+        header_params = {
+            param['name']: generate_param_value(param)
+            for param in op['parameters']
+            if param.get('in') == 'header' and param.get('name')
+        }
+        for name, value in header_params.items():
+            headers.setdefault(name, value)
+        headers['Accept'] = choose_accept_header(op['responses'])
         
         # Get request data if needed
         request_data = generate_request_data(op)
         
         try:
             # Make request
-            if request_data:
+            if request_data is not None:
                 response = make_request_with_retry(method, url, headers=headers, json=request_data)
             else:
                 response = make_request_with_retry(method, url, headers=headers)
@@ -407,6 +514,3 @@ def test_coverage_report():
 if __name__ == "__main__":
     # Allow running directly for quick testing
     pytest.main([__file__, "-v", "-s"])
-
-
-

@@ -101,6 +101,10 @@ paths:
                   status_url:
                     type: string
                     format: uri
+              example:
+                job_id: 11111111-2222-3333-4444-555555555555
+                estimated_duration_seconds: 15
+                status_url: https://api.skeldir.com/api/budget/recommendations/11111111-2222-3333-4444-555555555555/status
         '401':
           $ref: './_common/base.yaml#/components/responses/UnauthorizedError'
       x-latency-requirement: 200ms
@@ -138,6 +142,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BudgetRecommendation'
+              example:
+                job_id: 11111111-2222-3333-4444-555555555555
+                status: complete
+                allocations:
+                  - channel: meta
+                    allocation_cents: 2200000
+                    expected_roas: 3.1
+                  - channel: google
+                    allocation_cents: 1800000
+                    expected_roas: 2.7
+                synthesis: "Allocate +20% to Meta due to higher ROAS; reduce Google spend until CPA stabilizes."
+                metrics:
+                  deterministic_runtime_ms: 120
+                  llm_cost_usd: 0.02
         '202':
           description: Job still running
           headers:
@@ -163,6 +181,10 @@ paths:
                     type: integer
                     minimum: 0
                     maximum: 100
+              example:
+                job_id: 11111111-2222-3333-4444-555555555555
+                status: running
+                progress_percentage: 65
         '404':
           $ref: './_common/base.yaml#/components/responses/NotFoundError'
       x-latency-requirement: 200ms

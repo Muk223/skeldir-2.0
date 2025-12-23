@@ -60,28 +60,38 @@ def main() -> int:
     issues: list[str] = []
     bundles_root = repo_root / "api-contracts" / "dist" / "openapi" / "v1"
 
-    for mock in registry.get("primary_mocks", []):
-        if mock not in procfile_mocks:
-            issues.append(f"Mock '{mock}' missing from Procfile.")
+    contract_entries = []
+    for group in registry.get("contracts", {}).values():
+        contract_entries.extend(group)
+
+    for entry in contract_entries:
+        name = entry.get("name")
+        expected_port = entry.get("port")
+        contract_path = entry.get("contract")
+
+        if not name or not contract_path:
+            issues.append(f"Invalid registry entry: {entry}")
             continue
-        info = procfile_mocks[mock]
-        expected_port = registry["port_mapping"].get(mock)
-        if info["port"] != expected_port:
+
+        proc_key = name.replace("-", "_")
+        if proc_key not in procfile_mocks:
+            issues.append(f"Mock '{name}' missing from Procfile.")
+            continue
+
+        info = procfile_mocks[proc_key]
+        if expected_port and info["port"] != expected_port:
             issues.append(
-                f"Mock '{mock}' port mismatch: registry {expected_port}, Procfile {info['port']}"
+                f"Mock '{name}' port mismatch: registry {expected_port}, Procfile {info['port']}"
             )
-        if "api-contracts/dist/openapi/v1" not in info["command"]:
+        command_text = info["command"]
+        if "api-contracts/dist/openapi/v1" not in command_text:
             issues.append(
-                f"Mock '{mock}' command does not reference bundled artifacts."
+                f"Mock '{name}' command does not reference bundled artifacts."
             )
 
-    # Ensure bundled artifacts exist
-    missing_bundles = [
-        mock for mock in registry["primary_mocks"]
-        if not (bundles_root / f"{mock}.bundled.yaml").exists()
-    ]
-    for mock in missing_bundles:
-        issues.append(f"Bundled artifact missing for mock '{mock}'.")
+        bundle_name = contract_path.replace("/", ".").replace(".yaml", ".bundled.yaml")
+        if not (bundles_root / bundle_name).exists():
+            issues.append(f"Bundled artifact missing for mock '{name}' ({bundle_name}).")
 
     report = {
         "status": "success" if not issues else "failure",

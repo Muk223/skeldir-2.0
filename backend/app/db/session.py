@@ -6,6 +6,8 @@ applies the `app.current_tenant_id` session variable required for PostgreSQL
 row-level security enforcement.
 """
 
+from __future__ import annotations
+
 import ssl
 import os
 from contextlib import asynccontextmanager

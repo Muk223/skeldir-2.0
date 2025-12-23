@@ -105,6 +105,7 @@ async def test_tenants_and_events_celery():
     # Insert test events
     async with test_engine.begin() as conn:
         # 3 events for tenant A
+        # RAW_SQL_ALLOWLIST: legacy Celery RLS contract test seeds attribution_events
         for i in range(3):
             await conn.execute(
                 text("""
@@ -124,6 +125,7 @@ async def test_tenants_and_events_celery():
             )
 
         # 2 events for tenant B
+        # RAW_SQL_ALLOWLIST: legacy Celery RLS contract test seeds attribution_events
         for i in range(2):
             await conn.execute(
                 text("""

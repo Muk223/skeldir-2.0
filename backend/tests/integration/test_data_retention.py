@@ -48,13 +48,18 @@ def test_tenant_id(db_session):
     """Create a test tenant for use in tests."""
     tenant_id = uuid4()
     
+    # RAW_SQL_ALLOWLIST: fixture seeds tenant for retention integration tests
     db_session.execute(
         text("""
-            INSERT INTO tenants (id, name, created_at, updated_at)
-            VALUES (:tenant_id, 'Test Tenant', NOW(), NOW())
+            INSERT INTO tenants (id, name, api_key_hash, notification_email, created_at, updated_at)
+            VALUES (:tenant_id, 'Test Tenant', :api_key_hash, :notification_email, NOW(), NOW())
             ON CONFLICT (id) DO NOTHING
         """),
-        {"tenant_id": tenant_id}
+        {
+            "tenant_id": tenant_id,
+            "api_key_hash": f"test_hash_{tenant_id}",
+            "notification_email": f"tenant_{tenant_id}@example.com",
+        }
     )
     db_session.commit()
     
@@ -77,6 +82,7 @@ class TestDataRetentionEnforcement:
         # Create event with timestamp 100 days ago
         old_timestamp = datetime.now(timezone.utc) - timedelta(days=100)
         
+        # RAW_SQL_ALLOWLIST: seed historical events to validate retention deletion
         db_session.execute(
             text("""
                 INSERT INTO attribution_events (
@@ -128,6 +134,7 @@ class TestDataRetentionEnforcement:
         # Create event with timestamp 10 days ago
         new_timestamp = datetime.now(timezone.utc) - timedelta(days=10)
         
+        # RAW_SQL_ALLOWLIST: seed recent events to validate retention preservation
         db_session.execute(
             text("""
                 INSERT INTO attribution_events (
@@ -171,6 +178,7 @@ class TestDataRetentionEnforcement:
         ledger_id = uuid4()
         
         # Create prerequisite data
+        # RAW_SQL_ALLOWLIST: seed event for retention financial preservation test
         db_session.execute(
             text("""
                 INSERT INTO attribution_events (
@@ -182,6 +190,7 @@ class TestDataRetentionEnforcement:
             {"event_id": event_id, "tenant_id": test_tenant_id}
         )
         
+        # RAW_SQL_ALLOWLIST: seed allocation for financial retention test
         db_session.execute(
             text("""
                 INSERT INTO attribution_allocations (
@@ -200,6 +209,7 @@ class TestDataRetentionEnforcement:
         # Create revenue_ledger entry with old timestamp (100 days ago)
         old_timestamp = datetime.now(timezone.utc) - timedelta(days=100)
         
+        # RAW_SQL_ALLOWLIST: seed revenue ledger row to ensure financial data preserved
         db_session.execute(
             text("""
                 INSERT INTO revenue_ledger (
@@ -329,7 +339,5 @@ class TestDataRetentionEnforcement:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
-
-
 
 

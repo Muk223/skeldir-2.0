@@ -39,6 +39,7 @@ fail() { echo "[FAIL] $1"; exit 1; }
 echo "Test 1: Attribution event insert with PII key 'email' (expect FAILURE)"
 pii_event_output=$(
     psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
+        SET app.current_tenant_id = '$GUARDRAIL_TENANT_ID';
         INSERT INTO attribution_events (
             tenant_id,
             session_id,
@@ -77,6 +78,7 @@ echo ""
 # Test 2: attribution_events.raw_payload with PII only in value should pass
 echo "Test 2: Attribution event insert with PII-like value (expect SUCCESS)"
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 >/dev/null <<SQL
+SET app.current_tenant_id = '$GUARDRAIL_TENANT_ID';
 INSERT INTO attribution_events (
     tenant_id,
     session_id,
@@ -110,6 +112,7 @@ echo ""
 insert_ledger_with_metadata() {
     local metadata_json="$1"
     psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
+        SET app.current_tenant_id = '$GUARDRAIL_TENANT_ID';
         WITH event_seed AS (
             INSERT INTO attribution_events (
                 tenant_id,

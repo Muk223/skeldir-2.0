@@ -83,6 +83,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExportData'
+              example:
+                generated_at: '2025-11-26T14:30:00Z'
+                date_range:
+                  start: '2025-11-01'
+                  end: '2025-11-26'
+                data:
+                  - date: '2025-11-25'
+                    channel: Meta
+                    revenue: 15230.50
+                    conversions: 127
+                    confidence: 0.92
+                  - date: '2025-11-25'
+                    channel: Google
+                    revenue: 12450.00
+                    conversions: 98
+                    confidence: 0.89
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
               schema:
                 type: string
@@ -151,6 +167,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExportData'
+              example:
+                generated_at: '2025-11-26T14:30:00Z'
+                date_range:
+                  start: '2025-11-01'
+                  end: '2025-11-26'
+                data:
+                  - date: '2025-11-25'
+                    channel: Meta
+                    revenue: 15230.50
+                    conversions: 127
+                    confidence: 0.92
+                  - date: '2025-11-25'
+                    channel: Google
+                    revenue: 12450.00
+                    conversions: 98
+                    confidence: 0.89
         '401':
           $ref: './_common/base.yaml#/components/responses/UnauthorizedError'
 

@@ -21,7 +21,8 @@ from app.schemas.auth import (
     LoginResponse,
     RefreshRequest,
     RefreshResponse,
-    LogoutResponse
+    LogoutResponse,
+    User,
 )
 
 router = APIRouter()
@@ -51,10 +52,17 @@ async def login(
     # Sample implementation - always succeeds for testing
     # Production: validate credentials, query database, generate real JWT
     
+    user = User(
+        id=uuid4(),
+        email=request.email,
+        username=request.email.split("@")[0] if "@" in request.email else "user",
+    )
+
     return LoginResponse(
         access_token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.sample_access_token",
         refresh_token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.sample_refresh_token",
         expires_in=3600,
+        user=user,
         token_type="Bearer"
     )
 
@@ -117,6 +125,5 @@ async def logout(
     return LogoutResponse(
         message="Logout successful"
     )
-
 
 

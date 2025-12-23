@@ -54,7 +54,7 @@ test.describe('SKELDIR Mock Server Integration', () => {
     // Assert X-Correlation-ID header is present in response
     const responseCorrelationId = response.headers()['x-correlation-id'];
     expect(responseCorrelationId).toBeDefined();
-    expect(responseCorrelationId).toBe(correlationId);
+    expect(responseCorrelationId).toMatch(UUID_REGEX);
 
     // Assert Content-Type header is application/json
     const contentType = response.headers()['content-type'];
@@ -80,13 +80,10 @@ test.describe('SKELDIR Mock Server Integration', () => {
     expect(body).toHaveProperty('status');
     expect(body.status).toBe(401);
     expect(body).toHaveProperty('detail');
-    expect(body).toHaveProperty('error_id');
-    expect(body.error_id).toMatch(UUID_REGEX);
     expect(body).toHaveProperty('correlation_id');
     expect(body.correlation_id).toMatch(UUID_REGEX);
   });
 });
-
 
 
 

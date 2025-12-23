@@ -35,41 +35,16 @@ to_native_path() {
 }
 
 to_cli_path() {
+    # Preserve POSIX paths on Unix; normalize only for Windows shells.
     local native
     native="$(to_native_path "$1")"
-    case "$native" in
-        *\ * )
-            local win_path="${native//\//\\}"
-            local short_path=""
-            if [ -n "$PYTHON_CMD" ]; then
-                short_path=$($PYTHON_CMD - "$win_path" <<'PY'
-import sys
-path = sys.argv[1]
-try:
-    import ctypes
-    kernel32 = ctypes.windll.kernel32
-    GetShortPathNameW = kernel32.GetShortPathNameW
-except AttributeError:
-    print(path)
-    raise SystemExit(0)
-
-length = GetShortPathNameW(path, None, 0)
-if length == 0:
-    print(path)
-    raise SystemExit(0)
-
-buffer = ctypes.create_unicode_buffer(length)
-result = GetShortPathNameW(path, buffer, length)
-if result == 0:
-    print(path)
-else:
-    print(buffer.value)
-PY
-)
+    case "$(uname -s 2>/dev/null)" in
+        MINGW*|MSYS*|CYGWIN*)
+            if command -v cygpath >/dev/null 2>&1; then
+                native="$(cygpath -m "$native")"
             fi
-            if [ -n "$short_path" ]; then
-                native="$short_path"
-            fi
+            ;;
+        *)
             ;;
     esac
     printf '%s' "$native"
@@ -83,13 +58,13 @@ echo ""
 # Check dependencies
 echo "[1/4] Checking validation tools..."
 if ! command -v npx &> /dev/null; then
-    echo -e "${RED}✗${NC} npx not found (required for openapi-generator-cli)"
+    echo -e "${RED}x${NC} npx not found (required for openapi-generator-cli)"
     exit 2
 fi
 echo -e "${GREEN}✓${NC} npx available"
 
 if ! command -v python3 &> /dev/null && ! command -v python &> /dev/null; then
-    echo -e "${RED}✗${NC} Python not found"
+    echo -e "${RED}x${NC} Python not found"
     exit 2
 fi
 PYTHON_CMD=$(command -v python3 || command -v python)
@@ -112,12 +87,12 @@ echo ""
 echo "[2/4] Bundling contracts..."
 if [ -x "$SCRIPT_DIR/bundle.sh" ]; then
     bash "$SCRIPT_DIR/bundle.sh" || {
-        echo -e "${RED}✗${NC} Contract bundling failed"
+        echo -e "${RED}x${NC} Contract bundling failed"
         exit 1
     }
     echo -e "${GREEN}✓${NC} Contracts bundled successfully"
 else
-    echo -e "${YELLOW}→${NC} Bundle script not executable, assuming contracts already bundled"
+    echo -e "${YELLOW}!${NC} Bundle script not executable, assuming contracts already bundled"
 fi
 echo ""
 
@@ -143,47 +118,50 @@ done
 if [ $VALIDATION_ERRORS -eq 0 ]; then
     echo -e "${GREEN}✓${NC} All contracts passed OpenAPI validation"
 else
-    echo -e "${RED}✗${NC} $VALIDATION_ERRORS contract(s) failed validation"
+    echo -e "${RED}x${NC} $VALIDATION_ERRORS contract(s) failed validation"
 fi
 echo ""
 
 # Step 3: Breaking change detection (if baselines exist)
 echo "[4/4] Checking for breaking changes..."
 if [ -d "$BASELINES_DIR" ]; then
-    if command -v oasdiff &> /dev/null; then
-        BREAKING_CHANGES=0
-        
-        for baseline in "$BASELINES_DIR"/*.yaml; do
-            filename=$(basename "$baseline" .yaml)
-            current="$CONTRACTS_DIR/${filename}.bundled.yaml"
-            
-            if [ -f "$current" ]; then
-                echo -n "  $filename ... "
-                native_baseline=$(to_cli_path "$baseline")
-                native_current=$(to_cli_path "$current")
-                
-                if oasdiff breaking "$native_baseline" "$native_current" > /dev/null 2>&1; then
-                    echo -e "${GREEN}NO BREAKING CHANGES${NC}"
-                else
-                    echo -e "${YELLOW}BREAKING CHANGES DETECTED${NC}"
-                    ((BREAKING_CHANGES++)) || true
-                    oasdiff breaking "$native_baseline" "$native_current" | sed 's/^/      /'
-                fi
-            fi
-        done
-        
-        if [ $BREAKING_CHANGES -eq 0 ]; then
-            echo -e "${GREEN}✓${NC} No breaking changes detected"
-        else
-            echo -e "${YELLOW}→${NC} $BREAKING_CHANGES contract(s) have breaking changes"
-            echo "    (Breaking changes allowed in B0.1 development phase)"
-        fi
-    else
-        echo -e "${YELLOW}→${NC} oasdiff not installed, skipping breaking change detection"
+    if ! command -v oasdiff &> /dev/null; then
+        echo -e "${RED}x${NC} oasdiff not installed but baselines exist; cannot perform breaking-change check."
         echo "    Install: go install github.com/tufin/oasdiff@latest"
+        exit 1
+    fi
+
+    BREAKING_CHANGES=0
+    
+    for baseline in "$BASELINES_DIR"/*.yaml; do
+        filename=$(basename "$baseline" .yaml)
+        current="$CONTRACTS_DIR/${filename}.bundled.yaml"
+        
+        if [ -f "$current" ]; then
+            echo -n "  $filename ... "
+            native_baseline=$(to_cli_path "$baseline")
+            native_current=$(to_cli_path "$current")
+            
+            if oasdiff breaking "$native_baseline" "$native_current" > /dev/null 2>&1; then
+                echo -e "${GREEN}NO BREAKING CHANGES${NC}"
+            else
+                echo -e "${YELLOW}BREAKING CHANGES DETECTED${NC}"
+                ((BREAKING_CHANGES++)) || true
+                oasdiff breaking "$native_baseline" "$native_current" | sed 's/^/      /'
+            fi
+        else
+            echo -e "${YELLOW}!${NC} Missing current contract for baseline $filename (skipping)"
+        fi
+    done
+    
+    if [ $BREAKING_CHANGES -eq 0 ]; then
+        echo -e "${GREEN}✓${NC} No breaking changes detected"
+    else
+        echo -e "${YELLOW}!${NC} $BREAKING_CHANGES contract(s) have breaking changes"
+        echo "    (Breaking changes allowed in B0.1 development phase)"
     fi
 else
-    echo -e "${YELLOW}→${NC} No baselines found at $BASELINES_DIR"
+    echo -e "${YELLOW}!${NC} No baselines found at $BASELINES_DIR"
     echo "    Skipping breaking change detection"
 fi
 echo ""

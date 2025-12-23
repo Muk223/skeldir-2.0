@@ -19,6 +19,10 @@ WITH tenant_seed AS (
     )
     RETURNING id
 ),
+set_tenant AS (
+    SELECT set_config('app.current_tenant_id', tenant_seed.id::text, false) AS ignored
+    FROM tenant_seed
+),
 event_seed AS (
     INSERT INTO attribution_events (
         tenant_id,
@@ -45,7 +49,7 @@ event_seed AS (
         jsonb_build_object('order_id', 'ORD-GUARDRAIL', 'source', 'fixture'),
         10000,
         10000
-    FROM tenant_seed
+    FROM tenant_seed, set_tenant
     RETURNING id, tenant_id, idempotency_key
 ),
 allocation_primary AS (
@@ -166,17 +170,27 @@ FROM tenant_seed, event_seed, allocation_primary, ledger_seed;
 
 cleanup_guardrail_fixture() {
     local database_url="$1"
+    set +e
     if [[ -z "${GUARDRAIL_TENANT_ID:-}" ]]; then
         return
     fi
     psql "$database_url" -v ON_ERROR_STOP=1 >/dev/null <<SQL
 BEGIN;
-SET LOCAL session_replication_role = replica;
+SET LOCAL app.current_tenant_id = '$GUARDRAIL_TENANT_ID';
+ALTER TABLE attribution_recompute_jobs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE attribution_allocations DISABLE TRIGGER trg_check_allocation_sum;
+ALTER TABLE revenue_ledger DISABLE TRIGGER trg_ledger_prevent_mutation;
+ALTER TABLE attribution_events DISABLE TRIGGER trg_events_prevent_mutation;
+DELETE FROM attribution_recompute_jobs WHERE tenant_id = '$GUARDRAIL_TENANT_ID'::uuid;
 DELETE FROM revenue_ledger WHERE tenant_id = '$GUARDRAIL_TENANT_ID'::uuid;
 DELETE FROM attribution_allocations WHERE tenant_id = '$GUARDRAIL_TENANT_ID'::uuid;
 DELETE FROM attribution_events WHERE tenant_id = '$GUARDRAIL_TENANT_ID'::uuid;
 DELETE FROM tenants WHERE id = '$GUARDRAIL_TENANT_ID'::uuid;
-SET LOCAL session_replication_role = DEFAULT;
+ALTER TABLE attribution_recompute_jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE attribution_allocations ENABLE TRIGGER trg_check_allocation_sum;
+ALTER TABLE revenue_ledger ENABLE TRIGGER trg_ledger_prevent_mutation;
+ALTER TABLE attribution_events ENABLE TRIGGER trg_events_prevent_mutation;
 COMMIT;
 SQL
+    set -e
 }

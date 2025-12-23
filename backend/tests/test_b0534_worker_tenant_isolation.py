@@ -16,13 +16,11 @@ from sqlalchemy import text
 from app.celery_app import celery_app
 from app.core.db import engine
 from app.tasks.attribution import recompute_window
+from tests.conftest import _insert_tenant
 
 
-async def _insert_tenant(conn, tenant_id):
-    await conn.execute(
-        text("INSERT INTO tenants (id, name) VALUES (:id, :name) ON CONFLICT DO NOTHING"),
-        {"id": tenant_id, "name": f"Test Tenant {tenant_id}"},
-    )
+async def _insert_test_tenant(conn, tenant_id):
+    await _insert_tenant(conn, tenant_id, api_key_hash=f"test_hash_{tenant_id}")
 
 
 from datetime import datetime, timezone
@@ -40,6 +38,7 @@ async def _insert_events(conn, tenant_id, events):
     )
     ts1 = _to_dt(events[0][1])
     ts2 = _to_dt(events[1][1])
+    # RAW_SQL_ALLOWLIST: seed cross-tenant events to validate RLS enforcement
     await conn.execute(
         text(
             """
@@ -81,8 +80,8 @@ class TestWorkerTenantIsolation:
         window_end = "2025-06-02T00:00:00Z"
 
         async with engine.begin() as conn:
-            await _insert_tenant(conn, tenant_a)
-            await _insert_tenant(conn, tenant_b)
+            await _insert_test_tenant(conn, tenant_a)
+            await _insert_test_tenant(conn, tenant_b)
             await _insert_events(
                 conn,
                 tenant_a,
@@ -196,7 +195,7 @@ class TestWorkerTenantIsolation:
         model_version = "1.0.0"
 
         async with engine.begin() as conn:
-            await _insert_tenant(conn, tenant_id)
+            await _insert_test_tenant(conn, tenant_id)
             await _insert_events(
                 conn,
                 tenant_id,
@@ -284,7 +283,7 @@ class TestWorkerTenantIsolation:
         window_end = "2025-06-11T00:00:00Z"
 
         async with engine.begin() as conn:
-            await _insert_tenant(conn, tenant_id)
+            await _insert_test_tenant(conn, tenant_id)
             await _insert_events(
                 conn,
                 tenant_id,

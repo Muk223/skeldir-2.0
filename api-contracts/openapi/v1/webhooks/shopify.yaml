@@ -29,19 +29,19 @@ paths:
       parameters:
         - name: X-Shopify-Hmac-SHA256
           in: header
-          required: true
+          required: false
           schema:
             type: string
           description: HMAC signature for webhook verification
         - name: X-Shopify-Shop-Domain
           in: header
-          required: true
+          required: false
           schema:
             type: string
           description: Shop domain that triggered the webhook
         - name: X-Shopify-Topic
           in: header
-          required: true
+          required: false
           schema:
             type: string
             enum: [orders/create]
@@ -52,7 +52,7 @@ paths:
             schema:
               $ref: '#/components/schemas/ShopifyOrder'
             example:
-              id: 820982911946154508
+              id: 8209829119461
               order_number: 1001
               total_price: "199.99"
               currency: USD
@@ -64,13 +64,9 @@ paths:
                   value: facebook
       responses:
         '200':
-          description: Webhook processed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '../_common/base.yaml#/components/schemas/SuccessResponse'
+          $ref: '#/components/responses/WebhookAccepted'
         '401':
-          description: Invalid HMAC signature
+          $ref: '../_common/base.yaml#/components/responses/UnauthorizedError'
         '500':
           $ref: '../_common/base.yaml#/components/responses/ServerError'
 
@@ -84,17 +80,17 @@ paths:
       parameters:
         - name: X-Shopify-Hmac-SHA256
           in: header
-          required: true
+          required: false
           schema:
             type: string
         - name: X-Shopify-Shop-Domain
           in: header
-          required: true
+          required: false
           schema:
             type: string
         - name: X-Shopify-Topic
           in: header
-          required: true
+          required: false
           schema:
             type: string
             enum: [orders/paid]
@@ -105,7 +101,7 @@ paths:
             schema:
               $ref: '#/components/schemas/ShopifyOrder'
             example:
-              id: 820982911946154508
+              id: 8209829119461
               order_number: 1001
               total_price: "199.99"
               currency: USD
@@ -116,11 +112,7 @@ paths:
                   value: sess_def456
       responses:
         '200':
-          description: Webhook processed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '../_common/base.yaml#/components/schemas/SuccessResponse'
+          $ref: '#/components/responses/WebhookAccepted'
 
   /webhooks/shopify/refunds/create:
     post:
@@ -132,17 +124,17 @@ paths:
       parameters:
         - name: X-Shopify-Hmac-SHA256
           in: header
-          required: true
+          required: false
           schema:
             type: string
         - name: X-Shopify-Shop-Domain
           in: header
-          required: true
+          required: false
           schema:
             type: string
         - name: X-Shopify-Topic
           in: header
-          required: true
+          required: false
           schema:
             type: string
             enum: [refunds/create]
@@ -153,20 +145,16 @@ paths:
             schema:
               $ref: '#/components/schemas/ShopifyRefund'
             example:
-              id: 230982911946154508
-              order_id: 820982911946154508
+              id: 2309829119461
+              order_id: 8209829119461
               transactions:
-                - id: 389274982374
+                - id: 3892749823
                   amount: "50.00"
                   kind: refund
                   currency: USD
       responses:
         '200':
-          description: Webhook processed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '../_common/base.yaml#/components/schemas/SuccessResponse'
+          $ref: '#/components/responses/WebhookAccepted'
 
   /webhooks/shopify/checkouts/update:
     post:
@@ -178,17 +166,17 @@ paths:
       parameters:
         - name: X-Shopify-Hmac-SHA256
           in: header
-          required: true
+          required: false
           schema:
             type: string
         - name: X-Shopify-Shop-Domain
           in: header
-          required: true
+          required: false
           schema:
             type: string
         - name: X-Shopify-Topic
           in: header
-          required: true
+          required: false
           schema:
             type: string
             enum: [checkouts/update]
@@ -200,13 +188,21 @@ paths:
               $ref: '#/components/schemas/ShopifyCheckout'
       responses:
         '200':
-          description: Webhook processed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '../_common/base.yaml#/components/schemas/SuccessResponse'
+          $ref: '#/components/responses/WebhookAccepted'
 
 components:
+  responses:
+    WebhookAccepted:
+      description: Webhook processed successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../_common/base.yaml#/components/schemas/SuccessResponse'
+          example:
+            success: true
+            correlation_id: 00000000-0000-0000-0000-000000000000
+            message: Webhook received
+
   schemas:
     ShopifyOrder:
       type: object

@@ -68,16 +68,10 @@ async def _insert_tenant(conn, tenant_id: uuid4, api_key_hash: str) -> None:
     """
     Insert a tenant row while tolerating schema drift (api_key_hash/notification_email optional).
     """
-    columns = {
-        row[0]
-        for row in (
-            await conn.execute(
-                text(
-                    "SELECT column_name FROM information_schema.columns WHERE table_name = 'tenants'"
-                )
-            )
-        ).scalars()
-    }
+    result = await conn.execute(
+        text("SELECT column_name FROM information_schema.columns WHERE table_name = 'tenants'")
+    )
+    columns = set(result.scalars().all())
 
     insert_cols = ["id", "name"]
     params = {
@@ -93,6 +87,7 @@ async def _insert_tenant(conn, tenant_id: uuid4, api_key_hash: str) -> None:
         insert_cols.append("notification_email")
 
     values_clause = ", ".join(f":{col}" for col in insert_cols)
+    # RAW_SQL_ALLOWLIST: bootstrap tenant fixture during migration/rls setup
     await conn.execute(
         text(
             f"INSERT INTO tenants ({', '.join(insert_cols)}) VALUES ({values_clause})"

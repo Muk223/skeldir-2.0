@@ -55,13 +55,18 @@ def test_tenant_id(db_session):
     """Create a test tenant for use in tests."""
     tenant_id = uuid4()
     
+    # RAW_SQL_ALLOWLIST: fixture seeds tenant for PII guardrail integration tests
     db_session.execute(
         text("""
-            INSERT INTO tenants (id, name, created_at, updated_at)
-            VALUES (:tenant_id, 'Test Tenant', NOW(), NOW())
+            INSERT INTO tenants (id, name, api_key_hash, notification_email, created_at, updated_at)
+            VALUES (:tenant_id, 'Test Tenant', :api_key_hash, :notification_email, NOW(), NOW())
             ON CONFLICT (id) DO NOTHING
         """),
-        {"tenant_id": tenant_id}
+        {
+            "tenant_id": tenant_id,
+            "api_key_hash": f"test_hash_{tenant_id}",
+            "notification_email": f"tenant_{tenant_id}@example.com",
+        }
     )
     db_session.commit()
     
@@ -78,6 +83,7 @@ class TestPIIGuardrailAttributionEvents:
         Expected: Raises IntegrityError with error message containing "PII key detected" and "email".
         """
         # Attempt INSERT with PII key
+        # RAW_SQL_ALLOWLIST: intentional PII injection to assert trigger enforcement
         with pytest.raises((IntegrityError, InternalError)) as exc_info:
             db_session.execute(
                 text("""
@@ -100,6 +106,7 @@ class TestPIIGuardrailAttributionEvents:
     
     def test_insert_with_phone_fails_on_attribution_events(self, db_session, test_tenant_id):
         """Test that phone number in raw_payload is blocked."""
+        # RAW_SQL_ALLOWLIST: intentional PII injection to assert trigger enforcement
         with pytest.raises((IntegrityError, InternalError)) as exc_info:
             db_session.execute(
                 text("""
@@ -127,6 +134,7 @@ class TestPIIGuardrailAttributionEvents:
         event_id = uuid4()
         
         # INSERT with clean payload
+        # RAW_SQL_ALLOWLIST: controlled clean payload insert to validate allow path
         db_session.execute(
             text("""
                 INSERT INTO attribution_events (
@@ -162,6 +170,7 @@ class TestPIIGuardrailDeadEvents:
         Expected: Raises exception with PII detection message.
         """
         # Attempt INSERT with PII key
+        # RAW_SQL_ALLOWLIST: intentional PII injection to assert trigger enforcement
         with pytest.raises((IntegrityError, InternalError)) as exc_info:
             db_session.execute(
                 text("""
@@ -196,6 +205,7 @@ class TestPIIGuardrailRevenueLedger:
         event_id = uuid4()
         
         # Create event first
+        # RAW_SQL_ALLOWLIST: seed event for FK prerequisite in PII guardrail test
         db_session.execute(
             text("""
                 INSERT INTO attribution_events (
@@ -208,6 +218,7 @@ class TestPIIGuardrailRevenueLedger:
         )
         
         # Create allocation
+        # RAW_SQL_ALLOWLIST: seed allocation for FK prerequisite in PII guardrail test
         db_session.execute(
             text("""
                 INSERT INTO attribution_allocations (
@@ -233,6 +244,7 @@ class TestPIIGuardrailRevenueLedger:
         Expected: Raises exception.
         """
         # Attempt INSERT with PII in metadata
+        # RAW_SQL_ALLOWLIST: intentional PII injection to assert trigger enforcement
         with pytest.raises((IntegrityError, InternalError)) as exc_info:
             db_session.execute(
                 text("""
@@ -263,6 +275,7 @@ class TestPIIGuardrailRevenueLedger:
         ledger_id = uuid4()
         
         # INSERT with NULL metadata
+        # RAW_SQL_ALLOWLIST: validate NULL metadata path bypasses PII trigger
         db_session.execute(
             text("""
                 INSERT INTO revenue_ledger (
@@ -295,6 +308,7 @@ class TestPIIGuardrailAdditionalKeys:
         """Test that first_name, last_name, full_name are blocked."""
         for name_key in ["first_name", "last_name", "full_name"]:
             with pytest.raises((IntegrityError, InternalError)):
+                # RAW_SQL_ALLOWLIST: intentional name PII injection to trigger guard
                 db_session.execute(
                     text(f"""
                         INSERT INTO attribution_events (
@@ -311,6 +325,7 @@ class TestPIIGuardrailAdditionalKeys:
         """Test that address, street_address are blocked."""
         for addr_key in ["address", "street_address"]:
             with pytest.raises((IntegrityError, InternalError)):
+                # RAW_SQL_ALLOWLIST: intentional address PII injection to trigger guard
                 db_session.execute(
                     text(f"""
                         INSERT INTO attribution_events (
@@ -327,6 +342,7 @@ class TestPIIGuardrailAdditionalKeys:
         """Test that ip_address, ip are blocked."""
         for ip_key in ["ip_address", "ip"]:
             with pytest.raises((IntegrityError, InternalError)):
+                # RAW_SQL_ALLOWLIST: intentional IP PII injection to trigger guard
                 db_session.execute(
                     text(f"""
                         INSERT INTO attribution_events (
@@ -343,6 +359,7 @@ class TestPIIGuardrailAdditionalKeys:
         """Test that ssn, social_security_number are blocked."""
         for ssn_key in ["ssn", "social_security_number"]:
             with pytest.raises((IntegrityError, InternalError)):
+                # RAW_SQL_ALLOWLIST: intentional SSN PII injection to trigger guard
                 db_session.execute(
                     text(f"""
                         INSERT INTO attribution_events (
@@ -358,7 +375,3 @@ class TestPIIGuardrailAdditionalKeys:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
-
-
-
-

@@ -29,6 +29,7 @@ paths:
       operationId: login
       tags:
         - Authentication
+      security: []
       parameters:
         - $ref: './_common/base.yaml#/components/parameters/CorrelationId'
       requestBody:
@@ -181,6 +182,10 @@ paths:
             application/json:
               schema:
                 $ref: './_common/base.yaml#/components/schemas/SuccessResponse'
+              example:
+                success: true
+                correlation_id: 00000000-0000-0000-0000-000000000000
+                message: Session terminated
         '401':
           $ref: './_common/base.yaml#/components/responses/UnauthorizedError'
 

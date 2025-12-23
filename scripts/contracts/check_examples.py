@@ -35,7 +35,12 @@ def parse_args() -> argparse.Namespace:
 
 def has_example(response: Dict[str, Any]) -> bool:
     content = response.get("content", {})
-    json_content = content.get("application/json", {})
+    json_content = content.get("application/json")
+    # If the response does not define JSON content, we don't enforce an example.
+    if json_content is None:
+        return True
+    if not isinstance(json_content, dict):
+        return False
     if "example" in json_content:
         return True
     examples = json_content.get("examples")

@@ -22,5 +22,13 @@ worker: cd backend && celery -A app.tasks worker --loglevel=info
 # Mock Servers (Contract-First Development)
 mock_auth: prism mock api-contracts/dist/openapi/v1/auth.bundled.yaml -p 4010 -h 0.0.0.0
 mock_attribution: prism mock api-contracts/dist/openapi/v1/attribution.bundled.yaml -p 4011 -h 0.0.0.0
-mock_health: prism mock api-contracts/dist/openapi/v1/health.bundled.yaml -p 4012 -h 0.0.0.0
-
+mock_reconciliation: prism mock api-contracts/dist/openapi/v1/reconciliation.bundled.yaml -p 4012 -h 0.0.0.0
+mock_export: prism mock api-contracts/dist/openapi/v1/export.bundled.yaml -p 4013 -h 0.0.0.0
+mock_health: prism mock api-contracts/dist/openapi/v1/health.bundled.yaml -p 4014 -h 0.0.0.0
+mock_shopify: prism mock api-contracts/dist/openapi/v1/webhooks.shopify.bundled.yaml -p 4015 -h 0.0.0.0
+mock_woocommerce: prism mock api-contracts/dist/openapi/v1/webhooks.woocommerce.bundled.yaml -p 4016 -h 0.0.0.0
+mock_stripe: prism mock api-contracts/dist/openapi/v1/webhooks.stripe.bundled.yaml -p 4017 -h 0.0.0.0
+mock_paypal: prism mock api-contracts/dist/openapi/v1/webhooks.paypal.bundled.yaml -p 4018 -h 0.0.0.0
+mock_llm_investigations: prism mock api-contracts/dist/openapi/v1/llm-investigations.bundled.yaml -p 4024 -h 0.0.0.0
+mock_llm_budget: prism mock api-contracts/dist/openapi/v1/llm-budget.bundled.yaml -p 4025 -h 0.0.0.0
+mock_llm_explanations: prism mock api-contracts/dist/openapi/v1/llm-explanations.bundled.yaml -p 4026 -h 0.0.0.0

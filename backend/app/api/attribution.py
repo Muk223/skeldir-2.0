@@ -52,6 +52,7 @@ async def get_realtime_revenue(
 
     # System phase determines verification status
     system_phase = os.getenv('SYSTEM_PHASE', 'B0.1')
+    tenant_id = os.getenv('TEST_TENANT_ID', '00000000-0000-0000-0000-000000000000')
 
     # In B0.1: Revenue data is NOT verified (no reconciliation pipeline yet)
     verified = False if system_phase == 'B0.1' else True
@@ -62,7 +63,8 @@ async def get_realtime_revenue(
         "event_count": 0,  # Stub value for B0.1 (no event tracking yet)
         "last_updated": datetime.utcnow().isoformat() + "Z",
         "data_freshness_seconds": 45,
-        "verified": verified
+        "verified": verified,
+        "tenant_id": tenant_id,
     }
 
     # Add upgrade_notice when data is unverified (interim state)

@@ -129,11 +129,13 @@ CREATE FUNCTION public.fn_enforce_pii_guardrail() RETURNS trigger
             END IF;
             
             -- Enforce PII guardrail on revenue_ledger (metadata) - only if NOT NULL
-            IF TG_TABLE_NAME = 'revenue_ledger' AND NEW.metadata IS NOT NULL THEN
-                IF fn_detect_pii_keys(NEW.metadata) THEN
+            IF TG_TABLE_NAME = 'revenue_ledger' THEN
+                PERFORM NULL;  -- explicit branch to avoid cross-table field resolution
+                PERFORM NULL;
+                IF to_jsonb(NEW)->'metadata' IS NOT NULL AND fn_detect_pii_keys(to_jsonb(NEW)->'metadata') THEN
                     -- Find first PII key for error message
                     SELECT key INTO detected_key
-                    FROM jsonb_object_keys(NEW.metadata) key
+                    FROM jsonb_object_keys(to_jsonb(NEW)->'metadata') key
                     WHERE key IN (
                         'email', 'email_address', 
                         'phone', 'phone_number', 

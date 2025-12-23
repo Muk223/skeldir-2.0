@@ -17,6 +17,7 @@ from app.celery_app import celery_app  # noqa: E402
 from app.db.session import engine, set_tenant_guc  # noqa: E402
 from app.services.attribution import schedule_recompute_window  # noqa: E402
 from tests.test_b051_celery_foundation import celery_worker_proc as foundation_worker_proc  # noqa: E402
+from tests.conftest import _insert_tenant
 
 DEFAULT_SYNC_DSN = os.environ.get(
     "TEST_SYNC_DSN", "postgresql://app_user:app_user@localhost:5432/skeldir_validation"
@@ -47,12 +48,14 @@ def celery_worker_proc(foundation_worker_proc):
 async def _prepare_facts():
     """Insert tenant and deterministic events for the test window."""
     async with engine.begin() as conn:
-        await conn.execute(
-            text("INSERT INTO tenants (id, name) VALUES (:id, :name) ON CONFLICT DO NOTHING"),
-            {"id": TENANT_ID, "name": "B0536 Test Tenant"},
+        await _insert_tenant(
+            conn,
+            TENANT_ID,
+            api_key_hash=f"test_hash_{TENANT_ID}",
         )
         await set_tenant_guc(conn, TENANT_ID, local=True)
         await conn.execute(text("SELECT set_config('app.execution_context', 'ingestion', true)"))
+        # RAW_SQL_ALLOWLIST: seed deterministic events for end-to-end attribution proof
         await conn.execute(
             text(
                 """

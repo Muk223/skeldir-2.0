@@ -28,6 +28,7 @@ async def tenant_with_secret():
     api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
     secret = "shopify_secret"
     conn = await asyncpg.connect(os.environ["DATABASE_URL"])
+    # RAW_SQL_ALLOWLIST: legacy logging/metrics contract test seeds tenant with webhook secret
     await conn.execute(
         """
         INSERT INTO tenants (id, api_key_hash, name, notification_email, shopify_webhook_secret, created_at, updated_at)

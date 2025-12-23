@@ -56,6 +56,7 @@ async def test_tenants_and_events():
     # Insert test data for both tenants
     async with test_engine.begin() as conn:
         # Insert 3 events for tenant A
+        # RAW_SQL_ALLOWLIST: legacy minimal RLS contract test seeds attribution_events
         for i in range(3):
             await conn.execute(
                 text("""
@@ -75,6 +76,7 @@ async def test_tenants_and_events():
             )
 
         # Insert 2 events for tenant B
+        # RAW_SQL_ALLOWLIST: legacy minimal RLS contract test seeds attribution_events
         for i in range(2):
             await conn.execute(
                 text("""

@@ -38,6 +38,7 @@ from sqlalchemy import text
 
 from app.core.db import engine
 from app.tasks.attribution import recompute_window
+from tests.conftest import _insert_tenant
 
 
 def _parse_timestamp(iso_string: str) -> datetime:
@@ -88,9 +89,10 @@ class TestRevenueInputContract:
 
         # Insert test tenant
         async with engine.begin() as conn:
-            await conn.execute(
-                text("INSERT INTO tenants (id, name) VALUES (:id, :name) ON CONFLICT DO NOTHING"),
-                {"id": test_tenant_id, "name": f"Test Tenant {test_tenant_id}"}
+            await _insert_tenant(
+                conn,
+                test_tenant_id,
+                api_key_hash=f"test_hash_{test_tenant_id}",
             )
 
             # Set tenant context for RLS policy
@@ -109,6 +111,7 @@ class TestRevenueInputContract:
             event_id_1 = uuid4()
             event_id_2 = uuid4()
 
+            # RAW_SQL_ALLOWLIST: seed deterministic events for revenue input contract baseline
             await conn.execute(
                 text("""
                     INSERT INTO attribution_events (
@@ -213,9 +216,10 @@ class TestRevenueInputContract:
 
         # Insert test tenant
         async with engine.begin() as conn:
-            await conn.execute(
-                text("INSERT INTO tenants (id, name) VALUES (:id, :name) ON CONFLICT DO NOTHING"),
-                {"id": test_tenant_id, "name": f"Test Tenant {test_tenant_id}"}
+            await _insert_tenant(
+                conn,
+                test_tenant_id,
+                api_key_hash=f"test_hash_{test_tenant_id}",
             )
 
             # Set tenant context for RLS policy
@@ -227,6 +231,7 @@ class TestRevenueInputContract:
             event_id_1 = uuid4()
             event_id_2 = uuid4()
 
+            # RAW_SQL_ALLOWLIST: seed deterministic events for revenue input contract rerun
             await conn.execute(
                 text("""
                     INSERT INTO attribution_events (
@@ -294,6 +299,7 @@ class TestRevenueInputContract:
             ledger_row_1_id = uuid4()
             ledger_row_2_id = uuid4()
 
+            # RAW_SQL_ALLOWLIST: simulate pre-existing ledger rows for contract test
             await conn.execute(
                 text("""
                     INSERT INTO revenue_ledger (

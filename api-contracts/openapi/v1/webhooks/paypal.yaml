@@ -29,19 +29,19 @@ paths:
       parameters:
         - name: PAYPAL-TRANSMISSION-ID
           in: header
-          required: true
+          required: false
           schema:
             type: string
           description: PayPal transmission ID
         - name: PAYPAL-TRANSMISSION-SIG
           in: header
-          required: true
+          required: false
           schema:
             type: string
           description: PayPal transmission signature
         - name: PAYPAL-CERT-URL
           in: header
-          required: true
+          required: false
           schema:
             type: string
             format: uri
@@ -65,13 +65,9 @@ paths:
                 custom_id: sess_abc123
       responses:
         '200':
-          description: Webhook processed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '../_common/base.yaml#/components/schemas/SuccessResponse'
+          $ref: '#/components/responses/WebhookAccepted'
         '400':
-          description: Invalid webhook signature
+          $ref: '../_common/base.yaml#/components/responses/ValidationError'
         '500':
           $ref: '../_common/base.yaml#/components/responses/ServerError'
 
@@ -85,17 +81,17 @@ paths:
       parameters:
         - name: PAYPAL-TRANSMISSION-ID
           in: header
-          required: true
+          required: false
           schema:
             type: string
         - name: PAYPAL-TRANSMISSION-SIG
           in: header
-          required: true
+          required: false
           schema:
             type: string
         - name: PAYPAL-CERT-URL
           in: header
-          required: true
+          required: false
           schema:
             type: string
             format: uri
@@ -105,13 +101,20 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PayPalEvent'
+            example:
+              id: WH-9876543210
+              event_type: PAYMENT.CAPTURE.COMPLETED
+              create_time: '2025-11-26T15:00:00Z'
+              resource:
+                id: "CAP-1234567890"
+                state: completed
+                amount:
+                  total: "249.99"
+                  currency: USD
+                custom_id: sess_xyz789
       responses:
         '200':
-          description: Webhook processed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '../_common/base.yaml#/components/schemas/SuccessResponse'
+          $ref: '#/components/responses/WebhookAccepted'
 
   /webhooks/paypal/payment/sale/refunded:
     post:
@@ -123,17 +126,17 @@ paths:
       parameters:
         - name: PAYPAL-TRANSMISSION-ID
           in: header
-          required: true
+          required: false
           schema:
             type: string
         - name: PAYPAL-TRANSMISSION-SIG
           in: header
-          required: true
+          required: false
           schema:
             type: string
         - name: PAYPAL-CERT-URL
           in: header
-          required: true
+          required: false
           schema:
             type: string
             format: uri
@@ -145,13 +148,21 @@ paths:
               $ref: '#/components/schemas/PayPalEvent'
       responses:
         '200':
-          description: Webhook processed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '../_common/base.yaml#/components/schemas/SuccessResponse'
+          $ref: '#/components/responses/WebhookAccepted'
 
 components:
+  responses:
+    WebhookAccepted:
+      description: Webhook processed successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../_common/base.yaml#/components/schemas/SuccessResponse'
+          example:
+            success: true
+            correlation_id: 00000000-0000-0000-0000-000000000000
+            message: Webhook received
+
   schemas:
     PayPalEvent:
       type: object

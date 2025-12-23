@@ -54,26 +54,7 @@ paths:
                   queue: up
                 uptime_seconds: 86400
         '503':
-          description: System is unhealthy
-          headers:
-            X-Correlation-ID:
-              schema:
-                type: string
-                format: uuid
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/HealthResponse'
-              example:
-                status: unhealthy
-                timestamp: '2025-11-26T14:30:00Z'
-                version: 2.0.0
-                services:
-                  database: down
-                  api: up
-                  cache: up
-                  queue: degraded
-                uptime_seconds: 3600
+          $ref: '#/components/responses/ServiceUnavailable'
 
   /api/health/detailed:
     get:
@@ -99,6 +80,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DetailedHealthResponse'
+              example:
+                status: healthy
+                timestamp: '2025-11-26T14:30:00Z'
+                version: 2.0.0
+                services:
+                  database: up
+                  api: up
+                  cache: up
+                  queue: up
+                uptime_seconds: 86400
+                metrics:
+                  requests_per_minute: 1200
+                  average_response_ms: 180.5
+                  error_rate: 0.002
+                  active_connections: 24
+                database:
+                  pool_size: 50
+                  active_connections: 12
+                  query_latency_ms: 12.3
         '401':
           $ref: './_common/base.yaml#/components/responses/UnauthorizedError'
 
@@ -120,8 +120,10 @@ paths:
                   ready:
                     type: boolean
                     example: true
+              example:
+                ready: true
         '503':
-          description: Service is not ready
+          $ref: '#/components/responses/ServiceUnavailable'
 
   /api/health/live:
     get:
@@ -141,8 +143,10 @@ paths:
                   alive:
                     type: boolean
                     example: true
+              example:
+                alive: true
         '503':
-          description: Service is not alive
+          $ref: '#/components/responses/ServiceUnavailable'
 
 components:
   schemas:
@@ -216,6 +220,20 @@ components:
                 query_latency_ms:
                   type: number
                   format: float
+
+  responses:
+    ServiceUnavailable:
+      description: Service is unavailable
+      headers:
+        X-Correlation-ID:
+          schema:
+            type: string
+            format: uuid
+          description: Request correlation ID for distributed tracing
+      content:
+        application/problem+json:
+          schema:
+            $ref: './_common/base.yaml#/components/schemas/ProblemDetails'
 
   securitySchemes:
     bearerAuth:

@@ -26,6 +26,8 @@ def main() -> int:
         "B0.1": "scripts.phase_gates.b0_1_gate",
         "B0.2": "scripts.phase_gates.b0_2_gate",
         "B0.3": "scripts.phase_gates.b0_3_gate",
+        "B0.4": "scripts.phase_gates.b0_4_gate",
+        "SCHEMA_GUARD": "scripts.phase_gates.schema_guard_gate",
     }
 
     if phase not in handlers:

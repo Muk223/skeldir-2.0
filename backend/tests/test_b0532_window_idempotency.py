@@ -27,6 +27,7 @@ from sqlalchemy import text
 from app.core.db import engine
 from app.tasks.attribution import recompute_window
 from app.db.session import set_tenant_guc
+from tests.conftest import _insert_tenant
 
 
 def _parse_timestamp(iso_string: str) -> datetime:
@@ -73,9 +74,10 @@ class TestWindowIdempotency:
         try:
             # Insert test tenant
             async with engine.begin() as conn:
-                await conn.execute(
-                    text("INSERT INTO tenants (id, name) VALUES (:id, :name) ON CONFLICT DO NOTHING"),
-                    {"id": test_tenant_id, "name": f"Test Tenant {test_tenant_id}"},
+                await _insert_tenant(
+                    conn,
+                    test_tenant_id,
+                    api_key_hash=f"test_hash_{test_tenant_id}",
                 )
 
             # First execution - creates job identity
@@ -210,11 +212,13 @@ class TestWindowIdempotency:
 
         try:
             async with engine.begin() as conn:
-                await conn.execute(
-                    text("INSERT INTO tenants (id, name) VALUES (:id, :name) ON CONFLICT DO NOTHING"),
-                    {"id": test_tenant_id, "name": f"Test Tenant {test_tenant_id}"},
+                await _insert_tenant(
+                    conn,
+                    test_tenant_id,
+                    api_key_hash=f"test_hash_{test_tenant_id}",
                 )
                 await set_tenant_guc(conn, test_tenant_id, local=True)
+                # RAW_SQL_ALLOWLIST: seed deterministic attribution_events for idempotency test
                 await conn.execute(
                     text(
                         """
@@ -361,9 +365,10 @@ class TestWindowIdempotency:
 
         try:
             async with engine.begin() as conn:
-                await conn.execute(
-                    text("INSERT INTO tenants (id, name) VALUES (:id, :name) ON CONFLICT DO NOTHING"),
-                    {"id": test_tenant_id, "name": f"Test Tenant {test_tenant_id}"},
+                await _insert_tenant(
+                    conn,
+                    test_tenant_id,
+                    api_key_hash=f"test_hash_{test_tenant_id}",
                 )
 
             recompute_window.delay(
@@ -439,9 +444,10 @@ class TestWindowIdempotency:
 
         try:
             async with engine.begin() as conn:
-                await conn.execute(
-                    text("INSERT INTO tenants (id, name) VALUES (:id, :name) ON CONFLICT DO NOTHING"),
-                    {"id": test_tenant_id, "name": f"Test Tenant {test_tenant_id}"},
+                await _insert_tenant(
+                    conn,
+                    test_tenant_id,
+                    api_key_hash=f"test_hash_{test_tenant_id}",
                 )
 
             recompute_window.delay(

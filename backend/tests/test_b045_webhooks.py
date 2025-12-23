@@ -46,6 +46,7 @@ async def create_tenant_with_secrets():
         "woocommerce_webhook_secret": "woo_secret",
     }
     conn = await asyncpg.connect(os.environ["DATABASE_URL"])
+    # RAW_SQL_ALLOWLIST: legacy webhook contract test seeds tenant secrets
     await conn.execute(
         """
         INSERT INTO tenants (id, api_key_hash, name, notification_email,

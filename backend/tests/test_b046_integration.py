@@ -61,6 +61,7 @@ async def test_tenant_with_secrets():
     }
 
     conn = await asyncpg.connect(os.environ["DATABASE_URL"])
+    # RAW_SQL_ALLOWLIST: legacy integration test seeds tenants with webhook secrets
     await conn.execute(
         """
         INSERT INTO tenants (id, api_key_hash, name, notification_email,
@@ -109,6 +110,7 @@ async def create_tenant_with_secrets(name_prefix: str):
     }
 
     conn = await asyncpg.connect(os.environ["DATABASE_URL"])
+    # RAW_SQL_ALLOWLIST: legacy integration test seeds tenants with webhook secrets
     await conn.execute(
         """
         INSERT INTO tenants (id, api_key_hash, name, notification_email,

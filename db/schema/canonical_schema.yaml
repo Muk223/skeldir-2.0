@@ -173,7 +173,7 @@ tables:
         
       processing_status:
         type: VARCHAR(20)
-        nullable: true
+        nullable: false
         default: "pending"
         invariant: processing_critical
         required_for: ["B0.5 Background Worker Queue"]
@@ -181,7 +181,7 @@ tables:
         
       retry_count:
         type: INTEGER
-        nullable: true
+        nullable: false
         default: 0
         invariant: processing_critical
         
@@ -226,7 +226,7 @@ tables:
         columns: [idempotency_key]
         unique: true
         
-      - name: idx_events_session_id
+      - name: idx_attribution_events_session_id
         columns: [session_id]
         unique: false
         where: "session_id IS NOT NULL"
@@ -259,25 +259,55 @@ tables:
         foreign_key: "attribution_events(id) ON DELETE SET NULL"
         invariant: null
         
-      model_type:
-        type: VARCHAR(50)
+      created_at:
+        type: TIMESTAMPTZ
         nullable: false
-        invariant: analytics_important
+        default: "now()"
+        invariant: null
         
-      model_version:
-        type: VARCHAR(20)
+      updated_at:
+        type: TIMESTAMPTZ
         nullable: false
-        invariant: analytics_important
+        default: "now()"
+        invariant: null
         
-      channel:
-        type: VARCHAR(100)
+      channel_code:
+        type: TEXT
         nullable: false
+        foreign_key: "channel_taxonomy(code)"
         invariant: processing_critical
         
       allocated_revenue_cents:
         type: INTEGER
         nullable: false
+        default: 0
         invariant: financial_critical
+        
+      model_metadata:
+        type: JSONB
+        nullable: true
+        invariant: analytics_important
+        
+      correlation_id:
+        type: UUID
+        nullable: true
+        invariant: null
+        
+      allocation_ratio:
+        type: NUMERIC(6,5)
+        nullable: false
+        default: 0.0
+        invariant: analytics_important
+        
+      model_version:
+        type: TEXT
+        nullable: false
+        invariant: analytics_important
+        
+      model_type:
+        type: VARCHAR(50)
+        nullable: false
+        invariant: analytics_important
         
       confidence_score:
         type: NUMERIC(4,3)
@@ -308,7 +338,7 @@ tables:
         
       verified:
         type: BOOLEAN
-        nullable: true
+        nullable: false
         default: false
         invariant: analytics_important
         required_for: ["B2.4 Revenue Verification"]
@@ -323,38 +353,44 @@ tables:
         nullable: true
         invariant: analytics_important
         
-      created_at:
-        type: TIMESTAMPTZ
-        nullable: false
-        default: "now()"
-        invariant: null
-        
-      updated_at:
-        type: TIMESTAMPTZ
-        nullable: false
-        default: "now()"
-        invariant: null
-        
     constraints:
-      - name: ck_allocations_revenue_positive
+      - name: ck_attribution_allocations_revenue_positive
         type: CHECK
         definition: "allocated_revenue_cents >= 0"
+      - name: ck_attribution_allocations_allocation_ratio_bounds
+        type: CHECK
+        definition: "allocation_ratio >= 0 AND allocation_ratio <= 1"
+      - name: ck_allocations_confidence_score
+        type: CHECK
+        definition: "confidence_score >= 0 AND confidence_score <= 1"
         
     indexes:
-      - name: idx_allocations_tenant_created_at
+      - name: idx_attribution_allocations_tenant_created_at
         columns: [tenant_id, created_at]
         unique: false
         ops: {created_at: DESC}
         
-      - name: idx_allocations_event_id
+      - name: idx_attribution_allocations_event_id
         columns: [event_id]
         unique: false
         
       - name: idx_allocations_channel_performance
-        columns: [tenant_id, channel, created_at]
+        columns: [tenant_id, channel_code, created_at]
         unique: false
         ops: {created_at: DESC}
         include: [allocated_revenue_cents, confidence_score]
+        
+      - name: idx_attribution_allocations_channel
+        columns: [channel_code]
+        unique: false
+        
+      - name: idx_attribution_allocations_event_model_channel
+        columns: [tenant_id, event_id, model_version, channel_code]
+        unique: true
+        
+      - name: idx_attribution_allocations_tenant_model_version
+        columns: [tenant_id, model_version]
+        unique: false
         
     rls_policy:
       name: tenant_isolation_policy
@@ -454,8 +490,8 @@ tables:
         columns: [transaction_id]
         unique: true
         
-      - name: idx_revenue_ledger_tenant_created_at
-        columns: [tenant_id, created_at]
+      - name: idx_revenue_ledger_tenant_state
+        columns: [tenant_id, state, created_at]
         unique: false
         ops: {created_at: DESC}
         
@@ -507,7 +543,7 @@ tables:
         invariant: null
         
     indexes:
-      - name: idx_revenue_transitions_ledger_id
+      - name: idx_revenue_state_transitions_ledger_id
         columns: [ledger_id, transitioned_at]
         unique: false
         ops: {transitioned_at: DESC}
@@ -528,6 +564,37 @@ tables:
         nullable: false
         foreign_key: "tenants(id) ON DELETE CASCADE"
         invariant: privacy_critical
+        
+      ingested_at:
+        type: TIMESTAMPTZ
+        nullable: false
+        default: "now()"
+        invariant: processing_critical
+        
+      source:
+        type: TEXT
+        nullable: false
+        invariant: processing_critical
+        
+      error_code:
+        type: TEXT
+        nullable: false
+        invariant: processing_critical
+        
+      error_detail:
+        type: JSONB
+        nullable: false
+        invariant: processing_critical
+        
+      correlation_id:
+        type: UUID
+        nullable: true
+        invariant: null
+        
+      external_event_id:
+        type: TEXT
+        nullable: true
+        invariant: null
         
       event_type:
         type: VARCHAR(50)
@@ -556,7 +623,7 @@ tables:
         
       retry_count:
         type: INTEGER
-        nullable: true
+        nullable: false
         default: 0
         invariant: processing_critical
         required_for: ["B0.5 Retry Logic"]
@@ -568,7 +635,7 @@ tables:
         
       remediation_status:
         type: VARCHAR(20)
-        nullable: true
+        nullable: false
         default: "pending"
         invariant: processing_critical
         required_for: ["B0.5 Background Remediation"]
@@ -577,12 +644,6 @@ tables:
       remediation_notes:
         type: TEXT
         nullable: true
-        invariant: null
-        
-      created_at:
-        type: TIMESTAMPTZ
-        nullable: false
-        default: "now()"
         invariant: null
         
       resolved_at:
@@ -596,19 +657,23 @@ tables:
         definition: "remediation_status IN ('pending', 'in_progress', 'resolved', 'abandoned')"
         
     indexes:
-      - name: idx_dead_events_tenant_created_at
-        columns: [tenant_id, created_at]
+      - name: idx_dead_events_tenant_ingested_at
+        columns: [tenant_id, ingested_at]
         unique: false
-        ops: {created_at: DESC}
+        ops: {ingested_at: DESC}
         
-      - name: idx_dead_events_error_type
-        columns: [error_type]
+      - name: idx_dead_events_error_code
+        columns: [error_code]
         unique: false
         
       - name: idx_dead_events_remediation
-        columns: [remediation_status, created_at]
+        columns: [remediation_status, ingested_at]
         unique: false
-        ops: {created_at: DESC}
+        ops: {ingested_at: DESC}
+        
+      - name: idx_dead_events_source
+        columns: [source]
+        unique: false
         
     rls_policy:
       name: tenant_isolation_policy
@@ -640,9 +705,3 @@ validation_rules:
   important_columns_warned:
     description: "Missing HIGH severity columns generate warnings"
     severity: HIGH
-
-
-
-
-
-

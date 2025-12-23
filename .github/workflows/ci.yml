@@ -19,6 +19,7 @@ jobs:
           fetch-depth: 0  # Full history for versioning
 
   # Contract validation
+
   validate-contracts:
     name: Validate Contracts
     runs-on: ubuntu-latest
@@ -36,10 +37,15 @@ jobs:
         run: |
           npm install -g @openapitools/openapi-generator-cli
       
+      - name: Bundle contracts
+        run: |
+          chmod +x scripts/contracts/bundle.sh
+          bash scripts/contracts/bundle.sh
+      
       - name: Validate all OpenAPI files
         run: |
           echo "Validating OpenAPI specifications..."
-          for file in contracts/*/v1/*.yaml contracts/_common/v1/*.yaml; do
+          for file in api-contracts/dist/openapi/v1/*.bundled.yaml; do
             if [ -f "$file" ]; then
               echo "Validating $file..."
               openapi-generator-cli validate -i "$file" || exit 1
@@ -47,20 +53,194 @@ jobs:
           done
           echo "All OpenAPI files validated successfully"
       
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      
+      - name: Install oasdiff
+        run: |
+          go install github.com/Tufin/oasdiff@latest
+      
       - name: Detect breaking changes
         run: |
           echo "Checking for breaking changes against baselines..."
-          # Compare active contracts against baselines
-          for domain in attribution webhooks auth reconciliation export health; do
-            if [ -f "contracts/${domain}/v1/${domain}.yaml" ] && [ -f "contracts/${domain}/baselines/v1.0.0/${domain}.yaml" ]; then
-              echo "Comparing ${domain} contract against baseline..."
-              # Use openapi-diff or similar tool to detect breaking changes
-              # For now, basic validation - full diff tool integration pending
-              echo "✓ ${domain} contract structure validated"
-            fi
-          done
+          set -e
+          if [ -d "api-contracts/baselines/v1.0.0" ]; then
+            for baseline in api-contracts/baselines/v1.0.0/*.yaml api-contracts/baselines/v1.0.0/webhooks/*.yaml; do
+              if [ -f "$baseline" ]; then
+                name=$(basename "$baseline" .yaml)
+                if [[ "$baseline" == */webhooks/* ]]; then
+                  current="api-contracts/dist/openapi/v1/webhooks.${name}.bundled.yaml"
+                else
+                  current="api-contracts/dist/openapi/v1/${name}.bundled.yaml"
+                fi
+                if [ ! -f "$current" ]; then
+                  echo "Skipping $name: current contract not found at $current"
+                  continue
+                fi
+                echo "Comparing $current against $(basename "$baseline")..."
+                oasdiff breaking "$baseline" "$current"
+              fi
+            done
+          else
+            echo "Baseline directory api-contracts/baselines/v1.0.0 missing"
+            exit 1
+          fi
           echo "Breaking change detection complete"
+  validate-phase-manifest:
+    name: Validate Phase Manifest
+    runs-on: ubuntu-latest
+    needs: checkout
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Validate manifest
+        run: |
+          python scripts/phase_gates/validate_manifest.py
+
+      - name: Emit phase matrix
+        id: emit-matrix
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, yaml
+          manifest = yaml.safe_load(pathlib.Path("docs/phases/phase_manifest.yaml").read_text())
+          phases = [p["id"] for p in manifest.get("phases", [])]
+          print(f"phases={json.dumps(phases)}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+              fh.write(f"phases={json.dumps(phases)}\n")
+          PY
+
+    outputs:
+      phases: ${{ steps.emit-matrix.outputs.phases }}
+
+  phase-gates:
+    name: Phase Gates
+    runs-on: ubuntu-latest
+    needs: [checkout, validate-phase-manifest]
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    strategy:
+      matrix:
+        phase: ${{ fromJson(needs.validate-phase-manifest.outputs.phases) }}
+    env:
+      DATABASE_URL: postgresql+asyncpg://app_user:app_user@127.0.0.1:5432/skeldir_phase
+      PYTHONPATH: ${{ github.workspace }}
+      CI: "true"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up toolchain
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm install -g @openapitools/openapi-generator-cli @redocly/cli
+          npx playwright install --with-deps chromium
+          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-dev.txt
+          go install github.com/Tufin/oasdiff@latest
+
+      - name: Prepare database and role
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -c "CREATE USER app_user WITH PASSWORD 'app_user';"
+          psql -h localhost -U postgres -c "CREATE DATABASE skeldir_phase OWNER app_user;"
+          psql -h localhost -U postgres -d skeldir_phase -c "GRANT ALL ON SCHEMA public TO app_user;"
+
+      - name: Run phase gate
+        run: |
+          python scripts/phase_gates/run_phase.py ${{ matrix.phase }}
+
+  phase-chain:
+    name: Phase Chain (B0.4 target)
+    runs-on: ubuntu-latest
+    needs: [checkout, validate-phase-manifest]
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://app_user:app_user@127.0.0.1:5432/skeldir_phase
+      PYTHONPATH: ${{ github.workspace }}
+      CI: "true"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm install -g @openapitools/openapi-generator-cli @redocly/cli
+          npx playwright install --with-deps chromium
+          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-dev.txt
+          go install github.com/Tufin/oasdiff@latest
+      - name: Prepare database and role
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -c "CREATE USER app_user WITH PASSWORD 'app_user';"
+          psql -h localhost -U postgres -c "CREATE DATABASE skeldir_phase OWNER app_user;"
+          psql -h localhost -U postgres -d skeldir_phase -c "GRANT ALL ON SCHEMA public TO app_user;"
+      - name: Run phase chain to B0.4
+        run: |
+          python scripts/phase_gates/run_chain.py B0.4
   # Backend tests (when backend exists)
   test-backend:
     name: Test Backend

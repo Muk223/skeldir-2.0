@@ -31,6 +31,10 @@ class RealtimeRevenueCounter(BaseModel):
     """
     Whether revenue is verified through payment reconciliation
     """
+    tenant_id: Annotated[str, Field(example='00000000-0000-0000-0000-000000000000')]
+    """
+    Tenant identifier associated with the revenue data
+    """
     confidence_score: Annotated[
         Optional[float], Field(example=0.94, ge=0.0, le=1.0)
     ] = None

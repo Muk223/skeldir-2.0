@@ -14,6 +14,12 @@ class LoginRequest(BaseModel):
     password: Annotated[SecretStr, Field(example='securePassword123')]
 
 
+class User(BaseModel):
+    id: UUID
+    email: EmailStr
+    username: str
+
+
 class LoginResponse(BaseModel):
     access_token: str
     """
@@ -26,6 +32,10 @@ class LoginResponse(BaseModel):
     expires_in: Annotated[int, Field(example=3600)]
     """
     Token expiration time in seconds
+    """
+    user: User
+    """
+    Authenticated user profile for the session
     """
     token_type: Annotated[str, Field(example='Bearer')]
     """

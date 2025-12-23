@@ -39,6 +39,7 @@ DIST_DIR="$ROOT_DIR/api-contracts/dist/openapi/v1"
 REGISTRY_FILE="$SCRIPT_DIR/contracts/mock_registry.json"
 PID_FILE="$ROOT_DIR/.mocks.pid"
 ON_DEMAND_PORT=4013
+export PATH="$ROOT_DIR/node_modules/.bin:$PATH"
 
 # Map domain to bundle file
 case "$DOMAIN" in
@@ -107,8 +108,14 @@ echo ""
 # Start new on-demand mock
 echo -e "${YELLOW}[2/2] Starting $DOMAIN on port $ON_DEMAND_PORT...${NC}"
 
+# Ensure port is free
+if lsof -ti tcp:"$ON_DEMAND_PORT" > /dev/null 2>&1; then
+    lsof -ti tcp:"$ON_DEMAND_PORT" | xargs -r kill >/dev/null 2>&1 || true
+    sleep 1
+fi
+
 # Start Prism
-prism mock "$BUNDLE_FILE" -p "$ON_DEMAND_PORT" -h 0.0.0.0 > "/tmp/prism-on-demand.log" 2>&1 &
+npx @stoplight/prism-cli mock "$BUNDLE_FILE" -p "$ON_DEMAND_PORT" -h 0.0.0.0 > "/tmp/prism-on-demand.log" 2>&1 &
 PID=$!
 
 # Append to PID file
@@ -138,8 +145,4 @@ echo ""
 echo -e "${YELLOW}To switch to another domain:${NC}"
 echo "  bash scripts/switch-mock.sh <domain>"
 echo ""
-
-
-
-
 

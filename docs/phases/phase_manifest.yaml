@@ -1,0 +1,69 @@
+phases:
+  - id: B0.1
+    intent: "API contract definition and validation for attribution/auth/export/webhooks."
+    prerequisites: []
+    ci_gate:
+      job_name: gate-b0_1
+      command: ["python", "scripts/phase_gates/run_gate.py", "B0.1"]
+      artifacts:
+        - backend/validation/evidence/contracts/b0_1_summary.json
+    exit_gates:
+      - contract_validation
+      - error_model
+      - examples
+      - models
+      - contract_semantics
+
+  - id: B0.2
+    intent: "Mock server deployment and contract fidelity."
+    prerequisites: ["B0.1"]
+    ci_gate:
+      job_name: gate-b0_2
+      command: ["python", "scripts/phase_gates/run_gate.py", "B0.2"]
+      artifacts:
+        - backend/validation/evidence/mocks/b0_2_summary.json
+    exit_gates:
+      - config
+      - toolchain
+      - behavior
+      - latency
+      - error_simulation
+      - frontend
+
+  - id: B0.3
+    intent: "Database schema foundation with migrations, guardrails, and performance checks."
+    prerequisites: ["B0.1"]
+    ci_gate:
+      job_name: gate-b0_3
+      command: ["python", "scripts/phase_gates/run_gate.py", "B0.3"]
+      artifacts:
+        - backend/validation/evidence/database/b0_3_summary.json
+    exit_gates:
+      - schema_validation
+      - migration_cycle
+      - guardrails
+      - query_performance
+
+  - id: SCHEMA_GUARD
+    intent: "Schema contract guard enforcing required columns and forbidding raw inserts."
+    prerequisites: ["B0.3"]
+    ci_gate:
+      job_name: gate-schema-guard
+      command: ["python", "scripts/phase_gates/schema_guard_gate.py"]
+      artifacts:
+        - backend/validation/evidence/phases/schema_guard_summary.json
+    exit_gates:
+      - schema_contract_guard
+      - no_raw_inserts
+
+  - id: B0.4
+    intent: "PostgreSQL-first ingestion service: idempotency, DLQ, and RLS isolation."
+    prerequisites: ["B0.3", "SCHEMA_GUARD"]
+    ci_gate:
+      job_name: gate-b0_4
+      command: ["python", "scripts/phase_gates/b0_4_gate.py"]
+      artifacts:
+        - backend/validation/evidence/phases/b0_4_summary.json
+    exit_gates:
+      - migrations
+      - ingestion_soundness

@@ -51,6 +51,7 @@ async def seeded_data(tenant_a_id, tenant_b_id, db_session: AsyncSession):
     # For now, this is a test plan template
     
     # Example structure:
+    # RAW_SQL_ALLOWLIST: documented template for future seed (not executed in tests)
     # await db_session.execute(
     #     text("""
     #         INSERT INTO tenants (id, name, api_key_hash, notification_email)
@@ -142,7 +143,6 @@ async def test_cross_tenant_query_blocked_at_db_level(tenant_a_id, tenant_b_id, 
     # count = result.scalar()
     # assert count == 0, "RLS should block cross-tenant queries"
     pass
-
 
 
 

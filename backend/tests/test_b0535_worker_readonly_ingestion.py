@@ -262,6 +262,7 @@ def test_static_posture_no_worker_writes_to_ingestion_tables():
             target_paths.append(str(path))
 
     patterns = [
+        # RAW_SQL_ALLOWLIST: static pattern list for worker write detection (not executed)
         "insert into attribution_events",
         "update attribution_events",
         "delete from attribution_events",

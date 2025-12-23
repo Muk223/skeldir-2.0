@@ -29,20 +29,20 @@ paths:
       parameters:
         - name: X-WC-Webhook-Signature
           in: header
-          required: true
+          required: false
           schema:
             type: string
           description: HMAC-SHA256 signature for webhook verification
         - name: X-WC-Webhook-Topic
           in: header
-          required: true
+          required: false
           schema:
             type: string
             enum: [order.created]
           description: Webhook topic
         - name: X-WC-Webhook-Resource
           in: header
-          required: true
+          required: false
           schema:
             type: string
             enum: [order]
@@ -69,13 +69,9 @@ paths:
                   value: google
       responses:
         '200':
-          description: Webhook processed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '../_common/base.yaml#/components/schemas/SuccessResponse'
+          $ref: '#/components/responses/WebhookAccepted'
         '401':
-          description: Invalid webhook signature
+          $ref: '../_common/base.yaml#/components/responses/UnauthorizedError'
         '500':
           $ref: '../_common/base.yaml#/components/responses/ServerError'
 
@@ -89,18 +85,18 @@ paths:
       parameters:
         - name: X-WC-Webhook-Signature
           in: header
-          required: true
+          required: false
           schema:
             type: string
         - name: X-WC-Webhook-Topic
           in: header
-          required: true
+          required: false
           schema:
             type: string
             enum: [order.updated]
         - name: X-WC-Webhook-Resource
           in: header
-          required: true
+          required: false
           schema:
             type: string
             enum: [order]
@@ -110,13 +106,20 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/WooCommerceOrder'
+            example:
+              id: 12345
+              order_key: wc_order_update_12345
+              date_created: '2025-11-26T14:30:00Z'
+              status: processing
+              total: "199.99"
+              currency: USD
+              meta_data:
+                - id: 1
+                  key: skeldir_session_id
+                  value: sess_update123
       responses:
         '200':
-          description: Webhook processed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '../_common/base.yaml#/components/schemas/SuccessResponse'
+          $ref: '#/components/responses/WebhookAccepted'
 
   /webhooks/woocommerce/order/completed:
     post:
@@ -128,18 +131,18 @@ paths:
       parameters:
         - name: X-WC-Webhook-Signature
           in: header
-          required: true
+          required: false
           schema:
             type: string
         - name: X-WC-Webhook-Topic
           in: header
-          required: true
+          required: false
           schema:
             type: string
             enum: [order.completed]
         - name: X-WC-Webhook-Resource
           in: header
-          required: true
+          required: false
           schema:
             type: string
             enum: [order]
@@ -151,11 +154,7 @@ paths:
               $ref: '#/components/schemas/WooCommerceOrder'
       responses:
         '200':
-          description: Webhook processed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '../_common/base.yaml#/components/schemas/SuccessResponse'
+          $ref: '#/components/responses/WebhookAccepted'
 
   /webhooks/woocommerce/order/refunded:
     post:
@@ -167,18 +166,18 @@ paths:
       parameters:
         - name: X-WC-Webhook-Signature
           in: header
-          required: true
+          required: false
           schema:
             type: string
         - name: X-WC-Webhook-Topic
           in: header
-          required: true
+          required: false
           schema:
             type: string
             enum: [order.refunded]
         - name: X-WC-Webhook-Resource
           in: header
-          required: true
+          required: false
           schema:
             type: string
             enum: [order]
@@ -205,13 +204,21 @@ paths:
                   value: sess_refund123
       responses:
         '200':
-          description: Webhook processed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '../_common/base.yaml#/components/schemas/SuccessResponse'
+          $ref: '#/components/responses/WebhookAccepted'
 
 components:
+  responses:
+    WebhookAccepted:
+      description: Webhook processed successfully
+      content:
+        application/json:
+          schema:
+            $ref: '../_common/base.yaml#/components/schemas/SuccessResponse'
+          example:
+            success: true
+            correlation_id: 00000000-0000-0000-0000-000000000000
+            message: Webhook received
+
   schemas:
     WooCommerceOrder:
       type: object

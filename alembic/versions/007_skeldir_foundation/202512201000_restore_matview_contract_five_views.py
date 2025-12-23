@@ -89,6 +89,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Revert ownership and drop the two reinstated views
     for view in MATVIEWS:
-        op.execute(f"ALTER MATERIALIZED VIEW {view} OWNER TO postgres")
+        op.execute(f"ALTER MATERIALIZED VIEW {view} OWNER TO app_user")
     op.execute("DROP MATERIALIZED VIEW IF EXISTS mv_realtime_revenue CASCADE")
     op.execute("DROP MATERIALIZED VIEW IF EXISTS mv_reconciliation_status CASCADE")
