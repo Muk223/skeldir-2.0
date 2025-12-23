@@ -15,6 +15,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import text
 
+from backend.tests.builders.core_builders import build_attribution_allocation, build_tenant
 from app.db.session import engine
 
 EVIDENCE_JSON = Path("backend/validation/evidence/value_traces/value_01_summary.json")
@@ -23,7 +24,11 @@ EVIDENCE_MD = Path("docs/evidence/value_traces/value_01_revenue_trace.md")
 
 @pytest.mark.asyncio
 async def test_value_trace_revenue_mismatch_resolves_to_verified_amount():
-    tenant_id = uuid4()
+    tenant_record = await build_tenant(name="ValueTrace Tenant")
+    tenant_id = tenant_record["tenant_id"]
+    allocation_record = await build_attribution_allocation(tenant_id=tenant_id)
+    allocation_id = allocation_record["id"]
+
     transaction_id = f"order-{uuid4().hex[:8]}"
     claimed_cents = 10_000
     verified_cents = 8_000
@@ -40,35 +45,11 @@ async def test_value_trace_revenue_mismatch_resolves_to_verified_amount():
         await conn.execute(
             text(
                 """
-                INSERT INTO tenants (id, name, api_key_hash, notification_email)
-                VALUES (:id, 'ValueTrace Tenant', :hash, :email)
-                """
-            ),
-            {
-                "id": str(tenant_id),
-                "hash": f"hash-{tenant_id.hex[:8]}",
-                "email": f"{tenant_id.hex[:8]}@test.invalid",
-            },
-        )
-        # RAW_SQL_ALLOWLIST: value trace revenue ledger seed
-        await conn.execute(
-            text(
-                """
-                INSERT INTO channel_taxonomy (code, display_name, family, is_paid)
-                VALUES ('direct', 'direct', 'organic', false)
-                ON CONFLICT (code) DO NOTHING
-                """
-            )
-        )
-        # RAW_SQL_ALLOWLIST: value trace revenue ledger seed
-        await conn.execute(
-            text(
-                """
                 INSERT INTO revenue_ledger (
-                    id, tenant_id, transaction_id, state, amount_cents, currency,
+                    id, tenant_id, allocation_id, transaction_id, state, amount_cents, currency,
                     verification_source, verification_timestamp, metadata
                 ) VALUES (
-                    :id, :tenant_id, :tx, 'captured', :amount, 'USD',
+                    :id, :tenant_id, :allocation_id, :tx, 'captured', :amount, 'USD',
                     'webhook', :ts, CAST(:metadata_payload AS JSONB)
                 )
                 """
@@ -76,6 +57,7 @@ async def test_value_trace_revenue_mismatch_resolves_to_verified_amount():
             {
                 "id": str(uuid4()),
                 "tenant_id": str(tenant_id),
+                "allocation_id": str(allocation_id),
                 "tx": transaction_id,
                 "amount": verified_cents,
                 "ts": now,
@@ -107,6 +89,7 @@ async def test_value_trace_revenue_mismatch_resolves_to_verified_amount():
 
     summary = {
         "tenant_id": str(tenant_id),
+        "allocation_id": str(allocation_id),
         "transaction_id": transaction_id,
         "claimed_cents": claimed_cents,
         "verified_cents": verified_cents,
