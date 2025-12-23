@@ -56,11 +56,11 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
       
       - name: Install oasdiff
         run: |
-          go install github.com/Tufin/oasdiff@latest
+          go install github.com/oasdiff/oasdiff/cmd/oasdiff@v1.11.7
       
       - name: Detect breaking changes
         run: |
@@ -163,7 +163,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
 
       - name: Install dependencies
         run: |
@@ -172,7 +172,7 @@ jobs:
           npx playwright install --with-deps chromium
           pip install -r backend/requirements.txt
           pip install -r backend/requirements-dev.txt
-          go install github.com/Tufin/oasdiff@latest
+          go install github.com/oasdiff/oasdiff/cmd/oasdiff@v1.11.7
 
       - name: Prepare database and role
         env:
@@ -222,7 +222,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
       - name: Install dependencies
         run: |
           npm ci
@@ -230,7 +230,7 @@ jobs:
           npx playwright install --with-deps chromium
           pip install -r backend/requirements.txt
           pip install -r backend/requirements-dev.txt
-          go install github.com/Tufin/oasdiff@latest
+          go install github.com/oasdiff/oasdiff/cmd/oasdiff@v1.11.7
       - name: Prepare database and role
         env:
           PGPASSWORD: postgres
