@@ -65,6 +65,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/WebhookAccepted'
+        '422':
+          $ref: '../_common/base.yaml#/components/responses/ValidationError'
         '401':
           $ref: '../_common/base.yaml#/components/responses/UnauthorizedError'
         '500':
@@ -113,6 +115,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/WebhookAccepted'
+        '422':
+          $ref: '../_common/base.yaml#/components/responses/ValidationError'
 
   /webhooks/shopify/refunds/create:
     post:
@@ -155,6 +159,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/WebhookAccepted'
+        '422':
+          $ref: '../_common/base.yaml#/components/responses/ValidationError'
 
   /webhooks/shopify/checkouts/update:
     post:
