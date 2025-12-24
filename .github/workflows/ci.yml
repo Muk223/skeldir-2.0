@@ -148,7 +148,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/skeldir_phase
       MIGRATION_DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/skeldir_phase
-      PYTHONPATH: ${{ github.workspace }}
+      PYTHONPATH: ${{ github.workspace }}/backend
       CI: "true"
     steps:
       - name: Checkout code
@@ -222,7 +222,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/skeldir_phase
       MIGRATION_DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/skeldir_phase
-      PYTHONPATH: ${{ github.workspace }}
+      PYTHONPATH: ${{ github.workspace }}/backend
       CI: "true"
     steps:
       - name: Checkout code
@@ -410,7 +410,7 @@ jobs:
 
       - name: Run Celery foundation tests
         env:
-          PYTHONPATH: ${{ github.workspace }}
+          PYTHONPATH: ${{ github.workspace }}/backend
           DATABASE_URL: ${{ env.DATABASE_URL }}
           CELERY_BROKER_URL: ${{ env.CELERY_BROKER_URL }}
           CELERY_RESULT_BACKEND: ${{ env.CELERY_RESULT_BACKEND }}
@@ -669,7 +669,7 @@ jobs:
       - name: Gate 2A - DSN Fingerprint Diagnostic (Pre-Pytest)
         env:
           DATABASE_URL: ${{ env.DATABASE_URL_ASYNC }}  # Use async driver for tests
-          PYTHONPATH: ${{ github.workspace }}/backend
+          PYTHONPATH: ${{ github.workspace }}/backend/backend
         run: |
           cd backend
           echo "=== Gate 2A: DSN Fingerprint Diagnostic (Pre-Pytest Env State) ==="
@@ -708,7 +708,7 @@ jobs:
       - name: Gate 2B - In-Test DSN Instrumentation
         env:
           DATABASE_URL: ${{ env.DATABASE_URL_ASYNC }}  # Use async driver for tests
-          PYTHONPATH: ${{ github.workspace }}/backend
+          PYTHONPATH: ${{ github.workspace }}/backend/backend
         run: |
           cd backend
           echo "=== Gate 2B: In-Test DSN Instrumentation ==="
@@ -770,7 +770,7 @@ jobs:
       - name: R5-5 / Gate G5 - Run B0.5.3.3 contract tests (2 tests must pass)
         env:
           DATABASE_URL: ${{ env.DATABASE_URL_ASYNC }}  # Use async driver for tests
-          PYTHONPATH: ${{ github.workspace }}/backend
+          PYTHONPATH: ${{ github.workspace }}/backend/backend
         run: |
           cd backend
           echo "=== R5-5 / G5: Running B0.5.3.3 Revenue Contract Tests ==="
