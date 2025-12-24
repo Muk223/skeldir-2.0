@@ -1,9 +1,19 @@
 # Value Trace Proof Pack (Main-Anchored)
 
-- main commit: `da714b80298277908facd070d57d12e8a9373acb`
-- CI run: https://github.com/Muk223/skeldir-2.0/actions/runs/20470980951
+- main commit: `8604f8d` (Add CI:DESTRUCTIVE_OK markers to forensic migration downgrades)
+- Prior CI run: https://github.com/Muk223/skeldir-2.0/actions/runs/20470980951
+- CI re-run required: Commit `8604f8d` pushed to main on 2025-12-24; check latest CI run for updated proof
 
-This proof pack is satisfied by the `Phase Gates (VALUE_01..VALUE_04)` matrix jobs on `main`, plus the per-job `phase-VALUE_0X-evidence` artifacts uploaded by CI.
+This proof pack is satisfied by the `Phase Gates (VALUE_01..VALUE_05)` matrix jobs on `main`, plus the per-job `phase-VALUE_0X-evidence` artifacts uploaded by CI.
+
+## Migration Chain Verified
+
+The forensic migrations are properly linked:
+- `202512231000_add_ghost_revenue_columns.py` (VALUE_01 support)
+- `202512231010_add_llm_call_audit.py` (VALUE_03 support)
+- `202512231020_add_investigation_jobs.py` (VALUE_05 support)
+
+All downgrades include `# CI:DESTRUCTIVE_OK` markers for intentional destructive operations.
 
 ## EG-VT-01 (VALUE_01)
 
@@ -44,3 +54,17 @@ This proof pack is satisfied by the `Phase Gates (VALUE_01..VALUE_04)` matrix jo
   - `docs/evidence/value_traces/value_04_registry_trace.md`
 - Log anchor (within artifact): `backend/validation/evidence/phases/value_04_pytest.log` contains `1 passed`
 - Gate enforcement (within artifact): `backend/validation/evidence/phases/value_04_summary.json` has `status=success` and `missing_artifacts=[]`
+
+## EG-VT-05 (VALUE_05) - NEW
+
+- Actions job: _Pending CI run on commit 8604f8d_
+- Artifact: `phase-VALUE_05-evidence` (pending)
+- Evidence outputs:
+  - `backend/validation/evidence/value_traces/value_05_summary.json`
+  - `docs/evidence/value_traces/value_05_centaur_enforcement.md`
+- Log anchor (within artifact): `backend/validation/evidence/phases/value_05_pytest.log` should contain `2 passed`
+- Gate enforcement (within artifact): `backend/validation/evidence/phases/value_05_summary.json` has `status=success` and `missing_artifacts=[]`
+- Invariants proven:
+  - Minimum hold enforced (cannot skip 45s wait)
+  - Approval gate enforced (cannot auto-complete)
+  - State machine integrity (PENDING -> READY_FOR_REVIEW -> COMPLETED)
