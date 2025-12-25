@@ -100,12 +100,16 @@ jobs:
       - name: Bundle all contracts
         run: |
           mkdir -p $ARTIFACT_DIR
-          chmod +x scripts/contracts/bundle.sh
-          bash scripts/contracts/bundle.sh 2>&1 | tee $ARTIFACT_DIR/openapi_contracts_check.log
+          cd api-contracts
+          npm install
+          chmod +x ../scripts/contracts/bundle.sh
+          bash ../scripts/contracts/bundle.sh 2>&1 | tee ../$ARTIFACT_DIR/openapi_contracts_check.log
           BUNDLE_EXIT=${PIPESTATUS[0]}
+          cd ..
 
           if [ $BUNDLE_EXIT -ne 0 ]; then
             echo "ERROR: Contract bundling failed with exit code $BUNDLE_EXIT"
+            cat $ARTIFACT_DIR/openapi_contracts_check.log
             exit $BUNDLE_EXIT
           fi
 
@@ -262,14 +266,16 @@ jobs:
           {
             echo "=== Migration Run 1: From Zero to Head ==="
             echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "Working directory: $(pwd)"
             echo ""
-            cd alembic
             alembic upgrade head
           } 2>&1 | tee $ARTIFACT_DIR/migration_apply_run1.log
 
           RUN1_EXIT=${PIPESTATUS[0]}
           if [ $RUN1_EXIT -ne 0 ]; then
             echo "ERROR: First migration run failed with exit code $RUN1_EXIT"
+            echo "Checking alembic.ini location:"
+            find . -name "alembic.ini" -type f
             exit $RUN1_EXIT
           fi
 
@@ -297,7 +303,6 @@ jobs:
             echo "=== Migration Run 2: Idempotency Check (should be no-op) ==="
             echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo ""
-            cd alembic
             alembic upgrade head
           } 2>&1 | tee $ARTIFACT_DIR/migration_apply_run2.log
 
@@ -372,7 +377,6 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:testpass@localhost:5432/skeldir_prod
         run: |
-          cd alembic
           alembic upgrade head 2>&1 | tee -a $ARTIFACT_DIR/live_stack_boot.log
 
       - name: Start live API server
@@ -591,7 +595,6 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:testpass@localhost:5432/skeldir_prod
         run: |
-          cd alembic
           alembic upgrade head || true
 
       - name: Start live API server
