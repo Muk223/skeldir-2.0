@@ -382,35 +382,52 @@ jobs:
         run: |
           cd backend
 
-          # Try to start the API - check for main.py or app.py or wsgi.py
-          if [ -f "main.py" ]; then
-            python -m uvicorn main:app --host 0.0.0.0 --port 8000 > $ARTIFACT_DIR/live_stack_boot.log 2>&1 &
-          elif [ -f "app/main.py" ]; then
-            python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > $ARTIFACT_DIR/live_stack_boot.log 2>&1 &
+          echo "=== Starting Live API Server ===" | tee $ARTIFACT_DIR/live_stack_boot.log
+
+          # Start API with correct module path
+          if [ -f "app/main.py" ]; then
+            echo "Starting API from app/main.py..." | tee -a $ARTIFACT_DIR/live_stack_boot.log
+            python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 >> $ARTIFACT_DIR/live_stack_boot.log 2>&1 &
           else
-            echo "ERROR: Could not find main.py or app/main.py"
-            find . -name "main.py" -o -name "wsgi.py"
+            echo "ERROR: app/main.py not found"
+            find . -name "main.py"
             exit 1
           fi
 
           API_PID=$!
-          echo "API PID: $API_PID"
+          echo "API PID: $API_PID" | tee -a $ARTIFACT_DIR/live_stack_boot.log
 
           # Wait for API to be ready (max 30 seconds)
           for i in {1..30}; do
             if curl -s http://localhost:8000/health > /dev/null 2>&1; then
-              echo "✓ API is ready (attempt $i)"
+              echo "✓ API is ready (attempt $i)" | tee -a $ARTIFACT_DIR/live_stack_boot.log
               break
             fi
             if [ $i -eq 30 ]; then
-              echo "ERROR: API failed to start within 30 seconds"
+              echo "ERROR: API failed to start within 30 seconds" | tee -a $ARTIFACT_DIR/live_stack_boot.log
               kill $API_PID || true
+              cat $ARTIFACT_DIR/live_stack_boot.log
               exit 1
             fi
+            echo "Waiting for API... (attempt $i/30)" | tee -a $ARTIFACT_DIR/live_stack_boot.log
             sleep 1
           done
 
           echo $API_PID > $ARTIFACT_DIR/api.pid
+
+      - name: Discover API routes from OpenAPI
+        run: |
+          {
+            echo "=== API Routes Discovered from OpenAPI ==="
+            echo ""
+            for spec in api-contracts/dist/openapi/v1/*.bundled.yaml; do
+              if [ -f "$spec" ]; then
+                echo "Contract: $(basename $spec)"
+                grep -E "^\s+/[^:]*:$" "$spec" | head -5 || echo "No routes found"
+                echo ""
+              fi
+            done
+          } > $ARTIFACT_DIR/discovered_routes.log
 
       - name: Test /health endpoint
         run: |
@@ -426,6 +443,14 @@ jobs:
 
           echo "" | tee -a $ARTIFACT_DIR/curl_live_health.log
           echo "✓ /health endpoint is working"
+
+      - name: Test / root endpoint
+        run: |
+          echo "=== Testing / root endpoint ===" | tee -a $ARTIFACT_DIR/curl_live_health.log
+
+          curl -v http://localhost:8000/ 2>&1 | tee -a $ARTIFACT_DIR/curl_live_health.log || echo "⚠ Root endpoint not available"
+
+          echo "" | tee -a $ARTIFACT_DIR/curl_live_health.log
 
       - name: Test /metrics endpoint
         run: |
@@ -569,6 +594,40 @@ jobs:
           cd alembic
           alembic upgrade head || true
 
+      - name: Start live API server
+        env:
+          DATABASE_URL: postgresql://postgres:testpass@localhost:5432/skeldir_prod
+          ENVIRONMENT: test
+        run: |
+          cd backend
+
+          echo "=== Starting Live API Server ===" | tee $ARTIFACT_DIR/live_stack_boot_eg5.log
+
+          # Start API with correct module path
+          if [ -f "app/main.py" ]; then
+            echo "Starting API from app/main.py..." | tee -a $ARTIFACT_DIR/live_stack_boot_eg5.log
+            python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 >> $ARTIFACT_DIR/live_stack_boot_eg5.log 2>&1 &
+          fi
+
+          API_PID=$!
+          echo "API PID: $API_PID" | tee -a $ARTIFACT_DIR/live_stack_boot_eg5.log
+
+          # Wait for API to be ready (max 30 seconds)
+          for i in {1..30}; do
+            if curl -s http://localhost:8000/health > /dev/null 2>&1; then
+              echo "✓ API is ready (attempt $i)" | tee -a $ARTIFACT_DIR/live_stack_boot_eg5.log
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "ERROR: API failed to start" | tee -a $ARTIFACT_DIR/live_stack_boot_eg5.log
+              kill $API_PID || true
+              exit 1
+            fi
+            sleep 1
+          done
+
+          echo $API_PID > $ARTIFACT_DIR/api_eg5.pid
+
       - name: Identify endpoints from bundled contracts
         run: |
           {
@@ -650,6 +709,13 @@ jobs:
             echo "This would contain request IDs from API logs correlated with database operations"
             echo "Evidence: API is responding to requests at http://localhost:8000"
           } | tee $ARTIFACT_DIR/request_correlation.log
+
+      - name: Cleanup API for EG-R1-5
+        if: always()
+        run: |
+          if [ -f $ARTIFACT_DIR/api_eg5.pid ]; then
+            kill $(cat $ARTIFACT_DIR/api_eg5.pid) || true
+          fi
 
       - name: Upload EG-R1-5 artifacts
         uses: actions/upload-artifact@v4
