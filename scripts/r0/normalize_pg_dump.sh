@@ -26,8 +26,9 @@ if [ ! -f "$INPUT_FILE" ]; then
 fi
 
 # Normalize pg_dump output by removing volatile fields
+# Note: Backslash in pg_dump output is literal, not escape character
 grep -v '^--' "$INPUT_FILE" | \
-  grep -v '^\restrict' | \
+  grep -v '^\\restrict' | \
   grep -v '^\\unrestrict' | \
   grep -v '^SET ' | \
   grep -v '^SELECT pg_catalog.set_config' | \
