@@ -1965,35 +1965,35 @@ ALTER TABLE ONLY public.tenants
 -- Name: idx_allocations_channel_performance; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_allocations_channel_performance ON public.attribution_allocations USING btree (tenant_id, channel_code, created_at DESC) INCLUDE (allocated_revenue_cents, confidence_score);
+CREATE INDEX IF NOT EXISTS idx_allocations_channel_performance ON public.attribution_allocations USING btree (tenant_id, channel_code, created_at DESC) INCLUDE (allocated_revenue_cents, confidence_score);
 
 
 --
 -- Name: idx_attribution_allocations_channel; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_attribution_allocations_channel ON public.attribution_allocations USING btree (channel_code);
+CREATE INDEX IF NOT EXISTS idx_attribution_allocations_channel ON public.attribution_allocations USING btree (channel_code);
 
 
 --
 -- Name: idx_attribution_allocations_event_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_attribution_allocations_event_id ON public.attribution_allocations USING btree (event_id);
+CREATE INDEX IF NOT EXISTS idx_attribution_allocations_event_id ON public.attribution_allocations USING btree (event_id);
 
 
 --
 -- Name: idx_attribution_allocations_tenant_created_at; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_attribution_allocations_tenant_created_at ON public.attribution_allocations USING btree (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_attribution_allocations_tenant_created_at ON public.attribution_allocations USING btree (tenant_id, created_at DESC);
 
 
 --
 -- Name: idx_attribution_allocations_tenant_event_model_channel; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_attribution_allocations_tenant_event_model_channel ON public.attribution_allocations USING btree (tenant_id, event_id, model_version, channel_code) WHERE (model_version IS NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_attribution_allocations_tenant_event_model_channel ON public.attribution_allocations USING btree (tenant_id, event_id, model_version, channel_code) WHERE (model_version IS NOT NULL);
 
 
 --
@@ -2007,7 +2007,7 @@ COMMENT ON INDEX public.idx_attribution_allocations_tenant_event_model_channel I
 -- Name: idx_attribution_allocations_tenant_model_version; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_attribution_allocations_tenant_model_version ON public.attribution_allocations USING btree (tenant_id, model_version);
+CREATE INDEX IF NOT EXISTS idx_attribution_allocations_tenant_model_version ON public.attribution_allocations USING btree (tenant_id, model_version);
 
 
 --
@@ -2021,70 +2021,70 @@ COMMENT ON INDEX public.idx_attribution_allocations_tenant_model_version IS 'Com
 -- Name: idx_attribution_events_session_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_attribution_events_session_id ON public.attribution_events USING btree (session_id) WHERE (session_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_attribution_events_session_id ON public.attribution_events USING btree (session_id) WHERE (session_id IS NOT NULL);
 
 
 --
 -- Name: idx_attribution_events_tenant_occurred_at; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_attribution_events_tenant_occurred_at ON public.attribution_events USING btree (tenant_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_attribution_events_tenant_occurred_at ON public.attribution_events USING btree (tenant_id, occurred_at DESC);
 
 
 --
 -- Name: idx_budget_jobs_tenant_status; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_budget_jobs_tenant_status ON public.budget_optimization_jobs USING btree (tenant_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_budget_jobs_tenant_status ON public.budget_optimization_jobs USING btree (tenant_id, status, created_at DESC);
 
 
 --
 -- Name: idx_channel_assignment_corrections_channels; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_channel_assignment_corrections_channels ON public.channel_assignment_corrections USING btree (from_channel, to_channel, corrected_at DESC);
+CREATE INDEX IF NOT EXISTS idx_channel_assignment_corrections_channels ON public.channel_assignment_corrections USING btree (from_channel, to_channel, corrected_at DESC);
 
 
 --
 -- Name: idx_channel_assignment_corrections_entity; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_channel_assignment_corrections_entity ON public.channel_assignment_corrections USING btree (tenant_id, entity_type, entity_id, corrected_at DESC);
+CREATE INDEX IF NOT EXISTS idx_channel_assignment_corrections_entity ON public.channel_assignment_corrections USING btree (tenant_id, entity_type, entity_id, corrected_at DESC);
 
 
 --
 -- Name: idx_channel_assignment_corrections_tenant; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_channel_assignment_corrections_tenant ON public.channel_assignment_corrections USING btree (tenant_id, corrected_at DESC);
+CREATE INDEX IF NOT EXISTS idx_channel_assignment_corrections_tenant ON public.channel_assignment_corrections USING btree (tenant_id, corrected_at DESC);
 
 
 --
 -- Name: idx_channel_state_transitions_channel_changed_at; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_channel_state_transitions_channel_changed_at ON public.channel_state_transitions USING btree (channel_code, changed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_channel_state_transitions_channel_changed_at ON public.channel_state_transitions USING btree (channel_code, changed_at DESC);
 
 
 --
 -- Name: idx_channel_state_transitions_to_state_changed_at; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_channel_state_transitions_to_state_changed_at ON public.channel_state_transitions USING btree (to_state, changed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_channel_state_transitions_to_state_changed_at ON public.channel_state_transitions USING btree (to_state, changed_at DESC);
 
 
 --
 -- Name: idx_dead_events_error_code; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dead_events_error_code ON public.dead_events USING btree (error_code);
+CREATE INDEX IF NOT EXISTS idx_dead_events_error_code ON public.dead_events USING btree (error_code);
 
 
 --
 -- Name: idx_dead_events_remediation; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dead_events_remediation ON public.dead_events USING btree (remediation_status, ingested_at DESC);
+CREATE INDEX IF NOT EXISTS idx_dead_events_remediation ON public.dead_events USING btree (remediation_status, ingested_at DESC);
 
 
 --
@@ -2098,21 +2098,21 @@ COMMENT ON INDEX public.idx_dead_events_remediation IS 'Optimizes remediation qu
 -- Name: idx_dead_events_source; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dead_events_source ON public.dead_events USING btree (source);
+CREATE INDEX IF NOT EXISTS idx_dead_events_source ON public.dead_events USING btree (source);
 
 
 --
 -- Name: idx_dead_events_tenant_ingested_at; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_dead_events_tenant_ingested_at ON public.dead_events USING btree (tenant_id, ingested_at DESC);
+CREATE INDEX IF NOT EXISTS idx_dead_events_tenant_ingested_at ON public.dead_events USING btree (tenant_id, ingested_at DESC);
 
 
 --
 -- Name: idx_events_idempotency; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_events_idempotency ON public.attribution_events USING btree (idempotency_key);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_events_idempotency ON public.attribution_events USING btree (idempotency_key);
 
 
 --
@@ -2126,7 +2126,7 @@ COMMENT ON INDEX public.idx_events_idempotency IS 'Ensures idempotency_key uniqu
 -- Name: idx_events_processing_status; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_events_processing_status ON public.attribution_events USING btree (processing_status, processed_at) WHERE ((processing_status)::text = 'pending'::text);
+CREATE INDEX IF NOT EXISTS idx_events_processing_status ON public.attribution_events USING btree (processing_status, processed_at) WHERE ((processing_status)::text = 'pending'::text);
 
 
 --
@@ -2140,7 +2140,7 @@ COMMENT ON INDEX public.idx_events_processing_status IS 'Partial index for pendi
 -- Name: idx_events_tenant_timestamp; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_events_tenant_timestamp ON public.attribution_events USING btree (tenant_id, event_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_events_tenant_timestamp ON public.attribution_events USING btree (tenant_id, event_timestamp DESC);
 
 
 --
@@ -2154,56 +2154,56 @@ COMMENT ON INDEX public.idx_events_tenant_timestamp IS 'Optimizes tenant-scoped 
 -- Name: idx_explanation_cache_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_explanation_cache_lookup ON public.explanation_cache USING btree (tenant_id, entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_explanation_cache_lookup ON public.explanation_cache USING btree (tenant_id, entity_type, entity_id);
 
 
 --
 -- Name: idx_investigations_tenant_status; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_investigations_tenant_status ON public.investigations USING btree (tenant_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_investigations_tenant_status ON public.investigations USING btree (tenant_id, status, created_at DESC);
 
 
 --
 -- Name: idx_llm_calls_tenant_created_at; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_llm_calls_tenant_created_at ON public.llm_api_calls USING btree (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_llm_calls_tenant_created_at ON public.llm_api_calls USING btree (tenant_id, created_at DESC);
 
 
 --
 -- Name: idx_llm_calls_tenant_endpoint; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_llm_calls_tenant_endpoint ON public.llm_api_calls USING btree (tenant_id, endpoint, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_llm_calls_tenant_endpoint ON public.llm_api_calls USING btree (tenant_id, endpoint, created_at DESC);
 
 
 --
 -- Name: idx_llm_failures_created_at; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_llm_failures_created_at ON public.llm_validation_failures USING btree (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_llm_failures_created_at ON public.llm_validation_failures USING btree (created_at DESC);
 
 
 --
 -- Name: idx_llm_failures_tenant_endpoint; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_llm_failures_tenant_endpoint ON public.llm_validation_failures USING btree (tenant_id, endpoint, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_llm_failures_tenant_endpoint ON public.llm_validation_failures USING btree (tenant_id, endpoint, created_at DESC);
 
 
 --
 -- Name: idx_llm_monthly_tenant_month; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_llm_monthly_tenant_month ON public.llm_monthly_costs USING btree (tenant_id, month DESC);
+CREATE INDEX IF NOT EXISTS idx_llm_monthly_tenant_month ON public.llm_monthly_costs USING btree (tenant_id, month DESC);
 
 
 --
 -- Name: idx_mv_allocation_summary_key; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_mv_allocation_summary_key ON public.mv_allocation_summary USING btree (tenant_id, event_id, model_version);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_allocation_summary_key ON public.mv_allocation_summary USING btree (tenant_id, event_id, model_version);
 
 
 --
@@ -2217,21 +2217,21 @@ COMMENT ON INDEX public.idx_mv_allocation_summary_key IS 'Unique index on (tenan
 -- Name: idx_mv_channel_performance_unique; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_mv_channel_performance_unique ON public.mv_channel_performance USING btree (tenant_id, channel_code, allocation_date);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_channel_performance_unique ON public.mv_channel_performance USING btree (tenant_id, channel_code, allocation_date);
 
 
 --
 -- Name: idx_mv_daily_revenue_summary_unique; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_mv_daily_revenue_summary_unique ON public.mv_daily_revenue_summary USING btree (tenant_id, revenue_date, state, currency);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_daily_revenue_summary_unique ON public.mv_daily_revenue_summary USING btree (tenant_id, revenue_date, state, currency);
 
 
 --
 -- Name: idx_pii_audit_findings_detected_key; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_pii_audit_findings_detected_key ON public.pii_audit_findings USING btree (detected_key);
+CREATE INDEX IF NOT EXISTS idx_pii_audit_findings_detected_key ON public.pii_audit_findings USING btree (detected_key);
 
 
 --
@@ -2245,7 +2245,7 @@ COMMENT ON INDEX public.idx_pii_audit_findings_detected_key IS 'Performance inde
 -- Name: idx_pii_audit_findings_table_detected_at; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_pii_audit_findings_table_detected_at ON public.pii_audit_findings USING btree (table_name, detected_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pii_audit_findings_table_detected_at ON public.pii_audit_findings USING btree (table_name, detected_at DESC);
 
 
 --
@@ -2259,28 +2259,28 @@ COMMENT ON INDEX public.idx_pii_audit_findings_table_detected_at IS 'Performance
 -- Name: idx_reconciliation_runs_state; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_reconciliation_runs_state ON public.reconciliation_runs USING btree (state);
+CREATE INDEX IF NOT EXISTS idx_reconciliation_runs_state ON public.reconciliation_runs USING btree (state);
 
 
 --
 -- Name: idx_reconciliation_runs_tenant_last_run_at; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_reconciliation_runs_tenant_last_run_at ON public.reconciliation_runs USING btree (tenant_id, last_run_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reconciliation_runs_tenant_last_run_at ON public.reconciliation_runs USING btree (tenant_id, last_run_at DESC);
 
 
 --
 -- Name: idx_revenue_ledger_is_verified; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_revenue_ledger_is_verified ON public.revenue_ledger USING btree (is_verified) WHERE (is_verified = true);
+CREATE INDEX IF NOT EXISTS idx_revenue_ledger_is_verified ON public.revenue_ledger USING btree (is_verified) WHERE (is_verified = true);
 
 
 --
 -- Name: idx_revenue_ledger_state; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_revenue_ledger_state ON public.revenue_ledger USING btree (state);
+CREATE INDEX IF NOT EXISTS idx_revenue_ledger_state ON public.revenue_ledger USING btree (state);
 
 
 --
@@ -2294,7 +2294,7 @@ COMMENT ON INDEX public.idx_revenue_ledger_state IS 'Optimizes queries by state 
 -- Name: idx_revenue_ledger_tenant_allocation_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_revenue_ledger_tenant_allocation_id ON public.revenue_ledger USING btree (tenant_id, allocation_id) WHERE (allocation_id IS NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_revenue_ledger_tenant_allocation_id ON public.revenue_ledger USING btree (tenant_id, allocation_id) WHERE (allocation_id IS NOT NULL);
 
 
 --
@@ -2308,7 +2308,7 @@ COMMENT ON INDEX public.idx_revenue_ledger_tenant_allocation_id IS 'Unique index
 -- Name: idx_revenue_ledger_tenant_state; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_revenue_ledger_tenant_state ON public.revenue_ledger USING btree (tenant_id, state, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_revenue_ledger_tenant_state ON public.revenue_ledger USING btree (tenant_id, state, created_at DESC);
 
 
 --
@@ -2322,14 +2322,14 @@ COMMENT ON INDEX public.idx_revenue_ledger_tenant_state IS 'Optimizes tenant-sco
 -- Name: idx_revenue_ledger_tenant_updated_at; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_revenue_ledger_tenant_updated_at ON public.revenue_ledger USING btree (tenant_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_revenue_ledger_tenant_updated_at ON public.revenue_ledger USING btree (tenant_id, updated_at DESC);
 
 
 --
 -- Name: idx_revenue_ledger_transaction_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_revenue_ledger_transaction_id ON public.revenue_ledger USING btree (transaction_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_revenue_ledger_transaction_id ON public.revenue_ledger USING btree (transaction_id);
 
 
 --
@@ -2343,7 +2343,7 @@ COMMENT ON INDEX public.idx_revenue_ledger_transaction_id IS 'Ensures transactio
 -- Name: idx_revenue_state_transitions_ledger_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_revenue_state_transitions_ledger_id ON public.revenue_state_transitions USING btree (ledger_id, transitioned_at DESC);
+CREATE INDEX IF NOT EXISTS idx_revenue_state_transitions_ledger_id ON public.revenue_state_transitions USING btree (ledger_id, transitioned_at DESC);
 
 
 --
@@ -2357,14 +2357,14 @@ COMMENT ON INDEX public.idx_revenue_state_transitions_ledger_id IS 'Optimizes lo
 -- Name: idx_revenue_state_transitions_tenant_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_revenue_state_transitions_tenant_id ON public.revenue_state_transitions USING btree (tenant_id, transitioned_at DESC);
+CREATE INDEX IF NOT EXISTS idx_revenue_state_transitions_tenant_id ON public.revenue_state_transitions USING btree (tenant_id, transitioned_at DESC);
 
 
 --
 -- Name: idx_tenants_api_key_hash; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX idx_tenants_api_key_hash ON public.tenants USING btree (api_key_hash);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_api_key_hash ON public.tenants USING btree (api_key_hash);
 
 
 --
@@ -2378,21 +2378,21 @@ COMMENT ON INDEX public.idx_tenants_api_key_hash IS 'Ensures api_key_hash unique
 -- Name: idx_tenants_name; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_tenants_name ON public.tenants USING btree (name);
+CREATE INDEX IF NOT EXISTS idx_tenants_name ON public.tenants USING btree (name);
 
 
 --
 -- Name: idx_tool_calls_investigation; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_tool_calls_investigation ON public.investigation_tool_calls USING btree (investigation_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_tool_calls_investigation ON public.investigation_tool_calls USING btree (investigation_id, created_at);
 
 
 --
 -- Name: idx_tool_calls_tenant; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_tool_calls_tenant ON public.investigation_tool_calls USING btree (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tool_calls_tenant ON public.investigation_tool_calls USING btree (tenant_id, created_at DESC);
 
 
 --

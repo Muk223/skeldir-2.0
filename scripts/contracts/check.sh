@@ -85,16 +85,17 @@ if [ "$RUN_MODEL_TEST" = "true" ] || [ "$RUN_MODEL_TEST" = "smoke" ]; then
         if [ -f "$BUNDLED_FILE" ]; then
             echo "Testing model generation for ${domain}..."
             TEMP_DIR=$(mktemp -d)
-            
+            OUTPUT_FILE="$TEMP_DIR/models.py"
+
             if python -m datamodel_code_generator \
                 --input "$BUNDLED_FILE" \
                 --input-file-type openapi \
-                --output "$TEMP_DIR" \
+                --output "$OUTPUT_FILE" \
                 --target-python-version 3.11 \
                 --use-annotated \
                 --use-standard-collections 2>&1; then
-                
-                # Check if any .py files were generated
+
+                # Check if the output file was generated (may also generate __init__.py, etc.)
                 PY_COUNT=$(find "$TEMP_DIR" -name "*.py" -type f | wc -l)
                 if [ "$PY_COUNT" -gt 0 ]; then
                     echo -e "${GREEN}✓ Generated $PY_COUNT Python file(s) for ${domain}${NC}"

@@ -121,6 +121,7 @@ jobs:
 
       - name: "EG-R1-1: OpenAPI validation + smoke codegen"
         run: |
+          set -o pipefail  # Ensure pipeline exit code reflects script failures
           echo "=== EG-R1-1: Strict OpenAPI Validation + Smoke Codegen ===" | tee -a $GITHUB_STEP_SUMMARY
           mkdir -p "$ARTIFACTS_DIR/CONTRACTS"
 
