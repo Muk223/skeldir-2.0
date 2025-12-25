@@ -173,15 +173,20 @@ jobs:
 
           echo "docker run postgres (digest pinned)" >> "$ARTIFACTS_DIR/COMMAND_LOG.txt"
 
-          # Wait for Postgres to be ready
+          # Wait for Postgres to be ready with robust verification
           echo "Waiting for Postgres to be ready..."
-          for i in {1..30}; do
-            if docker exec skeldir-r1-postgres pg_isready -U $POSTGRES_USER; then
-              echo "Postgres is ready after $i seconds"
-              break
+          for i in {1..60}; do
+            if docker exec skeldir-r1-postgres pg_isready -U $POSTGRES_USER 2>/dev/null; then
+              # pg_isready can report true before fully stable, verify with actual query
+              if docker exec skeldir-r1-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT 1" >/dev/null 2>&1; then
+                echo "Postgres is fully ready after $i seconds"
+                break
+              fi
             fi
             sleep 1
           done
+          # Extra stabilization wait
+          sleep 3
 
           # Apply canonical schema (Run 1)
           echo "Applying canonical schema (Run 1)..." | tee -a $GITHUB_STEP_SUMMARY
