@@ -1,22 +1,25 @@
 # R1 Contract & Runtime Viability — Validation Summary
 
-**Execution Date:** 2025-12-25
-**Candidate SHA:** 06d60a361e3cbd57c6ba1b0c713dbad7cc10dce7
-**Environment:** Ubuntu 24.04 LTS (GitHub Actions CI)
-**Authoritative Run:** Yes (CI/Ubuntu per directive: "CI-first truth is preferred")
+**Execution Date:** 2025-12-25 (R1 Workflow Created)
+**Candidate SHA:** PENDING CI EXECUTION
+**Environment:** Ubuntu 22.04 (GitHub Actions CI)
+**Authoritative Run:** CI/Ubuntu (per directive: "CI-first truth is preferred")
+**Workflow:** `.github/workflows/r1-contract-runtime.yml`
 
 ---
 
 ## Executive Summary
 
-This document records the R1 (Runtime 1) validation phase, which proves the system is invokable end-to-end at runtime. R1 executes five mandatory exit gates (EG-R1-0 through EG-R1-5) with hard evidence capture—logs, hashes, database interactions, and live endpoint probes—demonstrating that:
+This document records the R1 (Runtime 1) validation phase, which proves the system is invokable end-to-end at runtime. R1 executes six mandatory exit gates (EG-R1-0 through EG-R1-5) with hard evidence capture—logs, hashes, database interactions, and live endpoint probes—demonstrating that:
 
 1. **OpenAPI contracts are strictly valid and codegen-safe** (EG-R1-1)
-2. **Migrations are executable from zero → head deterministically** (EG-R1-3)
+2. **Database schema is executable from zero → head deterministically** (EG-R1-3)
 3. **Live services boot with real Postgres** (EG-R1-4)
 4. **Live endpoints enforce the contract + touch Postgres** (EG-R1-5, closure gate)
 
 **No "it compiles" illusions.** Only live endpoint evidence with database interaction authorizes transition to R2.
+
+**Note:** This document replaces the previous R1 summary. The earlier version referenced Alembic migrations which are not present in the current repo. The current workflow uses `db/schema/canonical_schema.sql` for schema application.
 
 ---
 
@@ -44,14 +47,14 @@ If EG-R1-5 is not PASS, R1 is FAIL—even if all other gates pass.
 
 | Gate | Objective | Status | Evidence |
 |------|-----------|--------|----------|
-| **EG-R1-0** | Evidence Anchor (SHA, env, logs) | ✅ PASS | ENV_SNAPSHOT.json, COMMAND_LOG.txt |
-| **EG-R1-1** | Strict OpenAPI + Smoke Codegen | ✅ PASS | openapi_contracts_check.log, openapi_contracts_smoke_codegen.log, bundled_spec_tree_hash.txt |
-| **EG-R1-3** | Fresh DB Migration + Idempotency | ✅ PASS | migration_apply_run1.log, migration_apply_run2.log, alembic_state.log, db_bootstrap.log |
-| **EG-R1-4** | Live Stack Boot + /health + /metrics | ✅ PASS | live_stack_boot.log, curl_live_health.log, curl_live_metrics.log, live_route_invocation_evidence.log |
-| **EG-R1-5** | Live Contract Enforcement + DB (Closure) | ✅ PASS | curl_live_happy_path.log, curl_live_invalid_payload.log, db_probe_before_after.log, request_correlation.log |
-| **EG-R1-2** | Prism Mocks (Prerequisite) | ✅ PASS | prism_compose_up.log, prism_health_ps.log, curl_mock_samples.log |
+| **EG-R1-0** | Evidence Anchor (SHA, env, logs) | ⏳ PENDING | ENV_SNAPSHOT.json, COMMAND_LOG.txt |
+| **EG-R1-1** | Strict OpenAPI + Smoke Codegen | ⏳ PENDING | openapi_contracts_check.log, bundled_spec_tree_hash.txt |
+| **EG-R1-2** | Prism Mocks (Prerequisite) | ⏳ PENDING | prism_compose_up.log, curl_mock_samples.log |
+| **EG-R1-3** | Fresh DB Schema Apply + Idempotency | ⏳ PENDING | schema_apply_run1.log, schema_apply_run2.log |
+| **EG-R1-4** | Live Stack Boot + /health + /metrics | ⏳ PENDING | curl_live_health.log, curl_live_metrics.log |
+| **EG-R1-5** | Live Contract Enforcement + DB (Closure) | ⏳ PENDING | curl_live_happy_path.log, curl_live_invalid_payload.log, db_probe_before_after.log |
 
-**Overall: ✅ R1 PASS**
+**Overall: ⏳ PENDING CI EXECUTION**
 
 ---
 
@@ -100,30 +103,32 @@ curl http://localhost:4011/<endpoint>   # Test other mocks
 
 ---
 
-### H-R1-3: Migrations are Executable Truth from Zero
+### H-R1-3: Schema is Executable Truth from Zero
 
 **Hypothesis:**
-A fresh Postgres instance can be migrated to head with no manual intervention, and migration apply is idempotent (second apply is no-op).
+A fresh Postgres instance can have the canonical schema applied with no manual intervention, and the apply is idempotent (second apply is no-op or produces warnings only).
 
 **Test:**
 ```bash
-# Fresh DB instance
-docker run postgres:16-alpine
-# Run 1: Zero → Head
-alembic upgrade head
-# Run 2: Head → Head (should be no-op)
-alembic upgrade head
-alembic current
-alembic heads
+# Fresh DB instance (digest-pinned)
+docker run -d postgres@sha256:b3968e348b48...
+
+# Run 1: Zero → Canonical schema
+psql -U skeldir_test -d skeldir_test < db/schema/canonical_schema.sql
+
+# Run 2: Idempotency check
+psql -U skeldir_test -d skeldir_test < db/schema/canonical_schema.sql
+
+# Compare: Schema hashes must match
+pg_dump --schema-only | sha256sum
 ```
 
-**Result:** ✅ **VERIFIED**
+**Result:** ⏳ **PENDING CI EXECUTION**
 
-- Fresh Postgres instance created and bootstrapped successfully
-- First migration run: zero → head completed without errors
-- Second migration run: confirmed idempotent (no new migrations applied)
-- Alembic state shows stable head revision
-- Database schema initialized with all required tables
+- Fresh Postgres instance will be created (digest-pinned for immutability)
+- First schema apply: zero → canonical schema
+- Second schema apply: idempotency check (schema hash after Run 1 == schema hash after Run 2)
+- RLS configuration verified on attribution_events table
 
 ---
 
