@@ -267,30 +267,40 @@ jobs:
           echo "### Cross-Tenant Denial Test" | tee -a $GITHUB_STEP_SUMMARY
           echo "" | tee -a $GITHUB_STEP_SUMMARY
 
-          # Create test data
-          CROSS_TENANT_PROOF=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t <<'EOSQL'
-          -- Create test tenants
-          INSERT INTO tenants (id, name) VALUES
-            ('11111111-1111-1111-1111-111111111111', 'R2 Test Tenant A'),
-            ('22222222-2222-2222-2222-222222222222', 'R2 Test Tenant B')
-          ON CONFLICT (id) DO NOTHING;
+          # Create test data - use separate commands for better error visibility
+          echo "Setting up test tenants..." | tee -a $GITHUB_STEP_SUMMARY
 
-          -- Insert data as Tenant A
+          # Create tenants (with all required columns)
+          docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -c "
+            INSERT INTO tenants (id, name, api_key_hash, notification_email) VALUES
+              ('11111111-1111-1111-1111-111111111111', 'R2 Test Tenant A', 'hash_a', 'a@test.com'),
+              ('22222222-2222-2222-2222-222222222222', 'R2 Test Tenant B', 'hash_b', 'b@test.com')
+            ON CONFLICT (id) DO NOTHING;
+          " 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+
+          CROSS_TENANT_PROOF=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t <<'EOSQL'
+          -- Insert data as Tenant A (using correct schema columns)
           SET app.current_tenant_id = '11111111-1111-1111-1111-111111111111';
           INSERT INTO attribution_events (
-            event_id, tenant_id, event_timestamp, event_type, source_url, attribution_model, created_at
+            tenant_id, session_id, occurred_at, event_timestamp, event_type, channel,
+            idempotency_key, raw_payload, external_event_id
           ) VALUES (
-            'R2_CROSS_TENANT_TEST_A', '11111111-1111-1111-1111-111111111111',
-            now(), 'page_view', 'https://r2-test-a.example.com', 'last_touch', now()
+            '11111111-1111-1111-1111-111111111111',
+            'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+            now(), now(), 'page_view', 'organic',
+            'R2_CROSS_TENANT_TEST_A', '{"test": "data_a"}'::jsonb, 'R2_CROSS_TENANT_TEST_A'
           ) ON CONFLICT DO NOTHING;
 
           -- Insert data as Tenant B
           SET app.current_tenant_id = '22222222-2222-2222-2222-222222222222';
           INSERT INTO attribution_events (
-            event_id, tenant_id, event_timestamp, event_type, source_url, attribution_model, created_at
+            tenant_id, session_id, occurred_at, event_timestamp, event_type, channel,
+            idempotency_key, raw_payload, external_event_id
           ) VALUES (
-            'R2_CROSS_TENANT_TEST_B', '22222222-2222-2222-2222-222222222222',
-            now(), 'page_view', 'https://r2-test-b.example.com', 'last_touch', now()
+            '22222222-2222-2222-2222-222222222222',
+            'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+            now(), now(), 'page_view', 'organic',
+            'R2_CROSS_TENANT_TEST_B', '{"test": "data_b"}'::jsonb, 'R2_CROSS_TENANT_TEST_B'
           ) ON CONFLICT DO NOTHING;
 
           -- Cross-Tenant Denial: Tenant A tries to SELECT Tenant B data
@@ -306,24 +316,27 @@ jobs:
             'OWN_DATA_' ||
             CASE WHEN COUNT(*) > 0 THEN 'VISIBLE' ELSE 'BLOCKED' END as result
           FROM attribution_events
-          WHERE event_id = 'R2_CROSS_TENANT_TEST_A';
+          WHERE external_event_id = 'R2_CROSS_TENANT_TEST_A';
 
           -- Cross-Tenant Denial: Tenant A tries to INSERT into Tenant B
           SET app.current_tenant_id = '11111111-1111-1111-1111-111111111111';
           INSERT INTO attribution_events (
-            event_id, tenant_id, event_timestamp, event_type, source_url, attribution_model, created_at
+            tenant_id, session_id, occurred_at, event_timestamp, event_type, channel,
+            idempotency_key, raw_payload, external_event_id
           ) VALUES (
-            'R2_CROSS_TENANT_INSERT_ATTEMPT', '22222222-2222-2222-2222-222222222222',
-            now(), 'page_view', 'https://malicious.example.com', 'last_touch', now()
+            '22222222-2222-2222-2222-222222222222',
+            'cccccccc-cccc-cccc-cccc-cccccccccccc',
+            now(), now(), 'page_view', 'malicious',
+            'R2_CROSS_TENANT_INSERT_ATTEMPT', '{"test": "cross_tenant"}'::jsonb, 'R2_CROSS_TENANT_INSERT_ATTEMPT'
           ) ON CONFLICT DO NOTHING;
 
-          -- Verify cross-tenant insert was blocked
+          -- Verify cross-tenant insert was blocked (check as Tenant B)
           SET app.current_tenant_id = '22222222-2222-2222-2222-222222222222';
           SELECT
             'CROSS_TENANT_INSERT_' ||
             CASE WHEN COUNT(*) = 0 THEN 'BLOCKED' ELSE 'LEAKED' END as result
           FROM attribution_events
-          WHERE event_id = 'R2_CROSS_TENANT_INSERT_ATTEMPT';
+          WHERE external_event_id = 'R2_CROSS_TENANT_INSERT_ATTEMPT';
 
           -- Default-deny: Unset GUC should block all access
           RESET app.current_tenant_id;
@@ -486,11 +499,13 @@ jobs:
             RESULT=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t 2>&1 <<EOSQL || true
             SET app.current_tenant_id = '11111111-1111-1111-1111-111111111111';
             INSERT INTO attribution_events (
-              event_id, tenant_id, event_timestamp, event_type, source_url,
-              attribution_model, created_at, raw_payload
+              tenant_id, session_id, occurred_at, event_timestamp, event_type,
+              channel, idempotency_key, raw_payload
             ) VALUES (
-              'PII_TEST_$key', '11111111-1111-1111-1111-111111111111',
-              now(), 'page_view', 'https://test.example.com', 'last_touch', now(),
+              '11111111-1111-1111-1111-111111111111',
+              'dddddddd-dddd-dddd-dddd-dddddddddddd',
+              now(), now(), 'page_view', 'organic',
+              'PII_TEST_$key',
               '{"$key": "test_value"}'::jsonb
             );
             EOSQL
@@ -515,14 +530,16 @@ jobs:
           VALID_INSERT=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t 2>&1 <<'EOSQL'
           SET app.current_tenant_id = '11111111-1111-1111-1111-111111111111';
           INSERT INTO attribution_events (
-            event_id, tenant_id, event_timestamp, event_type, source_url,
-            attribution_model, created_at, raw_payload
+            tenant_id, session_id, occurred_at, event_timestamp, event_type,
+            channel, idempotency_key, raw_payload
           ) VALUES (
-            'PII_TEST_VALID_PAYLOAD', '11111111-1111-1111-1111-111111111111',
-            now(), 'page_view', 'https://test.example.com', 'last_touch', now(),
+            '11111111-1111-1111-1111-111111111111',
+            'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+            now(), now(), 'page_view', 'organic',
+            'PII_TEST_VALID_PAYLOAD',
             '{"channel": "organic", "utm_source": "google"}'::jsonb
           )
-          RETURNING event_id;
+          RETURNING idempotency_key;
           EOSQL
           )
 
@@ -584,7 +601,7 @@ jobs:
           SET app.current_tenant_id = '11111111-1111-1111-1111-111111111111';
           UPDATE attribution_events
           SET event_type = 'modified'
-          WHERE event_id = 'R2_CROSS_TENANT_TEST_A';
+          WHERE external_event_id = 'R2_CROSS_TENANT_TEST_A';
           EOSQL
           )
 
@@ -600,7 +617,7 @@ jobs:
           DELETE_RESULT=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB 2>&1 <<'EOSQL' || true
           SET app.current_tenant_id = '11111111-1111-1111-1111-111111111111';
           DELETE FROM attribution_events
-          WHERE event_id = 'R2_CROSS_TENANT_TEST_A';
+          WHERE external_event_id = 'R2_CROSS_TENANT_TEST_A';
           EOSQL
           )
 
@@ -625,22 +642,24 @@ jobs:
 
             -- Create test allocation first (required for FK)
             INSERT INTO attribution_allocations (
-              id, tenant_id, event_id, channel_code, model, weight, revenue_cents, created_at
+              id, tenant_id, channel_code, model_type, confidence_score, allocated_revenue_cents
             ) VALUES (
               'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
               '11111111-1111-1111-1111-111111111111',
-              'R2_CROSS_TENANT_TEST_A', 'organic', 'last_touch', 1.0, 10000, now()
+              'organic', 'last_touch', 0.95, 10000
             ) ON CONFLICT DO NOTHING;
 
-            -- Insert ledger entry
+            -- Insert ledger entry (with all required columns)
             INSERT INTO revenue_ledger (
-              tenant_id, allocation_id, revenue_cents, is_verified, posted_at
+              tenant_id, allocation_id, revenue_cents, amount_cents, state,
+              transaction_id, verification_source, verification_timestamp, posted_at
             ) VALUES (
               '11111111-1111-1111-1111-111111111111',
               'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-              10000, false, now()
+              10000, 10000, 'captured',
+              'R2_TEST_TXN_001', 'test', now(), now()
             ) ON CONFLICT DO NOTHING;
-          " > /dev/null 2>&1 || true
+          " 2>&1 | tee -a $GITHUB_STEP_SUMMARY || true
 
           # Test UPDATE
           LEDGER_UPDATE=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB 2>&1 <<'EOSQL' || true
@@ -830,11 +849,13 @@ jobs:
 
           -- Try to insert PII via nested JSONB
           INSERT INTO attribution_events (
-            event_id, tenant_id, event_timestamp, event_type, source_url,
-            attribution_model, created_at, raw_payload
+            tenant_id, session_id, occurred_at, event_timestamp, event_type,
+            channel, idempotency_key, raw_payload
           ) VALUES (
-            'ADVERSARIAL_PII_ATTACK', '11111111-1111-1111-1111-111111111111',
-            now(), 'page_view', 'https://attack.example.com', 'last_touch', now(),
+            '11111111-1111-1111-1111-111111111111',
+            'ffffffff-ffff-ffff-ffff-ffffffffffff',
+            now(), now(), 'page_view', 'organic',
+            'ADVERSARIAL_PII_ATTACK',
             '{"user_data": {"email": "victim@example.com"}}'::jsonb
           );
           EOSQL
@@ -862,7 +883,7 @@ jobs:
           -- Try UPDATE with WHERE clause trick
           UPDATE attribution_events
           SET event_type = 'hacked'
-          WHERE event_id = 'R2_CROSS_TENANT_TEST_A'
+          WHERE external_event_id = 'R2_CROSS_TENANT_TEST_A'
             AND 1=1;
           EOSQL
           )
