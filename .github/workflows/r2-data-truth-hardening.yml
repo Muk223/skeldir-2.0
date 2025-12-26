@@ -212,6 +212,31 @@ jobs:
 
           echo "✅ Schema applied successfully" | tee -a $GITHUB_STEP_SUMMARY
 
+      - name: "Create application role for RLS tests"
+        run: |
+          set -o pipefail
+          echo "=== Creating non-superuser app role for RLS tests ===" | tee -a $GITHUB_STEP_SUMMARY
+
+          # Create a non-superuser application role (superusers bypass RLS)
+          docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -c "
+            -- Create app role (non-superuser, no inherit superuser privileges)
+            CREATE ROLE r2_app_role WITH LOGIN PASSWORD 'r2_app_password' NOSUPERUSER NOINHERIT;
+
+            -- Grant connect
+            GRANT CONNECT ON DATABASE $POSTGRES_DB TO r2_app_role;
+
+            -- Grant usage on schema
+            GRANT USAGE ON SCHEMA public TO r2_app_role;
+
+            -- Grant SELECT, INSERT on tables (not UPDATE/DELETE on immutable tables)
+            GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA public TO r2_app_role;
+
+            -- Grant usage on sequences
+            GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO r2_app_role;
+          "
+
+          echo "✅ App role created (r2_app_role is non-superuser, RLS will apply)" | tee -a $GITHUB_STEP_SUMMARY
+
       # ====================================================================
       # EG-R2-1: RLS Forced + Cross-Tenant Denial (DB-level proof)
       # ====================================================================
@@ -355,9 +380,9 @@ jobs:
           FROM attribution_events;
           EOSQL
 
-          # Copy SQL to container and execute
+          # Copy SQL to container and execute AS APP ROLE (non-superuser, RLS applies)
           docker cp /tmp/cross_tenant_test.sql skeldir-r2-postgres:/tmp/cross_tenant_test.sql
-          CROSS_TENANT_PROOF=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t -f /tmp/cross_tenant_test.sql 2>&1)
+          CROSS_TENANT_PROOF=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -t -f /tmp/cross_tenant_test.sql 2>&1)
 
           echo "\`\`\`" | tee -a $GITHUB_STEP_SUMMARY
           echo "$CROSS_TENANT_PROOF" | tee -a $GITHUB_STEP_SUMMARY
@@ -523,7 +548,7 @@ jobs:
           );
           EOSQL
             docker cp /tmp/pii_test_${key}.sql skeldir-r2-postgres:/tmp/pii_test_${key}.sql
-            RESULT=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t -f /tmp/pii_test_${key}.sql 2>&1 || true)
+            RESULT=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -t -f /tmp/pii_test_${key}.sql 2>&1 || true)
 
             if echo "$RESULT" | grep -q "PII key detected\|violates check constraint"; then
               echo "✅ PII key '$key' correctly blocked" | tee -a $GITHUB_STEP_SUMMARY
@@ -557,7 +582,7 @@ jobs:
           RETURNING idempotency_key;
           EOSQL
           docker cp /tmp/pii_valid_test.sql skeldir-r2-postgres:/tmp/pii_valid_test.sql
-          VALID_INSERT=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t -f /tmp/pii_valid_test.sql 2>&1)
+          VALID_INSERT=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -t -f /tmp/pii_valid_test.sql 2>&1)
 
           if echo "$VALID_INSERT" | grep -q "PII_TEST_VALID_PAYLOAD"; then
             echo "✅ Valid payload (no PII) accepted" | tee -a $GITHUB_STEP_SUMMARY
@@ -621,7 +646,7 @@ jobs:
           WHERE external_event_id = 'R2_CROSS_TENANT_TEST_A';
           EOSQL
           docker cp /tmp/immut_update_test.sql skeldir-r2-postgres:/tmp/immut_update_test.sql
-          UPDATE_RESULT=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -f /tmp/immut_update_test.sql 2>&1 || true)
+          UPDATE_RESULT=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -f /tmp/immut_update_test.sql 2>&1 || true)
 
           if echo "$UPDATE_RESULT" | grep -qE "append-only|immutable|not allowed"; then
             echo "✅ attribution_events UPDATE blocked by trigger" | tee -a $GITHUB_STEP_SUMMARY
@@ -638,7 +663,7 @@ jobs:
           WHERE external_event_id = 'R2_CROSS_TENANT_TEST_A';
           EOSQL
           docker cp /tmp/immut_delete_test.sql skeldir-r2-postgres:/tmp/immut_delete_test.sql
-          DELETE_RESULT=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -f /tmp/immut_delete_test.sql 2>&1 || true)
+          DELETE_RESULT=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -f /tmp/immut_delete_test.sql 2>&1 || true)
 
           if echo "$DELETE_RESULT" | grep -qE "append-only|immutable|not allowed"; then
             echo "✅ attribution_events DELETE blocked by trigger" | tee -a $GITHUB_STEP_SUMMARY
@@ -686,7 +711,7 @@ jobs:
           UPDATE revenue_ledger SET revenue_cents = 99999;
           EOSQL
           docker cp /tmp/ledger_update_test.sql skeldir-r2-postgres:/tmp/ledger_update_test.sql
-          LEDGER_UPDATE=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -f /tmp/ledger_update_test.sql 2>&1 || true)
+          LEDGER_UPDATE=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -f /tmp/ledger_update_test.sql 2>&1 || true)
 
           if echo "$LEDGER_UPDATE" | grep -qE "immutable|not allowed"; then
             echo "✅ revenue_ledger UPDATE blocked by trigger" | tee -a $GITHUB_STEP_SUMMARY
@@ -702,7 +727,7 @@ jobs:
           DELETE FROM revenue_ledger;
           EOSQL
           docker cp /tmp/ledger_delete_test.sql skeldir-r2-postgres:/tmp/ledger_delete_test.sql
-          LEDGER_DELETE=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -f /tmp/ledger_delete_test.sql 2>&1 || true)
+          LEDGER_DELETE=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -f /tmp/ledger_delete_test.sql 2>&1 || true)
 
           if echo "$LEDGER_DELETE" | grep -qE "immutable|not allowed"; then
             echo "✅ revenue_ledger DELETE blocked by trigger" | tee -a $GITHUB_STEP_SUMMARY
@@ -851,7 +876,7 @@ jobs:
           WHERE tenant_id = '22222222-2222-2222-2222-222222222222';
           EOSQL
           docker cp /tmp/adv_spoof_test.sql skeldir-r2-postgres:/tmp/adv_spoof_test.sql
-          SPOOF_RESULT=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t -f /tmp/adv_spoof_test.sql 2>&1)
+          SPOOF_RESULT=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -t -f /tmp/adv_spoof_test.sql 2>&1)
 
           if echo "$SPOOF_RESULT" | grep -q "SPOOF_ATTEMPT_BLOCKED"; then
             echo "✅ Tenant spoofing blocked - RLS enforced" | tee -a $GITHUB_STEP_SUMMARY
@@ -883,7 +908,7 @@ jobs:
           );
           EOSQL
           docker cp /tmp/adv_pii_attack.sql skeldir-r2-postgres:/tmp/adv_pii_attack.sql
-          PII_ATTACK=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -f /tmp/adv_pii_attack.sql 2>&1 || true)
+          PII_ATTACK=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -f /tmp/adv_pii_attack.sql 2>&1 || true)
 
           if echo "$PII_ATTACK" | grep -qE "PII key detected|violates"; then
             echo "✅ PII injection blocked - trigger enforced" | tee -a $GITHUB_STEP_SUMMARY
@@ -911,7 +936,7 @@ jobs:
             AND 1=1;
           EOSQL
           docker cp /tmp/adv_immut_attack.sql skeldir-r2-postgres:/tmp/adv_immut_attack.sql
-          IMMUT_ATTACK=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -f /tmp/adv_immut_attack.sql 2>&1 || true)
+          IMMUT_ATTACK=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -f /tmp/adv_immut_attack.sql 2>&1 || true)
 
           if echo "$IMMUT_ATTACK" | grep -qE "append-only|immutable|not allowed"; then
             echo "✅ Immutability bypass blocked - trigger enforced" | tee -a $GITHUB_STEP_SUMMARY
@@ -945,7 +970,7 @@ jobs:
           WHERE event_type = 'cross_tenant_modified';
           EOSQL
           docker cp /tmp/adv_cross_mod.sql skeldir-r2-postgres:/tmp/adv_cross_mod.sql
-          CROSS_MOD=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t -f /tmp/adv_cross_mod.sql 2>&1)
+          CROSS_MOD=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -t -f /tmp/adv_cross_mod.sql 2>&1)
 
           if echo "$CROSS_MOD" | grep -q "CROSS_MOD_BLOCKED"; then
             echo "✅ Cross-tenant modification blocked" | tee -a $GITHUB_STEP_SUMMARY
