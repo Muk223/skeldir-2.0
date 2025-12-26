@@ -46,12 +46,15 @@ Prove "truth is protected at runtime" with two simultaneous guarantees:
 
 ### Passing Run Anchor
 
-- **Run ID:** *(Pending - update after CI run)*
-- **SHA:** *(Pending)*
-- **Status:** *(Pending)*
-- **Date:** *(Pending)*
+- **Run ID:** [20526535769](https://github.com/Muk223/skeldir-2.0/actions/runs/20526535769)
+- **SHA:** `7eac51d`
+- **Status:** SUCCESS (All gates passed including EG-R2-FIX-3 and EG-R2-FIX-4)
+- **Date:** 2025-12-26T17:29:11Z
 
-**Runtime Innocence Verdict:** `TOTAL_DB_STATEMENTS_CAPTURED > 0` AND `MATCH_COUNT = 0`
+**Runtime Innocence Verdict:**
+- `TOTAL_DB_STATEMENTS_CAPTURED=2` (> 0, proving DB capture works)
+- `MATCH_COUNT=0` (no destructive statements on immutable tables)
+- **Canary Detection:** 3/3 patterns detected (anti-theater verified)
 
 ## Closed Sets (Derived from canonical_schema.sql)
 
@@ -187,4 +190,4 @@ If any gate fails:
 
 ---
 
-*Last updated: 2025-12-26 - Pending CI run after R2-FOLLOWUP directive implementation*
+*Last updated: 2025-12-26 - R2 COMPLETE (Run 20526535769, SHA 7eac51d) - Authoritative DB-level innocence proof implemented*
