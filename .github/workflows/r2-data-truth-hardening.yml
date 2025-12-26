@@ -651,8 +651,9 @@ jobs:
           docker cp /tmp/immut_update_test.sql skeldir-r2-postgres:/tmp/immut_update_test.sql
           UPDATE_RESULT=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -f /tmp/immut_update_test.sql 2>&1 || true)
 
-          if echo "$UPDATE_RESULT" | grep -qE "append-only|immutable|not allowed"; then
-            echo "✅ attribution_events UPDATE blocked by trigger" | tee -a $GITHUB_STEP_SUMMARY
+          # Check for immutability enforcement (trigger or privilege denial both valid)
+          if echo "$UPDATE_RESULT" | grep -qE "append-only|immutable|not allowed|permission denied"; then
+            echo "✅ attribution_events UPDATE blocked (trigger or privilege)" | tee -a $GITHUB_STEP_SUMMARY
           else
             echo "❌ attribution_events UPDATE was NOT blocked" | tee -a $GITHUB_STEP_SUMMARY
             echo "Result: $UPDATE_RESULT" | tee -a $GITHUB_STEP_SUMMARY
@@ -668,8 +669,8 @@ jobs:
           docker cp /tmp/immut_delete_test.sql skeldir-r2-postgres:/tmp/immut_delete_test.sql
           DELETE_RESULT=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -f /tmp/immut_delete_test.sql 2>&1 || true)
 
-          if echo "$DELETE_RESULT" | grep -qE "append-only|immutable|not allowed"; then
-            echo "✅ attribution_events DELETE blocked by trigger" | tee -a $GITHUB_STEP_SUMMARY
+          if echo "$DELETE_RESULT" | grep -qE "append-only|immutable|not allowed|permission denied"; then
+            echo "✅ attribution_events DELETE blocked (trigger or privilege)" | tee -a $GITHUB_STEP_SUMMARY
           else
             echo "❌ attribution_events DELETE was NOT blocked" | tee -a $GITHUB_STEP_SUMMARY
             echo "Result: $DELETE_RESULT" | tee -a $GITHUB_STEP_SUMMARY
@@ -716,8 +717,8 @@ jobs:
           docker cp /tmp/ledger_update_test.sql skeldir-r2-postgres:/tmp/ledger_update_test.sql
           LEDGER_UPDATE=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -f /tmp/ledger_update_test.sql 2>&1 || true)
 
-          if echo "$LEDGER_UPDATE" | grep -qE "immutable|not allowed"; then
-            echo "✅ revenue_ledger UPDATE blocked by trigger" | tee -a $GITHUB_STEP_SUMMARY
+          if echo "$LEDGER_UPDATE" | grep -qE "immutable|not allowed|permission denied"; then
+            echo "✅ revenue_ledger UPDATE blocked (trigger or privilege)" | tee -a $GITHUB_STEP_SUMMARY
           else
             echo "❌ revenue_ledger UPDATE was NOT blocked" | tee -a $GITHUB_STEP_SUMMARY
             echo "Result: $LEDGER_UPDATE" | tee -a $GITHUB_STEP_SUMMARY
@@ -732,8 +733,8 @@ jobs:
           docker cp /tmp/ledger_delete_test.sql skeldir-r2-postgres:/tmp/ledger_delete_test.sql
           LEDGER_DELETE=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -f /tmp/ledger_delete_test.sql 2>&1 || true)
 
-          if echo "$LEDGER_DELETE" | grep -qE "immutable|not allowed"; then
-            echo "✅ revenue_ledger DELETE blocked by trigger" | tee -a $GITHUB_STEP_SUMMARY
+          if echo "$LEDGER_DELETE" | grep -qE "immutable|not allowed|permission denied"; then
+            echo "✅ revenue_ledger DELETE blocked (trigger or privilege)" | tee -a $GITHUB_STEP_SUMMARY
           else
             echo "❌ revenue_ledger DELETE was NOT blocked" | tee -a $GITHUB_STEP_SUMMARY
             echo "Result: $LEDGER_DELETE" | tee -a $GITHUB_STEP_SUMMARY
@@ -941,8 +942,8 @@ jobs:
           docker cp /tmp/adv_immut_attack.sql skeldir-r2-postgres:/tmp/adv_immut_attack.sql
           IMMUT_ATTACK=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -f /tmp/adv_immut_attack.sql 2>&1 || true)
 
-          if echo "$IMMUT_ATTACK" | grep -qE "append-only|immutable|not allowed"; then
-            echo "✅ Immutability bypass blocked - trigger enforced" | tee -a $GITHUB_STEP_SUMMARY
+          if echo "$IMMUT_ATTACK" | grep -qE "append-only|immutable|not allowed|permission denied"; then
+            echo "✅ Immutability bypass blocked (trigger or privilege)" | tee -a $GITHUB_STEP_SUMMARY
           else
             echo "❌ Immutability bypass attack may have succeeded" | tee -a $GITHUB_STEP_SUMMARY
             echo "Result: $IMMUT_ATTACK" | tee -a $GITHUB_STEP_SUMMARY
