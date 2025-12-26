@@ -270,6 +270,14 @@ jobs:
           # Create test data - use separate commands for better error visibility
           echo "Setting up test tenants..." | tee -a $GITHUB_STEP_SUMMARY
 
+          # Create test channels first (required for FK constraint on attribution_events)
+          docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -c "
+            INSERT INTO channel_taxonomy (code, family, is_paid, display_name, is_active, state) VALUES
+              ('organic', 'organic', false, 'Organic Search', true, 'active'),
+              ('malicious', 'other', false, 'Test Channel', true, 'active')
+            ON CONFLICT (code) DO NOTHING;
+          " 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+
           # Create tenants (with all required columns)
           docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -c "
             INSERT INTO tenants (id, name, api_key_hash, notification_email) VALUES
