@@ -1,8 +1,8 @@
 # R1 Contract & Runtime Viability — Validation Summary
 
-**Execution Date:** 2025-12-25T21:11:23Z
-**Candidate SHA:** `9dcf248f587cfe80cd27e788b33d280ace608c44`
-**CI Run ID:** 20510970869
+**Execution Date:** 2025-12-26T00:53:28Z
+**Candidate SHA:** `82437f896991d46e6c24b159944cb2a475b8b139`
+**CI Run ID:** 20513329971
 **Environment:** Ubuntu 22.04 (GitHub Actions CI)
 **Authoritative Run:** CI/Ubuntu (per directive: "CI-first truth is preferred")
 **Workflow:** `.github/workflows/r1-contract-runtime.yml`
@@ -56,6 +56,38 @@ If EG-R1-5 is not PASS, R1 is FAIL—even if all other gates pass.
 | **EG-R1-5** | Live Contract Enforcement + DB (Closure) | ✅ PASS | curl_live_happy_path.log, curl_live_invalid_payload.log, db_probe_before_after.log |
 
 **Overall: ✅ R1 COMPLETE — ALL GATES PASS**
+
+---
+
+## Causal DB Proof (EG-R1-FIX Gates)
+
+This run addresses the "Live-but-Unproven" state by providing browser-visible causal proof of API↔Postgres interaction.
+
+| Fix Gate | Objective | Status | Evidence |
+|----------|-----------|--------|----------|
+| **EG-R1-FIX-1** | DB identity verification (API + psql same instance) | ✅ PASS | psql connected to database 'skeldir_test' |
+| **EG-R1-FIX-2** | Causal DB proof (/health/ready runs queries) | ✅ PASS | SELECT 1, RLS check, GUC write/read |
+| **EG-R1-FIX-3** | Readiness 200 before AND after closure tests | ✅ PASS | /health/ready: 200 both times |
+| **EG-R1-FIX-4** | Gate status in logs matches artifact verdict | ✅ PASS | Logs and manifest consistent |
+
+### Log Excerpts (Browser-Visible Proof)
+
+From CI Run 20513329971:
+
+```
+✅ **EG-R1-FIX-1 PASS:** psql connected to database 'skeldir_test'
+✅ **EG-R1-FIX-2 PASS:** Causal DB proof established
+✅ **EG-R1-FIX-3 PASS:** Readiness 200 both before AND after tests
+✅ EG-R1-FIX-4 PASS: Gate status in logs matches artifact verdict
+✅ **EG-R1-5 PASS:** CLOSURE GATE satisfied
+```
+
+### Causal Proof Established
+
+- **DB Identity Match:** API DATABASE_URL = `postgresql://skeldir_test:****@localhost:5432/skeldir_test`
+- **psql Identity:** `inet_server_addr()=NULL, inet_server_port()=5432, current_database()=skeldir_test`
+- **/health/ready Queries:** SELECT 1, RLS check on pg_class, GUC set_config/current_setting
+- **Readiness Stability:** /health/ready returned 200 BEFORE tests AND 200 AFTER tests
 
 ---
 
@@ -645,13 +677,14 @@ These were environmental/infrastructure issues, not systemic code issues. The fi
 
 ## Audit Trail
 
-- **Run ID:** 20510970869
+- **Run ID:** 20513329971
 - **Repository:** Muk223/skeldir-2.0
 - **Branch:** main
-- **Commit:** 9dcf248f587cfe80cd27e788b33d280ace608c44
+- **Commit:** 82437f896991d46e6c24b159944cb2a475b8b139
 - **Workflow:** .github/workflows/r1-contract-runtime.yml
-- **Artifacts:** artifacts/runtime_r1/9dcf248f587cfe80cd27e788b33d280ace608c44/
+- **Artifacts:** artifacts/runtime_r1/82437f896991d46e6c24b159944cb2a475b8b139/
 - **Manifest:** ARTIFACT_MANIFEST.json (SHA256 of all files)
+- **Actions URL:** https://github.com/Muk223/skeldir-2.0/actions/runs/20513329971
 
 ---
 
