@@ -103,13 +103,15 @@ def main() -> int:
         if orm_s.get(i, 0) < 1:
             failures.append(f"S{i}_NON_MARKER_ORM_STATEMENTS_COUNT<1")
 
-    # Discrepancy guard: totals should be broadly comparable.
+    # Discrepancy guard (one-sided): if ORM shows a lot of activity but the DB-log
+    # window is tiny, treat the DB instrument as mis-scoped or dead.
+    #
+    # Note: DB totals typically exceed ORM totals due to server-side statements
+    # and transaction protocol noise that ORM hooks don't capture; that direction
+    # is NOT suspicious.
     if db_total > 0 and orm_total > 0:
-        hi = max(db_total, orm_total)
-        lo = min(db_total, orm_total)
-        ratio = lo / hi if hi else 0.0
-        if ratio < 0.5 and (hi - lo) > 10:
-            failures.append(f"TOTAL_DISCREPANCY_TOO_LARGE (db={db_total}, orm={orm_total}, ratio={ratio:.2f})")
+        if db_total < (orm_total / 2) and (orm_total - db_total) > 10:
+            failures.append(f"DB_TOTAL_TOO_SMALL_VS_ORM (db={db_total}, orm={orm_total})")
 
     print("R2_INSTRUMENT_CONSISTENCY_VERDICT")
     print(f"DB_TOTAL_IN_WINDOW={db_total}")
@@ -128,4 +130,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

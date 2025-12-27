@@ -404,9 +404,11 @@ jobs:
           fi
           python - <<'PY'
           import json
-          path = "${ARTIFACTS_DIR}/CANARY/db_canary_verdict.json"
-          with open(path, "r", encoding="utf-8") as f:
-            verdict = json.load(f)
+          import os
+          from pathlib import Path
+          artifacts_dir = Path(os.environ["ARTIFACTS_DIR"])
+          path = artifacts_dir / "CANARY" / "db_canary_verdict.json"
+          verdict = json.loads(path.read_text(encoding="utf-8"))
           match_count = int(verdict.get("match_count_destructive_on_immutable", 0))
           if match_count <= 0:
             raise SystemExit(f"FAIL: canary window did not produce destructive matches (match_count={match_count})")
@@ -491,8 +493,10 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
-          path = Path("${ARTIFACTS_DIR}/DB_CAPTURE/window_verdict.json")
+          artifacts_dir = Path(os.environ["ARTIFACTS_DIR"])
+          path = artifacts_dir / "DB_CAPTURE" / "window_verdict.json"
           if not path.exists():
             raise SystemExit("FAIL: missing DB window verdict json (did EG-R2-FIX-3 run?)")
           verdict = json.loads(path.read_text(encoding="utf-8"))
