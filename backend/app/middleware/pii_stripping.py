@@ -36,21 +36,34 @@ logger = logging.getLogger(__name__)
 
 # PII keys to detect and redact
 PII_KEYS: Set[str] = {
+    # DB-trigger blocklist (authoritative keys)
     "email",
+    "email_address",
     "phone",
-    "address",
-    "ip",
+    "phone_number",
     "ssn",
-    "credit_card",
-    "passport",
+    "social_security_number",
+    "ip_address",
+    "ip",
+    "first_name",
+    "last_name",
+    "full_name",
+    "address",
+    "street_address",
+    # Common vendor payload keys (defense-in-depth)
     "billing_address",
     "shipping_address",
     "customer_email",
     "customer_phone",
+    "receipt_email",
 }
 
+# Only strip PII at ingestion boundary to avoid breaking non-ingestion APIs
+# (e.g., auth/login legitimately accepts an email address).
+PII_STRIP_PATH_PREFIXES: tuple[str, ...] = ("/api/webhooks",)
 
-def redact_pii_recursive(data: Any, path: str = "root") -> tuple[Any, list[str]]:
+
+def strip_pii_keys_recursive(data: Any, path: str = "root") -> tuple[Any, list[str]]:
     """
     Recursively traverse data structure and redact PII values.
     
@@ -64,31 +77,31 @@ def redact_pii_recursive(data: Any, path: str = "root") -> tuple[Any, list[str]]
     redacted_keys = []
     
     if isinstance(data, dict):
-        redacted_dict = {}
+        sanitized: dict[str, Any] = {}
         for key, value in data.items():
             current_path = f"{path}.{key}"
             
-            # Check if key is PII
             if key.lower() in PII_KEYS:
-                redacted_dict[key] = "[REDACTED]"
+                # Remove the key entirely to satisfy key-based DB guardrails.
                 redacted_keys.append(current_path)
-            else:
-                # Recursively process nested structures
-                redacted_value, nested_redactions = redact_pii_recursive(value, current_path)
-                redacted_dict[key] = redacted_value
-                redacted_keys.extend(nested_redactions)
-        
-        return redacted_dict, redacted_keys
-    
-    elif isinstance(data, list):
-        redacted_list = []
-        for i, item in enumerate(data):
-            current_path = f"{path}[{i}]"
-            redacted_item, nested_redactions = redact_pii_recursive(item, current_path)
-            redacted_list.append(redacted_item)
+                continue
+
+            # Recursively process nested structures
+            sanitized_value, nested_redactions = strip_pii_keys_recursive(value, current_path)
+            sanitized[key] = sanitized_value
             redacted_keys.extend(nested_redactions)
         
-        return redacted_list, redacted_keys
+        return sanitized, redacted_keys
+    
+    elif isinstance(data, list):
+        sanitized_list: list[Any] = []
+        for i, item in enumerate(data):
+            current_path = f"{path}[{i}]"
+            sanitized_item, nested_redactions = strip_pii_keys_recursive(item, current_path)
+            sanitized_list.append(sanitized_item)
+            redacted_keys.extend(nested_redactions)
+        
+        return sanitized_list, redacted_keys
     
     else:
         # Scalar value - return as-is
@@ -117,6 +130,10 @@ class PIIStrippingMiddleware(BaseHTTPMiddleware):
         Returns:
             HTTP response from downstream handler
         """
+        # Only process ingestion-boundary requests.
+        if not any(request.url.path.startswith(prefix) for prefix in PII_STRIP_PATH_PREFIXES):
+            return await call_next(request)
+
         # Only process POST/PUT/PATCH requests with JSON content
         if request.method in ["POST", "PUT", "PATCH"]:
             content_type = request.headers.get("content-type", "")
@@ -125,6 +142,7 @@ class PIIStrippingMiddleware(BaseHTTPMiddleware):
                 try:
                     # Read request body
                     body = await request.body()
+                    setattr(request.state, "original_body", body)
                     
                     if body:
                         # Parse JSON
@@ -135,13 +153,14 @@ class PIIStrippingMiddleware(BaseHTTPMiddleware):
                             logger.warning("Invalid JSON in request body, skipping PII redaction")
                             return await call_next(request)
                         
-                        # Redact PII
-                        redacted_payload, redacted_keys = redact_pii_recursive(payload)
+                        # Strip PII keys
+                        redacted_payload, redacted_keys = strip_pii_keys_recursive(payload)
+                        setattr(request.state, "pii_redacted_paths", redacted_keys)
                         
                         # Log redaction events
                         if redacted_keys:
                             logger.info(
-                                f"PII redacted from request",
+                                "PII keys stripped from ingestion request",
                                 extra={
                                     "event_type": "pii_redaction",
                                     "path": request.url.path,
@@ -159,6 +178,8 @@ class PIIStrippingMiddleware(BaseHTTPMiddleware):
                             return {"type": "http.request", "body": redacted_body}
                         
                         request._receive = receive
+                        # Starlette caches request.body() on first read; override cache too.
+                        request._body = redacted_body
                 
                 except Exception as e:
                     logger.error(
@@ -175,4 +196,3 @@ class PIIStrippingMiddleware(BaseHTTPMiddleware):
         # Continue to next middleware/handler
         response = await call_next(request)
         return response
-

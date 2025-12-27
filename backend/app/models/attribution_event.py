@@ -17,6 +17,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
@@ -34,7 +35,7 @@ class AttributionEvent(Base, TenantMixin):
 
     Schema Source: db/schema/canonical_schema.sql:675-700
     RLS Enabled: Yes (tenant_id isolation via app.current_tenant_id)
-    Idempotency: Enforced via UNIQUE(idempotency_key)
+    Idempotency: Enforced via UNIQUE(tenant_id, idempotency_key)
     Channel Validation: FK to channel_taxonomy.code
 
     B0.4 Critical Columns:
@@ -71,7 +72,7 @@ class AttributionEvent(Base, TenantMixin):
 
     # Idempotency & Deduplication
     idempotency_key: Mapped[str] = mapped_column(
-        String(255), unique=True, index=True, nullable=False
+        String(255), index=True, nullable=False
     )
 
     # Event Classification
@@ -110,6 +111,11 @@ class AttributionEvent(Base, TenantMixin):
 
     # Table Constraints (replicated from canonical_schema.sql:696-699)
     __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "idempotency_key",
+            name="uq_attribution_events_tenant_idempotency_key",
+        ),
         CheckConstraint("revenue_cents >= 0", name="attribution_events_revenue_cents_check"),
         CheckConstraint(
             "processing_status IN ('pending', 'processed', 'failed')",

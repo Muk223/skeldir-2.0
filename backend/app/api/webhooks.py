@@ -8,6 +8,7 @@ Responsibilities:
 - Return 200 for success and DLQ-routed validation failures; 401 for signature/tenant failures
 """
 from datetime import datetime, timezone
+from decimal import Decimal
 from uuid import uuid4, uuid5, NAMESPACE_URL
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
@@ -19,6 +20,7 @@ from typing import Optional
 from app.core.config import settings
 from app.core.tenant_context import get_tenant_with_webhook_secrets
 from app.db.session import get_session
+from app.ingestion.dlq_handler import DLQHandler
 from app.ingestion.event_service import ingest_with_transaction
 from app.models import DeadEvent
 from app.schemas.webhooks_shopify import ShopifyOrderCreateRequest
@@ -68,6 +70,42 @@ async def tenant_secrets(request: Request):
 
 def _make_correlation_uuid(idempotency_key: str):
     return uuid5(NAMESPACE_URL, idempotency_key)
+
+
+def _pii_redacted_paths(request: Request) -> list[str]:
+    paths = getattr(request.state, "pii_redacted_paths", None)
+    if not paths:
+        return []
+    if isinstance(paths, list):
+        return [str(p) for p in paths]
+    return []
+
+
+async def _route_to_dlq_direct(
+    tenant_id,
+    source: str,
+    correlation_id: str,
+    payload: dict,
+    error_message: str,
+    error_type: str = "validation_error",
+):
+    async with get_session(tenant_id=tenant_id) as session:
+        handler = DLQHandler()
+        error: Exception
+        if error_type == "pii_violation":
+            # Trigger DLQHandler's PII classification (string match).
+            error = Exception(f"PII detected: {error_message}")
+        else:
+            error = ValueError(error_message)
+        dead = await handler.route_to_dlq(
+            session=session,
+            tenant_id=tenant_id,
+            original_payload=payload,
+            error=error,
+            correlation_id=correlation_id,
+            source=source,
+        )
+        return dead
 
 
 async def _handle_ingestion(tenant_id, event_data: dict, idempotency_key: str, source: str):
@@ -154,6 +192,7 @@ async def stripe_payment_intent_succeeded(
     request: Request,
     payload: StripePaymentIntentSucceededRequest = Body(...),
     stripe_signature: str = Header(None, alias="Stripe-Signature"),
+    x_idempotency_key: Optional[str] = Header(None, alias="X-Idempotency-Key"),
     tenant_info=Depends(tenant_secrets),
 ):
     raw_body = getattr(request.state, "original_body", None) or await request.body()
@@ -163,24 +202,183 @@ async def stripe_payment_intent_succeeded(
             content={"status": "invalid_signature", "vendor": "stripe"},
         )
 
-    if not payload.id:
+    if not payload.id and not x_idempotency_key:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing payment intent id")
 
-    idempotency_key = str(uuid5(NAMESPACE_URL, f"stripe_payment_intent_succeeded_{payload.id}"))
+    idempotency_key = x_idempotency_key or str(uuid5(NAMESPACE_URL, f"stripe_payment_intent_succeeded_{payload.id}"))
     set_business_correlation_id(idempotency_key)
     ts = datetime.fromtimestamp(payload.created) if payload.created else datetime.now(timezone.utc)
+    # Avoid float conversion issues; ingestion service converts Decimal-string -> cents.
+    revenue_amount = "0"
+    if payload.amount is not None:
+        revenue_amount = str((Decimal(payload.amount) / Decimal(100)).quantize(Decimal("0.01")))
     event_data = {
         "event_type": "purchase",
         "event_timestamp": ts.isoformat(),
-        "revenue_amount": str((payload.amount or 0) / 100),
+        "revenue_amount": revenue_amount,
         "currency": payload.currency.upper() if payload.currency else "USD",
-        "session_id": str(uuid5(NAMESPACE_URL, f"stripe:{payload.id}")),
+        "session_id": str(uuid5(NAMESPACE_URL, f"stripe:{payload.id or idempotency_key}")),
         "vendor": "stripe",
         "utm_source": "stripe",
         "external_event_id": payload.id,
         "correlation_id": str(_make_correlation_uuid(idempotency_key)),
     }
     return await _handle_ingestion(tenant_info["tenant_id"], event_data, idempotency_key, source="stripe")
+
+
+@router.post(
+    "/webhooks/stripe/payment_intent/succeeded",
+    response_model=WebhookResponse,
+    responses={401: {"model": WebhookErrorResponse}},
+)
+async def stripe_payment_intent_succeeded_v2(
+    request: Request,
+    payload: dict = Body(...),
+    stripe_signature: str = Header(None, alias="Stripe-Signature"),
+    x_idempotency_key: Optional[str] = Header(None, alias="X-Idempotency-Key"),
+    tenant_info=Depends(tenant_secrets),
+):
+    """
+    Stripe payment_intent.succeeded webhook (contract path).
+
+    R3 semantics:
+    - Signature/tenant failures: 401 (never DLQ)
+    - PII present (keys stripped by middleware): DLQ with sanitized payload, no canonical insert
+    - Malformed payload: DLQ with sanitized payload, no canonical insert
+    - Duplicate valid events: idempotent success (no 5xx)
+    """
+    raw_body = getattr(request.state, "original_body", None) or await request.body()
+    if not verify_stripe_signature(raw_body, tenant_info["stripe_webhook_secret"], stripe_signature):
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"status": "invalid_signature", "vendor": "stripe"},
+        )
+
+    idempotency_key = x_idempotency_key
+    pi_id = None
+    amount_cents = None
+    currency = None
+    created_epoch = None
+    event_id = None
+    try:
+        event_id = payload.get("id")
+        created_epoch = payload.get("created")
+        obj = (payload.get("data") or {}).get("object") or {}
+        pi_id = obj.get("id")
+        amount_cents = obj.get("amount")
+        currency = obj.get("currency")
+        if not idempotency_key and pi_id:
+            idempotency_key = str(uuid5(NAMESPACE_URL, f"stripe_payment_intent_succeeded_{pi_id}"))
+    except Exception:
+        # Handled as malformed below (routes to DLQ).
+        pass
+
+    if not idempotency_key:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"status": "missing_idempotency_key", "vendor": "stripe"},
+        )
+
+    set_business_correlation_id(idempotency_key)
+    correlation_uuid = str(_make_correlation_uuid(idempotency_key))
+
+    pii_paths = _pii_redacted_paths(request)
+    if pii_paths:
+        dead = await _route_to_dlq_direct(
+            tenant_id=tenant_info["tenant_id"],
+            source="stripe",
+            correlation_id=correlation_uuid,
+            payload={
+                "event_type": "purchase",
+                "vendor": "stripe",
+                "idempotency_key": idempotency_key,
+                "correlation_id": correlation_uuid,
+                "vendor_payload": payload,
+                "pii_redacted_paths": pii_paths,
+            },
+            error_message="PII keys detected and stripped at ingestion boundary",
+            error_type="pii_violation",
+        )
+        return {
+            "status": "dlq_routed",
+            "dead_event_id": str(dead.id),
+            "error": "pii_violation",
+        }
+
+    # Validate minimal required shape; route any failure to DLQ (never 5xx)
+    try:
+        if not isinstance(created_epoch, int):
+            raise ValueError("created must be an integer unix timestamp")
+        if not isinstance(amount_cents, int):
+            raise ValueError("amount must be an integer cents value")
+        if not isinstance(currency, str) or len(currency) != 3:
+            raise ValueError("currency must be a 3-letter code")
+        if not pi_id or not isinstance(pi_id, str):
+            raise ValueError("payment_intent id is required")
+    except Exception as e:
+        dead = await _route_to_dlq_direct(
+            tenant_id=tenant_info["tenant_id"],
+            source="stripe",
+            correlation_id=correlation_uuid,
+            payload={
+                "event_type": "purchase",
+                "vendor": "stripe",
+                "idempotency_key": idempotency_key,
+                "correlation_id": correlation_uuid,
+                "vendor_payload": payload,
+            },
+            error_message=str(e),
+            error_type="validation_error",
+        )
+        return {
+            "status": "dlq_routed",
+            "dead_event_id": str(dead.id),
+            "error": "validation_error",
+        }
+
+    ts = datetime.fromtimestamp(created_epoch, tz=timezone.utc)
+    revenue_amount = str((Decimal(amount_cents) / Decimal(100)).quantize(Decimal("0.01")))
+    event_data = {
+        "event_type": "purchase",
+        "event_timestamp": ts.isoformat(),
+        "revenue_amount": revenue_amount,
+        "currency": currency.upper(),
+        "session_id": str(uuid5(NAMESPACE_URL, f"stripe:{idempotency_key}")),
+        "vendor": "stripe",
+        "utm_source": "stripe",
+        "external_event_id": pi_id,
+        "correlation_id": correlation_uuid,
+        "vendor_payload": payload,
+    }
+
+    result = await ingest_with_transaction(
+        tenant_id=tenant_info["tenant_id"],
+        event_data={**event_data, "idempotency_key": idempotency_key},
+        idempotency_key=idempotency_key,
+        source="stripe",
+    )
+
+    if result.get("status") == "success":
+        return {
+            "status": "success",
+            "event_id": result.get("event_id"),
+            "idempotency_key": idempotency_key,
+            "channel": result.get("channel"),
+        }
+
+    # Validation errors routed to DLQ by service: locate via correlation_id for response
+    async with get_session(tenant_id=tenant_info["tenant_id"]) as session:
+        from sqlalchemy import select
+        res = await session.execute(
+            select(DeadEvent).where(DeadEvent.correlation_id == uuid5(NAMESPACE_URL, idempotency_key))
+        )
+        dead_event = res.scalar_one_or_none()
+
+    return {
+        "status": "dlq_routed",
+        "dead_event_id": str(dead_event.id) if dead_event else None,
+        "error": result.get("error_type") or result.get("error"),
+    }
 
 
 @router.post(

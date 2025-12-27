@@ -64,6 +64,26 @@ def upgrade() -> None:
     2. GRANT SELECT TO app_ro
     3. REVOKE ALL FROM PUBLIC
     """
+
+    # Ensure roles exist so a clean-room bootstrap can run without external provisioning.
+    # Postgres lacks CREATE ROLE IF NOT EXISTS, so we use a DO block.
+    op.execute(
+        """
+        DO $$
+        BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_user') THEN
+            CREATE ROLE app_user;
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_rw') THEN
+            CREATE ROLE app_rw;
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'app_ro') THEN
+            CREATE ROLE app_ro;
+          END IF;
+        END
+        $$;
+        """
+    )
     
     # Grant permissions on tenant-scoped tables
     for table_name in TENANT_SCOPED_TABLES:

@@ -14,10 +14,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import routers
-from app.api import auth, attribution, health
+from app.api import auth, attribution, health, webhooks
 
 # Import middleware - Phase G: Active Privacy Defense
 from app.middleware import PIIStrippingMiddleware
+from app.middleware.observability import ObservabilityMiddleware
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -33,6 +34,9 @@ app = FastAPI(
 # Must be added BEFORE other middleware to ensure PII is stripped first
 app.add_middleware(PIIStrippingMiddleware)
 
+# Observability middleware: correlation ID context + response header echo
+app.add_middleware(ObservabilityMiddleware)
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -46,6 +50,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(attribution.router, prefix="/api/attribution", tags=["Attribution"])
 app.include_router(health.router, tags=["Health"])
+app.include_router(webhooks.router, prefix="/api", tags=["Webhooks"])
 
 # Health check endpoint (out-of-scope per contract_scope.yaml)
 @app.get("/health")

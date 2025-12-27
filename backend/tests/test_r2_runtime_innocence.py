@@ -213,6 +213,7 @@ class TestR2RuntimeInnocence:
                 # Check for a non-existent event (SELECT only)
                 result = await service._check_duplicate(
                     session=session,
+                    tenant_id=tenant_id,
                     idempotency_key="nonexistent_key_for_r2_test",
                 )
                 assert result is None

@@ -13,6 +13,7 @@ Related Documents:
 """
 
 import logging
+import hashlib
 from typing import Optional
 from uuid import UUID
 
@@ -20,12 +21,63 @@ from fastapi import Request, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
+from app.db.session import engine
+
 logger = logging.getLogger(__name__)
 
 
 class TenantContextError(Exception):
     """Raised when tenant context cannot be derived or is invalid."""
     pass
+
+
+async def get_tenant_with_webhook_secrets(api_key: str) -> dict:
+    """
+    Resolve tenant identity and webhook secrets by tenant API key.
+
+    Webhook ingress (B0.4) uses a tenant-scoped API key header to select the tenant
+    and verify vendor signatures deterministically.
+
+    Returns:
+        dict with keys: tenant_id (UUID), shopify_webhook_secret, stripe_webhook_secret,
+        paypal_webhook_secret, woocommerce_webhook_secret
+
+    Raises:
+        HTTPException(401): if the key is missing/unknown
+    """
+    if not api_key or not api_key.strip():
+        raise HTTPException(status_code=401, detail={"status": "invalid_tenant_key"})
+
+    api_key_hash = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+    async with engine.connect() as conn:
+        res = await conn.execute(
+            text(
+                """
+                SELECT
+                  id AS tenant_id,
+                  shopify_webhook_secret,
+                  stripe_webhook_secret,
+                  paypal_webhook_secret,
+                  woocommerce_webhook_secret
+                FROM tenants
+                WHERE api_key_hash = :api_key_hash
+                LIMIT 1
+                """
+            ),
+            {"api_key_hash": api_key_hash},
+        )
+        row = res.mappings().first()
+
+    if not row:
+        raise HTTPException(status_code=401, detail={"status": "invalid_tenant_key"})
+
+    return {
+        "tenant_id": UUID(str(row["tenant_id"])),
+        "shopify_webhook_secret": row.get("shopify_webhook_secret"),
+        "stripe_webhook_secret": row.get("stripe_webhook_secret"),
+        "paypal_webhook_secret": row.get("paypal_webhook_secret"),
+        "woocommerce_webhook_secret": row.get("woocommerce_webhook_secret"),
+    }
 
 
 def derive_tenant_id_from_request(request: Request) -> Optional[UUID]:
@@ -187,7 +239,6 @@ async def tenant_context_middleware(request: Request, call_next):
         # SET LOCAL is automatically cleared on transaction end
         # Explicit rollback not needed unless we want to ensure cleanup
         pass
-
 
 
 

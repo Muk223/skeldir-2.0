@@ -1,0 +1,185 @@
+# R3 — Ingestion Under Fire (Idempotency + DLQ + PII)
+#
+# Runs an adversarial HTTP load harness against a real FastAPI + Postgres stack
+# in CI, then verifies DB truth invariants (no duplicates, deterministic DLQ,
+# no PII persistence) purely from CI logs.
+
+name: "R3: Ingestion Under Fire"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/**'
+      - 'alembic/**'
+      - 'scripts/r3/**'
+      - '.github/workflows/r3-ingestion-under-fire.yml'
+
+jobs:
+  r3-ingestion-under-fire:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      pull-requests: write
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: r3
+          POSTGRES_PASSWORD: r3
+          POSTGRES_DB: r3
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U r3 -d r3"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      CI: "true"
+      PYTHONPATH: backend
+      TENANT_API_KEY_HEADER: X-Skeldir-Tenant-Key
+      DATABASE_URL: postgresql://r3:r3@127.0.0.1:5432/r3
+      MIGRATION_DATABASE_URL: postgresql://r3:r3@127.0.0.1:5432/r3
+      DATABASE_POOL_SIZE: "30"
+      DATABASE_MAX_OVERFLOW: "80"
+      R3_DATABASE_URL: postgresql://r3:r3@127.0.0.1:5432/r3
+      R3_API_BASE_URL: http://127.0.0.1:8000
+      R3_LADDER: "50,250,1000"
+      R3_CONCURRENCY: "200"
+      R3_TIMEOUT_S: "10"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+
+      - name: Setup Python
+        uses: actions/setup-python@82c7e631bb3cdc910f68e0081d67478d79c6982d
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+
+      - name: Run migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          alembic upgrade heads
+
+      - name: Start API
+        shell: bash
+        run: |
+          set -euo pipefail
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > uvicorn.log 2>&1 &
+
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
+              echo "API is healthy"
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "API failed to become healthy"
+          echo "---- uvicorn.log ----"
+          tail -n 200 uvicorn.log || true
+          exit 1
+
+      - name: Run R3 harness
+        id: r3_harness
+        continue-on-error: true
+        shell: bash
+        env:
+          CANDIDATE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python scripts/r3/ingestion_under_fire.py | tee r3_harness.log
+
+      - name: Render R3 summary (candidate-anchored)
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          python scripts/r3/render_r3_summary.py \
+            --log r3_harness.log \
+            --out docs/validation/runtime/r3_summary.md \
+            --candidate-sha "${GITHUB_SHA}" \
+            --run-url "${RUN_URL}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload R3 logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r3-runtime-logs-${{ github.sha }}
+          path: |
+            r3_harness.log
+            uvicorn.log
+
+      - name: EG-R3-FIX-1: Hard gate (harness must succeed)
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.r3_harness.outcome }}" != "success" ]; then
+            echo "FAIL: harness step outcome=${{ steps.r3_harness.outcome }}"
+            exit 1
+          fi
+          echo "PASS: harness step outcome=success"
+
+      - name: Open PR to anchor proof in repo
+        if: steps.r3_harness.outcome == 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- docs/validation/runtime/r3_summary.md; then
+            echo "No r3_summary changes to commit."
+            exit 0
+          fi
+
+          BRANCH="ci/r3-proof-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${BRANCH}"
+          git add docs/validation/runtime/r3_summary.md
+          git commit -m "docs: anchor R3 proof for ${GITHUB_SHA}"
+
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push origin "${BRANCH}"
+
+          RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          TITLE="R3 proof: ${GITHUB_SHA}"
+          BODY="Anchors R3 completion evidence for candidate SHA ${GITHUB_SHA}.\n\nCI run: ${RUN_URL}"
+          export TITLE BRANCH BODY
+          python - <<'PY' > pr.json
+          import json, os
+          title = os.environ["TITLE"]
+          head = os.environ["BRANCH"]
+          base = "main"
+          body = os.environ["BODY"]
+          print(json.dumps({"title": title, "head": head, "base": base, "body": body}))
+          PY
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls" \
+            -d @pr.json \
+            >/dev/null || true
+          echo "Opened PR for ${BRANCH}"
+
+      - name: Dump server logs on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "---- uvicorn.log ----"
+          tail -n 300 uvicorn.log || true

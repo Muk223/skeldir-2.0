@@ -89,7 +89,7 @@ class EventIngestionService:
             Database UNIQUE constraint enforces deduplication at persistence layer.
         """
         # 1. Idempotency check - return existing event if duplicate
-        existing = await self._check_duplicate(session, idempotency_key)
+        existing = await self._check_duplicate(session, tenant_id, idempotency_key)
         if existing:
             logger.info(
                 "duplicate_event_detected",
@@ -221,8 +221,43 @@ class EventIngestionService:
             ).observe(duration)
             raise  # Re-raise to signal failure to caller
 
+        except IntegrityError as e:
+            # Idempotency races: concurrent inserts may bypass the pre-check.
+            msg = str(e).lower()
+            is_duplicate = (
+                "duplicate key value violates unique constraint" in msg
+                and ("idempotency" in msg or "uq_attribution_events_tenant_idempotency_key" in msg)
+            )
+            if not is_duplicate:
+                raise
+
+            await session.rollback()
+            existing_after_race = await self._check_duplicate(session, tenant_id, idempotency_key)
+            if existing_after_race:
+                logger.info(
+                    "duplicate_event_detected_race",
+                    extra={
+                        "event": "duplicate_event_detected_race",
+                        "idempotency_key": idempotency_key,
+                        "existing_event_id": str(existing_after_race.id),
+                        "tenant_id": str(tenant_id),
+                        "vendor": event_data.get("vendor", source),
+                        "event_type": event_data.get("event_type"),
+                        **log_context(),
+                    },
+                )
+                events_duplicate_total.labels(
+                    tenant_id=str(tenant_id),
+                    vendor=event_data.get("vendor", source),
+                    event_type=event_data.get("event_type", "unknown"),
+                    error_type="duplicate_race",
+                ).inc()
+                return existing_after_race
+
+            raise
+
     async def _check_duplicate(
-        self, session: AsyncSession, idempotency_key: str
+        self, session: AsyncSession, tenant_id: UUID, idempotency_key: str
     ) -> Optional[AttributionEvent]:
         """
         Check if event with given idempotency key already exists.
@@ -239,7 +274,8 @@ class EventIngestionService:
         """
         result = await session.execute(
             select(AttributionEvent).where(
-                AttributionEvent.idempotency_key == idempotency_key
+                AttributionEvent.tenant_id == tenant_id,
+                AttributionEvent.idempotency_key == idempotency_key,
             )
         )
         return result.scalar_one_or_none()
@@ -361,7 +397,12 @@ class EventIngestionService:
             error = Exception(error_message)
 
         # Use enhanced DLQHandler for routing with classification
-        correlation_id = event_data.get("idempotency_key") or event_data.get("external_event_id") or str(uuid4())
+        correlation_id = (
+            event_data.get("correlation_id")
+            or event_data.get("idempotency_key")
+            or event_data.get("external_event_id")
+            or str(uuid4())
+        )
 
         dead_event = await self.dlq_handler.route_to_dlq(
             session=session,
@@ -442,6 +483,30 @@ async def ingest_with_transaction(
             }
 
         except IntegrityError as e:
+            # Idempotency races can surface here if callers bypass service-level handling.
+            msg = str(e).lower()
+            is_duplicate = (
+                "duplicate key value violates unique constraint" in msg
+                and ("idempotency" in msg or "uq_attribution_events_tenant_idempotency_key" in msg)
+            )
+            if is_duplicate:
+                await session.rollback()
+                from sqlalchemy import select
+                res = await session.execute(
+                    select(AttributionEvent).where(
+                        AttributionEvent.tenant_id == tenant_id,
+                        AttributionEvent.idempotency_key == idempotency_key,
+                    )
+                )
+                existing = res.scalar_one_or_none()
+                if existing:
+                    return {
+                        "status": "success",
+                        "event_id": str(existing.id),
+                        "channel": existing.channel,
+                        "idempotency_key": existing.idempotency_key,
+                    }
+
             # Database constraint violation (should be rare with validation)
             await session.rollback()
             logger.error(
