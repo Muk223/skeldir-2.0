@@ -86,11 +86,15 @@ jobs:
           EOF
 
           # Closed set: tenant-scoped tables (ENABLE RLS)
-          TENANT_TABLES=$(grep -E "^ALTER TABLE .* ENABLE ROW LEVEL SECURITY" db/schema/canonical_schema.sql \
-            | sed 's/^ALTER TABLE public\\.//' \
-            | sed 's/ ENABLE ROW LEVEL SECURITY;//' \
-            | sort -u)
-          echo "$TENANT_TABLES" > "$ARTIFACTS_DIR/CLOSED_SET_TENANT_TABLES.txt"
+          python - <<'PY' > "$ARTIFACTS_DIR/CLOSED_SET_TENANT_TABLES.txt"
+          import re
+          from pathlib import Path
+          text = Path("db/schema/canonical_schema.sql").read_text(encoding="utf-8", errors="replace").splitlines()
+          pat = re.compile(r"^\s*ALTER\s+TABLE(?:\s+ONLY)?\s+public\.([a-zA-Z0-9_]+)\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY\s*;\s*$")
+          tables = sorted({m.group(1) for line in text if (m := pat.search(line))})
+          for t in tables:
+            print(t)
+          PY
 
           # Closed set: immutable tables (prevent_mutation triggers)
           IMMUTABLE_TABLES=$(grep -E "trg_.*_prevent_mutation" db/schema/canonical_schema.sql \
@@ -223,19 +227,26 @@ jobs:
 
           LOG_STATEMENT=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SHOW log_statement;" | tr -d ' ')
           LOG_DESTINATION=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SHOW log_destination;" | tr -d ' ')
+          LOGGING_COLLECTOR=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SHOW logging_collector;" | tr -d ' ')
 
           echo "EG_R2_FIX_2_DB_CAPTURE_ENABLEMENT_PROOF" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "SHOW_log_statement=$LOG_STATEMENT" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "SHOW_log_destination=$LOG_DESTINATION" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "SHOW_logging_collector=$LOGGING_COLLECTOR" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "END_PROOF" | tee -a "$GITHUB_STEP_SUMMARY"
 
           {
             echo "log_statement=$LOG_STATEMENT"
             echo "log_destination=$LOG_DESTINATION"
+            echo "logging_collector=$LOGGING_COLLECTOR"
           } > "$ARTIFACTS_DIR/DB_CAPTURE_PROOF/db_logging_config.txt"
 
           if [ "$LOG_STATEMENT" != "all" ]; then
             echo "FAIL: expected log_statement=all" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if [ "$LOGGING_COLLECTOR" != "off" ]; then
+            echo "FAIL: expected logging_collector=off (must log to stderr for docker logs capture)" | tee -a "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
 
@@ -257,7 +268,7 @@ jobs:
           echo "RLS_STATUS_BEGIN"
           while IFS= read -r table; do
             [ -z "$table" ] && continue
-            row=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname='${table}';" | tr -d ' ')
+            row=$(docker exec skeldir-r2-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t -A -c "SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE oid=('public.${table}'::regclass);" | tr -d ' ')
             echo "${table}=${row}"
             if ! echo "$row" | grep -q "t|t"; then
               FAILURES+=("RLS_NOT_ENFORCED:${table}=${row}")
@@ -283,7 +294,7 @@ jobs:
           SELECT COUNT(*) FROM attribution_events WHERE tenant_id = '22222222-2222-2222-2222-222222222222';
           EOSQL
           docker cp /tmp/r2_cross_tenant.sql skeldir-r2-postgres:/tmp/r2_cross_tenant.sql
-          cross_count=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -t -f /tmp/r2_cross_tenant.sql 2>&1 | tr -d ' ')
+          cross_count=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -q -t -A -f /tmp/r2_cross_tenant.sql 2>&1 | tail -n 1 | tr -d ' ')
           echo "CROSS_TENANT_B_ROWS_VISIBLE_TO_A=${cross_count}"
           if ! echo "$cross_count" | grep -qE '^[0]+$'; then
             FAILURES+=("CROSS_TENANT_DENIAL_FAILED:count=${cross_count}")
@@ -308,7 +319,7 @@ jobs:
           EOSQL
           docker cp /tmp/r2_pii_fail.sql skeldir-r2-postgres:/tmp/r2_pii_fail.sql
           pii_result=$(docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -f /tmp/r2_pii_fail.sql 2>&1 || true)
-          echo "PII_INSERT_ATTEMPT_RESULT=$(echo "$pii_result" | head -1)"
+          echo "PII_INSERT_ATTEMPT_ERROR_SNIPPET=$(echo "$pii_result" | grep -i -m1 -E \"PII key detected|guardrail|ERROR\" || true)"
           if ! echo "$pii_result" | grep -qiE "pii|guardrail|not allowed|violat"; then
             FAILURES+=("PII_GUARDRAIL_NOT_ENFORCED")
           fi
@@ -376,7 +387,7 @@ jobs:
           docker exec -e PGPASSWORD=r2_app_password skeldir-r2-postgres psql -U r2_app_role -d $POSTGRES_DB -c \
             "SELECT 'R2_WINDOW_END::${R2_CANDIDATE_SHA}::${R2_CANARY_WINDOW_ID}';" >/dev/null 2>&1 || true
 
-          docker logs skeldir-r2-postgres 2>&1 > "$ARTIFACTS_DIR/CANARY/postgres_full_log.txt"
+          docker logs skeldir-r2-postgres > "$ARTIFACTS_DIR/CANARY/postgres_full_log.txt" 2>&1
 
           set +e
           python scripts/r2/db_log_window_audit.py \
@@ -454,7 +465,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$ARTIFACTS_DIR/DB_CAPTURE"
 
-          docker logs skeldir-r2-postgres 2>&1 > "$ARTIFACTS_DIR/DB_CAPTURE/postgres_full_log.txt"
+          docker logs skeldir-r2-postgres > "$ARTIFACTS_DIR/DB_CAPTURE/postgres_full_log.txt" 2>&1
 
           echo "R2_DB_LOG_HEAD_200_LINES" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "\`\`\`" | tee -a "$GITHUB_STEP_SUMMARY"
@@ -623,4 +634,3 @@ jobs:
           name: r2-validation-artifacts-${{ github.sha }}
           path: ${{ github.workspace }}/artifacts/runtime_r2/
           retention-days: 90
-

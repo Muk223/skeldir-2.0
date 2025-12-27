@@ -88,19 +88,56 @@ class StatementEvent:
 
 def extract_statement_events(lines: Iterable[str]) -> List[StatementEvent]:
     events: List[StatementEvent] = []
+    pending_multiline: dict | None = None
+
+    def _flush_pending() -> None:
+        nonlocal pending_multiline
+        if not pending_multiline:
+            return
+        sql = "\n".join(pending_multiline["sql_lines"]).strip()
+        if sql:
+            events.append(
+                StatementEvent(
+                    line_no=pending_multiline["line_no"],
+                    raw_line=pending_multiline["raw_line"],
+                    sql=sql,
+                )
+            )
+        pending_multiline = None
+
     for idx, line in enumerate(lines, start=1):
+        # If we were in a multiline EXECUTE statement, terminate it when we hit a new
+        # log record line (LOG/DETAIL/ERROR/STATEMENT prefixes) and then re-process
+        # the current line normally.
+        if pending_multiline and re.search(r"\b(?:LOG|DETAIL|ERROR|STATEMENT):", line):
+            _flush_pending()
+
         match = STATEMENT_EVENT_RE.search(line)
         if match:
             sql = match.group("statement") or match.group("execute") or ""
+            # Postgres may emit multiline statements for EXECUTE, logging only the
+            # "execute <name>:" line and then printing the SQL on subsequent
+            # indented lines without a LOG prefix.
+            if match.group("execute") is not None and not sql.strip():
+                pending_multiline = {
+                    "line_no": idx,
+                    "raw_line": line.rstrip("\n"),
+                    "sql_lines": [],
+                }
+                continue
         else:
             match_err = ERROR_STATEMENT_RE.search(line)
             if not match_err:
+                if pending_multiline:
+                    pending_multiline["sql_lines"].append(line.rstrip("\n"))
                 continue
             sql = match_err.group("statement") or ""
         sql = sql.strip()
         if not sql:
             continue
         events.append(StatementEvent(line_no=idx, raw_line=line.rstrip("\n"), sql=sql))
+
+    _flush_pending()
     return events
 
 
@@ -159,6 +196,7 @@ def audit(
                 "candidate_sha": candidate_sha,
                 "window_id": window_id,
                 "num_scenarios": num_scenarios,
+                "total_statement_events_parsed": len(events),
                 "window_found": False,
                 "failures": failures,
             },
@@ -172,6 +210,7 @@ def audit(
                 "candidate_sha": candidate_sha,
                 "window_id": window_id,
                 "num_scenarios": num_scenarios,
+                "total_statement_events_parsed": len(events),
                 "window_found": True,
                 "failures": failures,
             },
