@@ -1,11 +1,20 @@
 # R2 Data-Truth Hardening: Execution Summary
 
-## Empirical Completion Anchor
+## Previous Anchor (Invalidated)
+
+This document previously claimed R2 was empirically complete on a historical run/SHA.
+That claim is **invalidated** by the follow-up R2 hardening requirements:
+
+- Scenario suite must be a strict hard gate (`SCENARIOS_PASSED == SCENARIOS_EXECUTED`).
+- DB statement capture must be **window-delimited + per-scenario verified** (no “representative window” ambiguity).
+- Canary must prove detectors fail when injected and pass after removal.
+
+Run a fresh `R2: Data-Truth Hardening` CI job on the candidate SHA and update this document with the new run URL + SHA once all strengthened gates pass.
 
 | Field | Value |
 |-------|-------|
-| **Passing Run ID** | [20514240955](https://github.com/Muk223/skeldir-2.0/actions/runs/20514240955) |
-| **Commit SHA** | `e25126e` |
+| **Historical Run ID (invalidated)** | [20514240955](https://github.com/Muk223/skeldir-2.0/actions/runs/20514240955) |
+| **Historical Commit SHA (invalidated)** | `e25126e` |
 | **Workflow File** | `.github/workflows/r2-data-truth-hardening.yml` |
 | **Completion Time** | 2025-12-26T02:08:56Z |
 | **Duration** | 16 seconds |
@@ -15,7 +24,7 @@
 
 ## Independent Verification Guide
 
-### Step 1: Verify the Passing Run
+### Step 1: Inspect the Historical Run (invalidated)
 
 ```bash
 # Verify run status
@@ -286,17 +295,17 @@ docker exec r2-postgres psql -U skeldir_r2_test -d skeldir_r2_test -c "
 
 ---
 
-## Conclusion
+## Conclusion (Pending)
 
-R2 Data-Truth Hardening is **EMPIRICALLY COMPLETE**.
+R2 Data-Truth Hardening is **NOT YET COMPLETE** under the strengthened R2 acceptance criteria.
 
 The mission "truth is protected at runtime" is proven through:
 
 1. **DB prevents violations:** RLS policies, triggers, and privileges block unauthorized access
 2. **Application never attempts destructive writes:** Static analysis confirms no UPDATE/DELETE patterns in production code
 
-All 8 exit gates passed. Both closure gates (EG-R2-5, EG-R2-6) passed.
+Run the updated `R2: Data-Truth Hardening` workflow and replace this section with the new run URL + SHA once the strengthened gates pass.
 
 ---
 
-*Generated: 2025-12-26 | Run: 20514240955 | SHA: e25126e*
+*Generated: 2025-12-26 (historical) | Run: 20514240955 | SHA: e25126e*

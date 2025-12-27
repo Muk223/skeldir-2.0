@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict JXmJ9vpbHedQC3t57G5CXyIKuMKTry5LxMMu3pxsznvpvf5OKEo13QqtCgXaTGc
+-- \restrict JXmJ9vpbHedQC3t57G5CXyIKuMKTry5LxMMu3pxsznvpvf5OKEo13QqtCgXaTGc
 
 -- Dumped from database version 15.15 (9c546df)
 -- Dumped by pg_dump version 18.0
@@ -10,7 +10,7 @@
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
+-- SET transaction_timeout = 0; -- not supported on Postgres 15 (pg_dump v18 emits this)
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -3019,5 +3019,5 @@ COMMENT ON POLICY tenant_isolation_policy ON public.revenue_state_transitions IS
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JXmJ9vpbHedQC3t57G5CXyIKuMKTry5LxMMu3pxsznvpvf5OKEo13QqtCgXaTGc
+-- \unrestrict JXmJ9vpbHedQC3t57G5CXyIKuMKTry5LxMMu3pxsznvpvf5OKEo13QqtCgXaTGc
 

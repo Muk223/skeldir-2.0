@@ -10,6 +10,7 @@ Related Documents:
 - db/docs/channel_contract.md (Channel governance contract)
 """
 
+import json
 from uuid import UUID
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -225,17 +226,16 @@ def correct_assignment(
         )
     
     # Validate entity exists and belongs to tenant
-    if entity_type == 'allocation':
-        table_name = 'attribution_allocations'
-        column_name = 'channel_code'
-    else:  # entity_type == 'event'
-        table_name = 'attribution_events'
-        column_name = 'channel'
-    
-    entity_result = session.execute(
-        text(f"SELECT tenant_id, {column_name} FROM {table_name} WHERE id = :id"),
-        {"id": str(entity_id)}
-    ).fetchone()
+    if entity_type == "allocation":
+        entity_result = session.execute(
+            text("SELECT tenant_id, channel_code FROM attribution_allocations WHERE id = :id"),
+            {"id": str(entity_id)},
+        ).fetchone()
+    else:  # entity_type == "event"
+        entity_result = session.execute(
+            text("SELECT tenant_id, channel FROM attribution_events WHERE id = :id"),
+            {"id": str(entity_id)},
+        ).fetchone()
     
     if not entity_result:
         raise EntityNotFoundError(f"{entity_type.capitalize()} with id '{entity_id}' not found")
@@ -268,12 +268,37 @@ def correct_assignment(
         {"reason": reason}
     )
     
-    # Update assignment (trigger will log correction)
     try:
-        session.execute(
-            text(f"UPDATE {table_name} SET {column_name} = :to_channel WHERE id = :id"),
-            {"to_channel": to_channel, "id": str(entity_id)}
-        )
+        if entity_type == "allocation":
+            # attribution_allocations is mutable; its trigger logs to channel_assignment_corrections.
+            session.execute(
+                text("UPDATE attribution_allocations SET channel_code = :to_channel WHERE id = :id"),
+                {"to_channel": to_channel, "id": str(entity_id)},
+            )
+        else:
+            # attribution_events is immutable by schema; record an append-only correction.
+            session.execute(
+                text(
+                    """
+                    INSERT INTO channel_assignment_corrections (
+                        tenant_id, entity_type, entity_id,
+                        from_channel, to_channel, corrected_by, reason, metadata
+                    ) VALUES (
+                        :tenant_id, 'event', :entity_id,
+                        :from_channel, :to_channel, :corrected_by, :reason, :metadata::jsonb
+                    )
+                    """
+                ),
+                {
+                    "tenant_id": str(tenant_id),
+                    "entity_id": str(entity_id),
+                    "from_channel": str(current_channel),
+                    "to_channel": to_channel,
+                    "corrected_by": corrected_by,
+                    "reason": reason,
+                    "metadata": json.dumps(metadata or {}),
+                },
+            )
         session.commit()
     except IntegrityError as e:
         session.rollback()
@@ -283,7 +308,4 @@ def correct_assignment(
         session.execute(text("RESET app.current_tenant_id"))
         session.execute(text("RESET app.correction_by"))
         session.execute(text("RESET app.correction_reason"))
-
-
-
 

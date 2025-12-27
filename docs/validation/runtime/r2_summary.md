@@ -10,20 +10,20 @@ Prove "truth is protected at runtime" with two simultaneous guarantees:
 
 | Level | Gate | Description |
 |-------|------|-------------|
-| **PRIMARY BLOCKER** | EG-R2-FIX-3 | Runtime innocence via DB statement capture (Postgres logs) |
+| **PRIMARY BLOCKER** | EG-R2-FIX-A | Runtime innocence via DB statement capture (Postgres logs) |
 | **CO-PRIMARY BLOCKER** | EG-R2-FIX-4 | Static behavioral innocence (whole-repo analysis) |
 | Anti-Theater | EG-R2-FIX-5 | Canary injection proves detector is not broken |
 
 **Critical:**
-- Both EG-R2-FIX-3 (runtime via DB logs) AND EG-R2-FIX-4 (static) must pass
+- Both EG-R2-FIX-A (runtime via DB logs) AND EG-R2-FIX-4 (static) must pass
 - Runtime testing is probabilistic - static audit covers latent code paths
 - App/ORM layer hooks (SQLAlchemy) are NEVER authoritative - only DB logs are
 
 ### What This Means
 
-1. **EG-R2-FIX-3 (DB Logs)**: Parses actual Postgres server logs (`log_statement=all`). Counts all statements that hit the DB. MATCH_COUNT=0 for destructive on immutable AND TOTAL_STATEMENTS>0 required.
+1. **EG-R2-FIX-A (DB Logs)**: Parses actual Postgres server logs (`log_statement=all`) with **window + per-scenario delimiters**. Requires markers present, each scenario has ≥1 non-marker statement, and `MATCH_COUNT_DESTRUCTIVE_ON_IMMUTABLE=0`.
 
-2. **EG-R2-FIX-4 (Static Audit)**: Whole-repo grep for UPDATE/DELETE/TRUNCATE on immutable tables. Proves no latent code paths exist that could produce violations.
+2. **EG-R2-FIX-4 (Static Audit)**: Whole-repo scan (AST + literal SQL) for destructive patterns/constructs targeting immutable tables, with an explicit scope manifest + scope hash.
 
 3. **EG-R2-FIX-5 (Canary)**: Injects deliberate violations, verifies detector catches them, removes them. Proves the static detector is not broken (anti-theater).
 
@@ -37,24 +37,29 @@ Prove "truth is protected at runtime" with two simultaneous guarantees:
 | EG-R2-3 | PII defense-in-depth (DB trigger enforcement) | PASS |
 | EG-R2-4 | DB immutability enforcement (UPDATE/DELETE denied) | PASS |
 | EG-R2-FIX-1 | DB capture enablement proof (log_statement=all) | PASS |
-| EG-R2-FIX-2 | Runtime scenario suite (6 scenarios executed) | PASS |
-| **EG-R2-FIX-3** | **Runtime innocence via DB logs (PRIMARY BLOCKER)** | PASS |
-| **EG-R2-FIX-4** | **Static behavioral innocence (CO-PRIMARY BLOCKER)** | PASS |
-| EG-R2-FIX-5 | Canary injection (anti-theater proof) | PASS |
+| **EG-R2-FIX-B** | **Scenario suite hard gate (PRIMARY BLOCKER)** | PENDING (requires fresh CI run) |
+| **EG-R2-FIX-A** | **DB window-delimited runtime innocence (PRIMARY BLOCKER)** | PENDING (requires fresh CI run) |
+| **EG-R2-FIX-4** | **Static behavioral innocence (CO-PRIMARY BLOCKER)** | PENDING (requires fresh CI run) |
+| **EG-R2-FIX-5** | **Canary integrity (anti-theater proof)** | PENDING (requires fresh CI run) |
 | EG-R2-FIX-6 | DB refusal regression check (RLS + triggers) | PASS |
 | EG-R2-FIX-7 | Human-readable truth record | PASS |
 
-### Passing Run Anchor
+## Current Status: BLOCKED (Evidence Drift / False-Green Risk)
 
-- **Run ID:** [20526535769](https://github.com/Muk223/skeldir-2.0/actions/runs/20526535769)
-- **SHA:** `7eac51d`
-- **Status:** SUCCESS (All gates passed including EG-R2-FIX-3 and EG-R2-FIX-4)
-- **Date:** 2025-12-26T17:29:11Z
+Prior “passing” runs are not acceptable as authoritative R2 proof because they allowed false-green failure modes:
 
-**Runtime Innocence Verdict:**
-- `TOTAL_DB_STATEMENTS_CAPTURED=2` (> 0, proving DB capture works)
-- `MATCH_COUNT=0` (no destructive statements on immutable tables)
-- **Canary Detection:** 3/3 patterns detected (anti-theater verified)
+- Scenario suite was not proven as a hard gate (executed != passed must fail the phase).
+- DB statement capture could be mis-scoped/mis-counted (internally inconsistent totals), compatible with capturing only boot/preflight.
+- Canary “proof” could be satisfied without running the detector.
+
+R2 is COMPLETE only after a single CI run on the candidate SHA shows all required verdict blocks browser-visible and internally consistent.
+
+## What Changed (R2 Hardening)
+
+- **Scenario suite is a hard gate** via `scripts/r2/runtime_scenario_suite.py` (6 scenarios, per-scenario DB markers, exits non-zero on any failure).
+- **Authoritative DB capture is window-delimited and per-scenario verified** via `scripts/r2/db_log_window_audit.py` parsing Postgres `docker logs`.
+- **Static behavioral audit is independent and explicit** via `scripts/r2/static_behavioral_audit.py` (scope manifest + scope hash + reviewed allowlist file).
+- **Anti-theater canary is real**: the static audit must fail when a canary is injected and pass after removal (CI workspace only).
 
 ## Closed Sets (Derived from canonical_schema.sql)
 
@@ -182,12 +187,15 @@ If any gate fails:
 4. All gates must pass for R2 COMPLETE
 
 **Hard Fail Conditions:**
-- `TOTAL_DB_STATEMENTS_CAPTURED=0` → Theater detected (DB logs not working)
-- `MATCH_COUNT>0` in EG-R2-FIX-3 → Runtime violation found
-- Any match in EG-R2-FIX-4 → Latent code path violation
+- `SCENARIOS_PASSED != SCENARIOS_EXECUTED` (scenario suite hard gate)
+- Missing window/per-scenario markers or any scenario with `NON_MARKER_STATEMENTS_COUNT == 0` (theater window)
+- `TOTAL_DB_STATEMENTS_CAPTURED_IN_WINDOW < (2 * num_scenarios + 2)` (marker/parsing drift)
+- `MATCH_COUNT_DESTRUCTIVE_ON_IMMUTABLE > 0` in the authoritative DB window
+- Static audit detects destructive patterns/constructs targeting immutable tables
+- Canary does not force a fail when injected (detector integrity failure)
 
-**Both EG-R2-FIX-3 AND EG-R2-FIX-4 must pass.** They are orthogonal proofs - runtime testing is probabilistic, static analysis covers latent paths.
+**Both EG-R2-FIX-A AND EG-R2-FIX-4 must pass.** They are orthogonal proofs - runtime testing is probabilistic, static analysis covers latent paths.
 
 ---
 
-*Last updated: 2025-12-26 - R2 COMPLETE (Run 20526535769, SHA 7eac51d) - Authoritative DB-level innocence proof implemented*
+*Last updated: 2025-12-27 - R2 hardening implemented; awaiting a fresh CI run anchored to candidate SHA to declare R2 COMPLETE.*

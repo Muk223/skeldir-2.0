@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "notes": "Explicit, reviewed exceptions only. Keep this tiny; prefer fixing code over allowlisting.",
+  "allow": []
+}
+

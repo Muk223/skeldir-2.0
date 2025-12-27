@@ -244,17 +244,17 @@ async def _enforce_retention(tenant_id: UUID, cutoff_90: datetime, cutoff_30: da
     """
     Enforce data retention policy by purging old data.
 
-    DATA_RETENTION_ALLOWLIST: These DELETEs are authorized data lifecycle operations,
-    not immutability violations. Retention enforcement is a documented exception to
-    the immutability constraint, executed only by scheduled maintenance tasks with
-    proper tenant isolation (RLS context set).
+    IMPORTANT: Immutable tables (e.g., attribution_events, revenue_ledger) are never
+    deleted. Retention enforcement must only operate on mutable tables.
     """
     async with engine.begin() as conn:
         await set_tenant_guc(conn, tenant_id, local=False)
-        # DATA_RETENTION_ALLOWLIST: authorized retention purge for attribution_events
-        events_deleted = (await conn.execute(text("DELETE FROM attribution_events WHERE event_timestamp < :cutoff"), {"cutoff": cutoff_90})).rowcount or 0
-        # DATA_RETENTION_ALLOWLIST: authorized retention purge for attribution_allocations
-        allocations_deleted = (await conn.execute(text("DELETE FROM attribution_allocations WHERE created_at < :cutoff"), {"cutoff": cutoff_90})).rowcount or 0
+        allocations_deleted = (
+            await conn.execute(
+                text("DELETE FROM attribution_allocations WHERE created_at < :cutoff"),
+                {"cutoff": cutoff_90},
+            )
+        ).rowcount or 0
         dead_events_deleted = (
             await conn.execute(
                 text(
@@ -268,7 +268,6 @@ async def _enforce_retention(tenant_id: UUID, cutoff_90: datetime, cutoff_30: da
             )
         ).rowcount or 0
         return {
-            "events_deleted": events_deleted,
             "allocations_deleted": allocations_deleted,
             "dead_events_deleted": dead_events_deleted,
         }
