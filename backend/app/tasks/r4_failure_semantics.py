@@ -150,7 +150,7 @@ def rls_cross_tenant_probe(
     *,
     tenant_id: str,
     correlation_id: str,
-    target_external_event_id: str,
+    target_effect_key: str,
 ) -> dict[str, str | int]:
     tenant_uuid = _require_uuid(tenant_id, name="tenant_id")
     correlation_uuid = _require_uuid(correlation_id, name="correlation_id")
@@ -159,14 +159,14 @@ def rls_cross_tenant_probe(
     with _db_connect() as conn:
         with conn.cursor() as cur:
             _set_worker_context(cur, ctx)
-            cur.execute("SELECT COUNT(*) FROM attribution_events WHERE external_event_id = %s", (target_external_event_id,))
+            cur.execute("SELECT COUNT(*) FROM worker_side_effects WHERE effect_key = %s", (target_effect_key,))
             visible = int(cur.fetchone()[0] or 0)
         conn.commit()
 
     return {
         "visible_count": visible,
         "tenant_id": str(tenant_uuid),
-        "target_external_event_id": target_external_event_id,
+        "target_effect_key": target_effect_key,
     }
 
 

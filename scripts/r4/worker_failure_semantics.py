@@ -90,15 +90,16 @@ async def _seed_tenant(conn: asyncpg.Connection, tenant_id: UUID, *, label: str)
     )
 
 
-async def _seed_attribution_event(conn: asyncpg.Connection, tenant_id: UUID, *, external_event_id: str) -> None:
+async def _seed_worker_side_effect(conn: asyncpg.Connection, tenant_id: UUID, *, task_id: str, effect_key: str) -> None:
     await conn.execute(
         """
-        INSERT INTO attribution_events (tenant_id, occurred_at, external_event_id, revenue_cents, raw_payload)
-        VALUES ($1, NOW(), $2, 0, $3::jsonb)
+        INSERT INTO worker_side_effects (tenant_id, task_id, correlation_id, effect_key, created_at)
+        VALUES ($1, $2, NULL, $3, NOW())
+        ON CONFLICT (tenant_id, task_id) DO NOTHING
         """,
         str(tenant_id),
-        external_event_id,
-        json.dumps({"marker": "R4_RLS_PROBE", "external_event_id": external_event_id}),
+        task_id,
+        effect_key,
     )
 
 
@@ -341,9 +342,10 @@ async def scenario_rls_probe(ctx: ScenarioCtx, conn: asyncpg.Connection) -> dict
     )
     s_start = _now_utc()
 
-    # Seed a tenant-B event and probe it from tenant-A task context
-    target_external_event_id = f"R4_RLS_TARGET_{ctx.candidate_sha[:7]}"
-    await _seed_attribution_event(conn, ctx.tenant_b, external_event_id=target_external_event_id)
+    # Seed a tenant-B row into a tenant-scoped table and probe it from tenant-A task context
+    target_effect_key = f"R4_RLS_TARGET_{ctx.candidate_sha[:7]}"
+    seed_task_id = str(_uuid_deterministic("r4", ctx.candidate_sha, "S3", "seed_b"))
+    await _seed_worker_side_effect(conn, ctx.tenant_b, task_id=seed_task_id, effect_key=target_effect_key)
 
     task_id = str(_uuid_deterministic("r4", ctx.candidate_sha, "S3", "rls_probe"))
     r = celery_app.send_task(
@@ -351,7 +353,7 @@ async def scenario_rls_probe(ctx: ScenarioCtx, conn: asyncpg.Connection) -> dict
         kwargs={
             "tenant_id": str(ctx.tenant_a),
             "correlation_id": task_id,
-            "target_external_event_id": target_external_event_id,
+            "target_effect_key": target_effect_key,
         },
         task_id=task_id,
     )
@@ -364,7 +366,7 @@ async def scenario_rls_probe(ctx: ScenarioCtx, conn: asyncpg.Connection) -> dict
         kwargs={
             "tenant_id": "not-a-uuid",
             "correlation_id": bad_task_id,
-            "target_external_event_id": target_external_event_id,
+            "target_effect_key": target_effect_key,
         },
         task_id=bad_task_id,
     )
