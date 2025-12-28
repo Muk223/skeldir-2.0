@@ -236,10 +236,23 @@ async def _run_safely(
     tenant_a: UUID,
     tenant_b: UUID,
     n: int | None = None,
+    conn: asyncpg.Connection | None = None,
 ) -> dict[str, Any]:
     try:
-        return await fn
+        verdict = await fn
+        if conn is not None:
+            try:
+                verdict.setdefault("db_truth", {})["pg_connections_end"] = await _db_conn_snapshot(conn)
+            except Exception as snap_exc:  # noqa: BLE001
+                verdict.setdefault("db_truth", {})["pg_connections_end_error"] = f"{snap_exc.__class__.__name__}: {snap_exc}"
+        return verdict
     except Exception as exc:  # noqa: BLE001 - harness must remain evidence-producing
+        snapshot: dict[str, Any] | None = None
+        if conn is not None:
+            try:
+                snapshot = await _db_conn_snapshot(conn)
+            except Exception as snap_exc:  # noqa: BLE001
+                snapshot = {"error": f"{snap_exc.__class__.__name__}: {snap_exc}"}
         verdict = {
             "scenario": scenario,
             "N": n,
@@ -247,7 +260,7 @@ async def _run_safely(
             "run_url": run_url,
             "tenant_a": str(tenant_a),
             "tenant_b": str(tenant_b),
-            "db_truth": {},
+            "db_truth": {"pg_connections_error_snapshot": snapshot} if snapshot is not None else {},
             "worker_observed": {"error": f"{exc.__class__.__name__}: {exc}"},
             "passed": False,
         }
@@ -947,6 +960,7 @@ async def main() -> int:
             tenant_a=tenant_a,
             tenant_b=tenant_b,
             n=poison_n,
+            conn=conn,
         )
         print("R4_S1_WORKER_PING_AFTER", json.dumps(_ping_worker_safe(), sort_keys=True))
         print("R4_DB_CONN_SNAPSHOT_AFTER_S1", json.dumps(await _db_conn_snapshot(conn), sort_keys=True))
@@ -969,6 +983,7 @@ async def main() -> int:
             tenant_a=tenant_a,
             tenant_b=tenant_b,
             n=crash_n,
+            conn=conn,
         )
         print("R4_S2_WORKER_PING_AFTER", json.dumps(_ping_worker_safe(), sort_keys=True))
         print("R4_DB_CONN_SNAPSHOT_AFTER_S2", json.dumps(await _db_conn_snapshot(conn), sort_keys=True))
@@ -991,6 +1006,7 @@ async def main() -> int:
             tenant_a=tenant_a,
             tenant_b=tenant_b,
             n=1,
+            conn=conn,
         )
         print("R4_S3_WORKER_PING_AFTER", json.dumps(_ping_worker_safe(), sort_keys=True))
 
@@ -1003,6 +1019,7 @@ async def main() -> int:
             tenant_a=tenant_a,
             tenant_b=tenant_b,
             n=sentinel_n,
+            conn=conn,
         )
         print("R4_S4_WORKER_PING_AFTER", json.dumps(_ping_worker_safe(), sort_keys=True))
 
@@ -1015,6 +1032,7 @@ async def main() -> int:
             tenant_a=tenant_a,
             tenant_b=tenant_b,
             n=1,
+            conn=conn,
         )
 
         all_passed = all(v.get("passed") is True for v in [s1, s2, s3, s4, s5])
