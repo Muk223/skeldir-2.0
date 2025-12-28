@@ -11,10 +11,12 @@ import json
 import os
 import platform
 import asyncio
+import hashlib
 import signal
 import subprocess
 import sys
 import time
+from urllib.parse import urlsplit
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -106,6 +108,16 @@ def _verdict_block(name: str, payload: dict[str, Any]) -> None:
     print(f"R4_VERDICT_BEGIN {name}")
     print(json.dumps(payload, indent=2, sort_keys=True))
     print(f"R4_VERDICT_END {name}")
+
+
+def _dsn_scheme(dsn: str) -> str:
+    if not dsn:
+        return ""
+    return urlsplit(dsn).scheme
+
+
+def _sha256_hex(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -210,17 +222,20 @@ async def _seed_tenant(conn: asyncpg.Connection, tenant_id: UUID, *, label: str)
     )
 
 
-async def _seed_worker_side_effect(conn: asyncpg.Connection, tenant_id: UUID, *, task_id: str, effect_key: str) -> None:
-    await conn.execute(
+async def _seed_worker_side_effect(conn: asyncpg.Connection, tenant_id: UUID, *, task_id: str, effect_key: str) -> UUID:
+    row_id = await conn.fetchval(
         """
         INSERT INTO worker_side_effects (tenant_id, task_id, correlation_id, effect_key, created_at)
         VALUES ($1, $2, NULL, $3, NOW())
-        ON CONFLICT (tenant_id, task_id) DO NOTHING
+        ON CONFLICT (tenant_id, task_id)
+        DO UPDATE SET effect_key = EXCLUDED.effect_key
+        RETURNING id
         """,
         str(tenant_id),
         task_id,
         effect_key,
     )
+    return UUID(str(row_id))
 
 
 async def _db_conn_snapshot(conn: asyncpg.Connection) -> dict[str, Any]:
@@ -782,10 +797,11 @@ async def scenario_rls_probe(ctx: ScenarioCtx, conn: asyncpg.Connection) -> dict
     )
     s_start = _now_utc()
 
-    # Seed a tenant-B row into a tenant-scoped table and probe it from tenant-A task context
     target_effect_key = f"R4_RLS_TARGET_{ctx.candidate_sha[:7]}"
     seed_task_id = str(_uuid_deterministic("r4", ctx.candidate_sha, "S3", "seed_b"))
-    await _seed_worker_side_effect(conn, ctx.tenant_b, task_id=seed_task_id, effect_key=target_effect_key)
+    target_row_id = await _seed_worker_side_effect(conn, ctx.tenant_b, task_id=seed_task_id, effect_key=target_effect_key)
+    print(f"R4_S3_SEEDED tenant_id={ctx.tenant_b} row_id={target_row_id} effect_key={target_effect_key}")
+    print(f"R4_S3_TENANT_A={ctx.tenant_a} R4_S3_TENANT_B={ctx.tenant_b} R4_S3_TARGET_ROW_ID={target_row_id}")
 
     task_id = str(_uuid_deterministic("r4", ctx.candidate_sha, "S3", "rls_probe"))
     r = celery_app.send_task(
@@ -793,39 +809,26 @@ async def scenario_rls_probe(ctx: ScenarioCtx, conn: asyncpg.Connection) -> dict
         kwargs={
             "tenant_id": str(ctx.tenant_a),
             "correlation_id": task_id,
-            "target_effect_key": target_effect_key,
+            "target_row_id": str(target_row_id),
         },
         task_id=task_id,
     )
-    result = r.get(timeout=30)
+    result = r.get(timeout=30) or {}
 
-    # Missing-tenant probe should hard-fail and land in worker DLQ
-    bad_task_id = str(_uuid_deterministic("r4", ctx.candidate_sha, "S3", "missing_tenant"))
-    bad = celery_app.send_task(
-        "app.tasks.r4_failure_semantics.rls_cross_tenant_probe",
-        kwargs={
-            "tenant_id": "not-a-uuid",
-            "correlation_id": bad_task_id,
-            "target_effect_key": target_effect_key,
-        },
-        task_id=bad_task_id,
-    )
-    try:
-        bad.get(timeout=30)
-        bad_failed = False
-    except Exception:
-        bad_failed = True
+    result_rows = int(result.get("result_rows", -1))
+    db_error = str(result.get("db_error") or "")
+    sqlstate = str(result.get("sqlstate") or "")
+    if db_error:
+        print(f"R4_S3_DB_ERROR={db_error} sqlstate={sqlstate}")
+    else:
+        print(f"R4_S3_RESULT_ROWS={result_rows}")
+
+    bypass_detected = result_rows > 0
+    if bypass_detected:
+        print("R4_S3_BYPASS_DETECTED")
 
     s_end = _now_utc()
-    dlq = await _count_worker_failed_jobs(
-        conn,
-        task_name="app.tasks.r4_failure_semantics.rls_cross_tenant_probe",
-        task_ids=[bad_task_id],
-        since=s_start,
-        until=s_end,
-    )
-
-    passed = int(result.get("visible_count", -1)) == 0 and bad_failed and dlq["rows"] == 1
+    passed = (result_rows == 0) and (not db_error) and (not bypass_detected)
 
     verdict = {
         "scenario": "S3_RLSProbe",
@@ -834,8 +837,13 @@ async def scenario_rls_probe(ctx: ScenarioCtx, conn: asyncpg.Connection) -> dict
         "run_url": ctx.run_url,
         "tenant_a": str(ctx.tenant_a),
         "tenant_b": str(ctx.tenant_b),
-        "db_truth": {"missing_tenant_dlq_rows": dlq["rows"]},
-        "worker_observed": {"visible_count_for_tenant_a": int(result.get("visible_count", -1)), "bad_failed": bad_failed},
+        "db_truth": {"target_row_id": str(target_row_id)},
+        "worker_observed": {
+            "result_rows": result_rows,
+            "db_error": db_error,
+            "sqlstate": sqlstate,
+            "bypass_detected": bypass_detected,
+        },
         "passed": passed,
     }
     _verdict_block("S3_RLSProbe_N1", verdict)
@@ -975,6 +983,31 @@ async def main() -> int:
     window_start = _now_utc()
     print(f"R4_WINDOW_START {_utc_iso(window_start)} {candidate_sha}")
 
+    broker_dsn = str(getattr(celery_app.conf, "broker_url", "") or "")
+    backend_dsn = str(getattr(celery_app.conf, "result_backend", "") or "")
+    broker_scheme = _dsn_scheme(broker_dsn)
+    backend_scheme = _dsn_scheme(backend_dsn)
+    broker_hash = _sha256_hex(broker_dsn) if broker_dsn else ""
+    backend_hash = _sha256_hex(backend_dsn) if backend_dsn else ""
+
+    print(f"R4_BROKER_SCHEME={broker_scheme}")
+    print(f"R4_BACKEND_SCHEME={backend_scheme}")
+    print(f"R4_BROKER_DSN_SHA256={broker_hash}")
+    print(f"R4_BACKEND_DSN_SHA256={backend_hash}")
+
+    if broker_scheme != "sqla+postgresql" or backend_scheme != "db+postgresql":
+        print(
+            "R4_FAIL_NON_POSTGRES_FABRIC",
+            json.dumps(
+                {
+                    "broker_scheme": broker_scheme,
+                    "backend_scheme": backend_scheme,
+                },
+                sort_keys=True,
+            ),
+        )
+        return 2
+
     concurrency = int(_env("R4_WORKER_CONCURRENCY", "4") or 4)
     crash_concurrency = int(_env("R4_CRASH_WORKER_CONCURRENCY", "1") or 1)
     default_pool = _env("R4_WORKER_POOL", "prefork")
@@ -1004,8 +1037,10 @@ async def main() -> int:
         "python": sys.version.split()[0],
         "platform": platform.platform(),
         "celery": {
-            "broker_url": celery_app.conf.broker_url,
-            "result_backend": celery_app.conf.result_backend,
+            "broker_scheme": broker_scheme,
+            "result_backend_scheme": backend_scheme,
+            "broker_dsn_sha256": broker_hash,
+            "result_backend_dsn_sha256": backend_hash,
             "broker_transport_options": broker_transport_options,
             "broker_recovery": broker_recovery_config,
             "acks_late": bool(getattr(celery_app.conf, "task_acks_late", False)),

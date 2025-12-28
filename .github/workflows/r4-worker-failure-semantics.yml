@@ -183,6 +183,10 @@ jobs:
             echo "No r4_summary changes to commit."
             exit 0
           fi
+          if ! grep -q "R4 = \\*\\*COMPLETE\\*\\*" docs/validation/runtime/r4_summary.md; then
+            echo "R4 summary is not COMPLETE; skipping PR."
+            exit 0
+          fi
           BRANCH="ci/r4-proof-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

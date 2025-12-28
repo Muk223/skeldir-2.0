@@ -30,15 +30,16 @@ def _read_text(path: Path) -> str:
 def _parse_env_block(text: str) -> dict[str, Any]:
     lines = text.splitlines()
     for i, line in enumerate(lines):
-        if line.strip() == "=== R4_ENV ===":
-            buf: list[str] = []
-            for j in range(i + 1, min(i + 4000, len(lines))):
-                buf.append(lines[j])
-                joined = "\n".join(buf).strip()
-                try:
-                    return json.loads(joined)
-                except json.JSONDecodeError:
-                    continue
+        if line.strip() != "=== R4_ENV ===":
+            continue
+        buf: list[str] = []
+        for j in range(i + 1, min(i + 4000, len(lines))):
+            buf.append(lines[j])
+            joined = "\n".join(buf).strip()
+            try:
+                return json.loads(joined)
+            except json.JSONDecodeError:
+                continue
     return {}
 
 
@@ -58,9 +59,8 @@ def _parse_verdicts(text: str) -> dict[str, dict[str, Any]]:
 
         m_end = _END.match(line.strip())
         if m_end and current_name:
-            name = current_name
             payload_raw = "\n".join(current_json).strip()
-            verdicts[name] = json.loads(payload_raw) if payload_raw else {}
+            verdicts[current_name] = json.loads(payload_raw) if payload_raw else {}
             current_name = None
             current_json = []
             continue
@@ -96,14 +96,37 @@ def render_summary_md(*, candidate_sha: str, run_url: str, parsed: ParsedRun, ou
             return 0
 
     evidence_pack = all(x is not None for x in [s1, s2, s3, s4, s5])
-    gate_fix_0 = bool(env.get("candidate_sha") and env.get("tenants") and verdicts and evidence_pack)
+    gate_fix_0 = bool(env.get("candidate_sha") and env.get("tenants") and env.get("celery") and verdicts and evidence_pack)
+
+    celery_env = env.get("celery", {}) if isinstance(env.get("celery", {}), dict) else {}
+    broker_scheme = str(celery_env.get("broker_scheme") or "")
+    backend_scheme = str(celery_env.get("result_backend_scheme") or "")
+    broker_hash = str(celery_env.get("broker_dsn_sha256") or "")
+    backend_hash = str(celery_env.get("result_backend_dsn_sha256") or "")
+
+    gate_fix_1 = bool(
+        broker_scheme == "sqla+postgresql"
+        and backend_scheme == "db+postgresql"
+        and len(broker_hash) == 64
+        and len(backend_hash) == 64
+    )
+
+    s3_obs = (s3 or {}).get("worker_observed", {})
+    s3_target_row_id = str((s3 or {}).get("db_truth", {}).get("target_row_id") or "")
+    gate_fix_2 = bool(
+        s3
+        and s3.get("passed") is True
+        and s3_target_row_id
+        and _int(s3_obs.get("result_rows")) == 0
+        and not str(s3_obs.get("db_error") or "")
+    )
 
     s1_attempts = (s1 or {}).get("db_truth", {}).get("attempts", {})
-    gate_fix_1 = bool(s1 and s1.get("passed") is True and _int(s1_attempts.get("attempts_min_per_task")) >= 2)
+    gate_r4_1 = bool(s1 and s1.get("passed") is True and _int(s1_attempts.get("attempts_min_per_task")) >= 2)
 
     s2_phys = (s2 or {}).get("worker_observed", {}).get("crash_physics", {})
     s2_n = _int((s2 or {}).get("N"))
-    gate_fix_2 = bool(
+    gate_r4_2 = bool(
         s2
         and s2.get("passed") is True
         and _int(s2_phys.get("barrier_observed_count")) == s2_n
@@ -112,17 +135,11 @@ def render_summary_md(*, candidate_sha: str, run_url: str, parsed: ParsedRun, ou
         and _int(s2_phys.get("worker_restarted_count")) == s2_n
         and _int(s2_phys.get("redelivery_observed_count")) == s2_n
     )
-    gate_fix_3 = bool(s2 and _int(s2_phys.get("redelivery_observed_count")) == s2_n and s2_n > 0)
-    gate_fix_4 = bool(
-        s3
-        and s3.get("passed") is True
-        and s4
-        and s4.get("passed") is True
-        and s5
-        and s5.get("passed") is True
-    )
+    gate_r4_3 = bool(s2 and _int(s2_phys.get("redelivery_observed_count")) == s2_n and s2_n > 0)
+    gate_r4_4 = bool(s4 and s4.get("passed") is True)
+    gate_r4_5 = bool(s5 and s5.get("passed") is True)
 
-    complete = all([gate_fix_0, gate_fix_1, gate_fix_2, gate_fix_3, gate_fix_4])
+    complete = all([gate_fix_0, gate_fix_1, gate_fix_2, gate_r4_1, gate_r4_2, gate_r4_3, gate_r4_4, gate_r4_5])
     status = "COMPLETE" if complete else "IN PROGRESS"
 
     def _gate(v: bool) -> str:
@@ -142,8 +159,10 @@ def render_summary_md(*, candidate_sha: str, run_url: str, parsed: ParsedRun, ou
             "",
             "## Run Configuration (from harness log)",
             "",
-            f"- `broker_url` = `{env.get('celery', {}).get('broker_url')}`",
-            f"- `result_backend` = `{env.get('celery', {}).get('result_backend')}`",
+            f"- `broker_scheme` = `{broker_scheme}`",
+            f"- `result_backend_scheme` = `{backend_scheme}`",
+            f"- `broker_dsn_sha256` = `{broker_hash}`",
+            f"- `result_backend_dsn_sha256` = `{backend_hash}`",
             f"- `acks_late` = `{env.get('celery', {}).get('acks_late')}`",
             f"- `reject_on_worker_lost` = `{env.get('celery', {}).get('reject_on_worker_lost')}`",
             f"- `acks_on_failure_or_timeout` = `{env.get('celery', {}).get('acks_on_failure_or_timeout')}`",
@@ -156,16 +175,31 @@ def render_summary_md(*, candidate_sha: str, run_url: str, parsed: ParsedRun, ou
             "| Gate | Description | Status |",
             "|------|-------------|--------|",
             f"| EG-R4-FIX-0 | Instrument integrity (SHA + config + verdicts) | {_gate(gate_fix_0)} |",
-            f"| EG-R4-FIX-1 | Poison retries proven (attempts_min_per_task >= 2) | {_gate(gate_fix_1)} |",
-            f"| EG-R4-FIX-2 | Crash physics proven (barrier→kill→exit→restart→redelivery) | {_gate(gate_fix_2)} |",
-            f"| EG-R4-FIX-3 | Redelivery accounting (redelivery_observed_count == N) | {_gate(gate_fix_3)} |",
-            f"| EG-R4-FIX-4 | RLS + runaway + least-privilege still pass | {_gate(gate_fix_4)} |",
+            f"| EG-R4-FIX-1 | Postgres-only fabric provable (scheme + DSN hashes) | {_gate(gate_fix_1)} |",
+            f"| EG-R4-FIX-2 | Cross-tenant RLS probe explicit (tenant A reads tenant B id → 0) | {_gate(gate_fix_2)} |",
+            f"| EG-R4-1 | Poison retries proven (attempts_min_per_task >= 2) | {_gate(gate_r4_1)} |",
+            f"| EG-R4-2 | Crash physics proven (barrier→kill→exit→restart→redelivery) | {_gate(gate_r4_2)} |",
+            f"| EG-R4-3 | Redelivery accounting (redelivery_observed_count == N) | {_gate(gate_r4_3)} |",
+            f"| EG-R4-4 | Runaway terminated; no starvation | {_gate(gate_r4_4)} |",
+            f"| EG-R4-5 | Least privilege probes fail | {_gate(gate_r4_5)} |",
             "",
             "## Evidence (Browser-Verifiable Logs)",
             "",
             "This run prints, to CI logs, one `R4_VERDICT_BEGIN/END` JSON block per scenario.",
             "",
             "Log step containing verdict blocks: `Run R4 harness` in `.github/workflows/r4-worker-failure-semantics.yml`.",
+            "",
+            "Fabric proof markers printed in logs:",
+            "",
+            "- `R4_BROKER_SCHEME=...`",
+            "- `R4_BACKEND_SCHEME=...`",
+            "- `R4_BROKER_DSN_SHA256=...`",
+            "- `R4_BACKEND_DSN_SHA256=...`",
+            "",
+            "Cross-tenant RLS probe markers printed in logs:",
+            "",
+            "- `R4_S3_TENANT_A=... R4_S3_TENANT_B=... R4_S3_TARGET_ROW_ID=...`",
+            "- `R4_S3_RESULT_ROWS=0` (or `R4_S3_DB_ERROR=...`)",
             "",
             "Crash proof markers printed in logs (per task_id):",
             "",
@@ -237,3 +271,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

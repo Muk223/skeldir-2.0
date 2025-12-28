@@ -258,23 +258,36 @@ def rls_cross_tenant_probe(
     *,
     tenant_id: str,
     correlation_id: str,
-    target_effect_key: str,
-) -> dict[str, str | int]:
+    target_row_id: str,
+) -> dict[str, str | int | None]:
     tenant_uuid = _require_uuid(tenant_id, name="tenant_id")
     correlation_uuid = _require_uuid(correlation_id, name="correlation_id")
+    target_uuid = _require_uuid(target_row_id, name="target_row_id")
     ctx = DbCtx(tenant_id=tenant_uuid, correlation_id=correlation_uuid)
+
+    result_rows: int | None = None
+    sqlstate: str | None = None
+    db_error: str | None = None
 
     with _db_connect() as conn:
         with conn.cursor() as cur:
-            _set_worker_context(cur, ctx)
-            cur.execute("SELECT COUNT(*) FROM worker_side_effects WHERE effect_key = %s", (target_effect_key,))
-            visible = int(cur.fetchone()[0] or 0)
-        conn.commit()
+            try:
+                _set_worker_context(cur, ctx)
+                cur.execute("SELECT COUNT(*) FROM worker_side_effects WHERE id = %s", (str(target_uuid),))
+                result_rows = int(cur.fetchone()[0] or 0)
+                conn.commit()
+            except Exception as exc:  # noqa: BLE001 - probe surfaces DB errors for adjudication
+                conn.rollback()
+                result_rows = -1
+                sqlstate = getattr(exc, "pgcode", None)
+                db_error = str(exc)[:400]
 
     return {
-        "visible_count": visible,
+        "result_rows": int(result_rows or 0),
         "tenant_id": str(tenant_uuid),
-        "target_effect_key": target_effect_key,
+        "target_row_id": str(target_uuid),
+        "sqlstate": sqlstate,
+        "db_error": db_error,
     }
 
 
