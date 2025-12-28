@@ -122,6 +122,30 @@ def _ping_worker(timeout_s: float = 30.0) -> dict[str, Any]:
     raise TimeoutError("Worker ping did not succeed")
 
 
+def _ping_worker_safe(timeout_s: float = 10.0) -> dict[str, Any]:
+    try:
+        return {"ok": True, "result": _ping_worker(timeout_s=timeout_s)}
+    except Exception as exc:  # noqa: BLE001 - diagnostic surface for CI logs
+        return {"ok": False, "error": f"{exc.__class__.__name__}: {exc}"}
+
+
+async def _run_safely(verdict_name: str, scenario: str, fn, *, tenant_a: UUID, tenant_b: UUID, n: int | None = None) -> dict[str, Any]:
+    try:
+        return await fn
+    except Exception as exc:  # noqa: BLE001 - harness must remain evidence-producing
+        verdict = {
+            "scenario": scenario,
+            "N": n,
+            "tenant_a": str(tenant_a),
+            "tenant_b": str(tenant_b),
+            "db_truth": {},
+            "worker_observed": {"error": f"{exc.__class__.__name__}: {exc}"},
+            "passed": False,
+        }
+        _verdict_block(verdict_name, verdict)
+        return verdict
+
+
 async def _count_worker_failed_jobs(
     conn: asyncpg.Connection,
     *,
@@ -518,7 +542,7 @@ async def main() -> int:
     print(json.dumps(config_dump, indent=2, sort_keys=True))
 
     # Verify worker is alive and DB role is least-privileged (app_user)
-    ping = _ping_worker()
+    ping = _ping_worker_safe()
     print(
         "R4_CONFIG",
         json.dumps(
@@ -541,15 +565,58 @@ async def main() -> int:
         await _seed_tenant(conn, tenant_a, label="A")
         await _seed_tenant(conn, tenant_b, label="B")
 
-        s1 = await scenario_poison_pill(ctx, conn, n=int(_env("R4_POISON_N", "10")))
-        _ping_worker()
-        s2 = await scenario_crash_after_write(ctx, conn, n=int(_env("R4_CRASH_N", "10")))
-        _ping_worker()
-        s3 = await scenario_rls_probe(ctx, conn)
-        _ping_worker()
-        s4 = await scenario_runaway(ctx, conn, sentinel_n=int(_env("R4_SENTINEL_N", "10")))
-        _ping_worker()
-        s5 = await scenario_least_privilege(ctx, conn)
+        poison_n = int(_env("R4_POISON_N", "10"))
+        crash_n = int(_env("R4_CRASH_N", "10"))
+        sentinel_n = int(_env("R4_SENTINEL_N", "10"))
+
+        s1 = await _run_safely(
+            f"S1_PoisonPill_N{poison_n}",
+            "S1_PoisonPill",
+            scenario_poison_pill(ctx, conn, n=poison_n),
+            tenant_a=tenant_a,
+            tenant_b=tenant_b,
+            n=poison_n,
+        )
+        print("R4_S1_WORKER_PING_AFTER", json.dumps(_ping_worker_safe(), sort_keys=True))
+
+        s2 = await _run_safely(
+            f"S2_CrashAfterWritePreAck_N{crash_n}",
+            "S2_CrashAfterWritePreAck",
+            scenario_crash_after_write(ctx, conn, n=crash_n),
+            tenant_a=tenant_a,
+            tenant_b=tenant_b,
+            n=crash_n,
+        )
+        print("R4_S2_WORKER_PING_AFTER", json.dumps(_ping_worker_safe(), sort_keys=True))
+
+        s3 = await _run_safely(
+            "S3_RLSProbe_N1",
+            "S3_RLSProbe",
+            scenario_rls_probe(ctx, conn),
+            tenant_a=tenant_a,
+            tenant_b=tenant_b,
+            n=1,
+        )
+        print("R4_S3_WORKER_PING_AFTER", json.dumps(_ping_worker_safe(), sort_keys=True))
+
+        s4 = await _run_safely(
+            f"S4_RunawayNoStarve_N{sentinel_n}",
+            "S4_RunawayNoStarve",
+            scenario_runaway(ctx, conn, sentinel_n=sentinel_n),
+            tenant_a=tenant_a,
+            tenant_b=tenant_b,
+            n=sentinel_n,
+        )
+        print("R4_S4_WORKER_PING_AFTER", json.dumps(_ping_worker_safe(), sort_keys=True))
+
+        s5 = await _run_safely(
+            "S5_LeastPrivilege_N1",
+            "S5_LeastPrivilege",
+            scenario_least_privilege(ctx, conn),
+            tenant_a=tenant_a,
+            tenant_b=tenant_b,
+            n=1,
+        )
 
         all_passed = all(v.get("passed") is True for v in [s1, s2, s3, s4, s5])
     finally:

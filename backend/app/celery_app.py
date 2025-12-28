@@ -397,6 +397,20 @@ def _on_task_failure(task_id=None, exception=None, args=None, kwargs=None, einfo
             serialized_kwargs = _serialize_for_json(kwargs if kwargs else {})
 
             cur.execute("""
+                SELECT set_config('app.execution_context', 'worker', true);
+             """)
+            if tenant_id:
+                cur.execute(
+                    "SELECT set_config('app.current_tenant_id', %s, true);",
+                    (str(tenant_id),),
+                )
+            if correlation_id:
+                cur.execute(
+                    "SELECT set_config('app.correlation_id', %s, true);",
+                    (str(correlation_id),),
+                )
+
+            cur.execute("""
                 INSERT INTO worker_failed_jobs (
                     id, task_id, task_name, queue, worker,
                     task_args, task_kwargs, tenant_id,
