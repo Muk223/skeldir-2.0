@@ -506,7 +506,7 @@ async def scenario_crash_after_write(
 
     worker_pid = worker.start()
     print(f"R4_S2_WORKER_PID_BEFORE {worker_pid}")
-    print("R4_S2_WORKER_PING_BEFORE", json.dumps(_ping_worker_safe(timeout_s=30.0), sort_keys=True))
+    print("R4_S2_WORKER_PING_BEFORE", json.dumps(_ping_worker_safe(timeout_s=15.0), sort_keys=True))
 
     task_name = "app.tasks.r4_failure_semantics.crash_after_write_pre_ack"
     task_ids: list[str] = []
@@ -555,7 +555,7 @@ async def scenario_crash_after_write(
 
         worker_pid = worker.restart()
         restart_pids.append(worker_pid)
-        print("R4_S2_WORKER_PING_AFTER_RESTART", json.dumps(_ping_worker_safe(timeout_s=60.0), sort_keys=True))
+        print("R4_S2_WORKER_PING_AFTER_RESTART", json.dumps(_ping_worker_safe(timeout_s=20.0), sort_keys=True))
 
         attempt = await _wait_for_redelivery_attempt(
             conn,
@@ -568,12 +568,6 @@ async def scenario_crash_after_write(
         if attempt is not None and attempt >= 2:
             redelivery_observed += 1
             print(f"R4_S2_REDELIVERED task_id={task_id} attempt={attempt}")
-
-        try:
-            out = celery_app.AsyncResult(task_id).get(timeout=60)
-            print("R4_S2_TASK_COMPLETED", f"task_id={task_id}", json.dumps(out, sort_keys=True))
-        except Exception as exc:  # noqa: BLE001
-            print("R4_S2_TASK_COMPLETION_ERROR", f"task_id={task_id}", f"error={exc.__class__.__name__}:{exc}")
 
     s_end = _now_utc()
     effects = await _count_side_effects(conn, tenant_id=ctx.tenant_a, task_ids=task_ids, since=s_start, until=s_end)
@@ -827,7 +821,7 @@ async def main() -> int:
     pool = _env("R4_WORKER_POOL", "prefork")
     worker = WorkerSupervisor(concurrency=concurrency, pool=pool, log_prefix="celery_harness_worker")
     worker_pid_initial = worker.start()
-    ping = _ping_worker_safe(timeout_s=60.0)
+    ping = _ping_worker_safe(timeout_s=25.0)
     print("R4_WORKER_PING_INITIAL", json.dumps(ping, sort_keys=True))
 
     config_dump = {
