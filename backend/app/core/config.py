@@ -75,6 +75,14 @@ class Settings(BaseSettings):
         1,
         description="Prefetch multiplier for worker (1 minimizes starvation and improves crash determinism).",
     )
+    CELERY_BROKER_VISIBILITY_TIMEOUT_S: int = Field(
+        3600,
+        description="Broker (sqla+ Postgres) visibility timeout in seconds for redelivery after worker loss; must exceed max task runtime in production.",
+    )
+    CELERY_BROKER_POLLING_INTERVAL_S: float = Field(
+        1.0,
+        description="Broker (sqla+ Postgres) polling interval in seconds (lower improves redelivery latency at higher DB load).",
+    )
 
     model_config = SettingsConfigDict(
         env_file=None,
@@ -127,6 +135,20 @@ class Settings(BaseSettings):
     def validate_celery_prefetch_multiplier(cls, value: int) -> int:
         if value < 1:
             raise ValueError("CELERY_WORKER_PREFETCH_MULTIPLIER must be >= 1")
+        return value
+
+    @field_validator("CELERY_BROKER_VISIBILITY_TIMEOUT_S")
+    @classmethod
+    def validate_celery_visibility_timeout(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("CELERY_BROKER_VISIBILITY_TIMEOUT_S must be >= 1")
+        return value
+
+    @field_validator("CELERY_BROKER_POLLING_INTERVAL_S")
+    @classmethod
+    def validate_celery_polling_interval(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("CELERY_BROKER_POLLING_INTERVAL_S must be > 0")
         return value
 
 

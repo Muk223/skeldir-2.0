@@ -117,8 +117,18 @@ def _ensure_celery_configured():
     from kombu import Queue
     settings = _get_settings()  # Lazy settings access
 
+    broker_url = _build_broker_url()
+    broker_transport_options: dict[str, object] = {"pool_recycle": 300}
+    if broker_url.startswith("sqla+"):
+        broker_transport_options.update(
+            {
+                "visibility_timeout": settings.CELERY_BROKER_VISIBILITY_TIMEOUT_S,
+                "polling_interval": settings.CELERY_BROKER_POLLING_INTERVAL_S,
+            }
+        )
+
     celery_app.conf.update(
-        broker_url=_build_broker_url(),
+        broker_url=broker_url,
         result_backend=_build_result_backend(),
         task_serializer="json",
         result_serializer="json",
@@ -126,7 +136,7 @@ def _ensure_celery_configured():
         enable_utc=True,
         timezone="UTC",
         task_track_started=True,
-        broker_transport_options={"pool_recycle": 300},
+        broker_transport_options=broker_transport_options,
         worker_send_task_events=True,
         worker_hijack_root_logger=False,
         # R4: crash-safe + starvation-resistant defaults (override via env via Settings)
@@ -170,6 +180,7 @@ def _ensure_celery_configured():
         extra={
             "broker_url": celery_app.conf.broker_url,
             "result_backend": celery_app.conf.result_backend,
+            "broker_transport_options": celery_app.conf.broker_transport_options,
             "queues": [q.name for q in celery_app.conf.task_queues],
             "beat_schedule_loaded": bool(celery_app.conf.beat_schedule),
             "scheduled_tasks": list(celery_app.conf.beat_schedule.keys()) if celery_app.conf.beat_schedule else [],

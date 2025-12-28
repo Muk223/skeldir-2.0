@@ -409,21 +409,44 @@ async def _wait_for_redelivery_attempt(
     scenario: str,
     min_attempt_no: int,
     timeout_s: float,
+    since_ts: datetime | None = None,
 ) -> int | None:
     deadline = time.time() + timeout_s
     while time.time() < deadline:
-        val = await conn.fetchval(
-            """
-            SELECT COALESCE(MAX(attempt_no), 0) FROM r4_task_attempts
-            WHERE tenant_id=$1 AND task_id=$2 AND scenario=$3
-            """,
-            str(tenant_id),
-            task_id,
-            scenario,
-        )
-        max_attempt = int(val or 0)
-        if max_attempt >= min_attempt_no:
-            return max_attempt
+        if since_ts is None:
+            val = await conn.fetchval(
+                """
+                SELECT COALESCE(MAX(attempt_no), 0) FROM r4_task_attempts
+                WHERE tenant_id=$1 AND task_id=$2 AND scenario=$3
+                """,
+                str(tenant_id),
+                task_id,
+                scenario,
+            )
+            max_attempt = int(val or 0)
+            if max_attempt >= min_attempt_no:
+                return max_attempt
+        else:
+            row = await conn.fetchrow(
+                """
+                SELECT attempt_no
+                FROM r4_task_attempts
+                WHERE tenant_id=$1
+                  AND task_id=$2
+                  AND scenario=$3
+                  AND attempt_no >= $4
+                  AND created_at >= $5
+                ORDER BY attempt_no DESC, created_at DESC
+                LIMIT 1
+                """,
+                str(tenant_id),
+                task_id,
+                scenario,
+                int(min_attempt_no),
+                since_ts,
+            )
+            if row:
+                return int(row["attempt_no"])
         await asyncio.sleep(0.2)
     return None
 
@@ -550,6 +573,7 @@ async def scenario_crash_after_write(
             f"wrote_at={barrier['wrote_at']}",
         )
 
+        kill_since = await conn.fetchval("SELECT clock_timestamp()")
         kill = worker.kill(sig=9, timeout_s=30.0)
         kill_events.append(kill)
 
@@ -564,6 +588,7 @@ async def scenario_crash_after_write(
             scenario="S2_CrashAfterWritePreAck",
             min_attempt_no=2,
             timeout_s=30.0,
+            since_ts=kill_since,
         )
         if attempt is not None and attempt >= 2:
             redelivery_observed += 1
@@ -818,12 +843,16 @@ async def main() -> int:
     print(f"R4_WINDOW_START {_utc_iso(window_start)} {candidate_sha}")
 
     concurrency = int(_env("R4_WORKER_CONCURRENCY", "4") or 4)
+    crash_concurrency = int(_env("R4_CRASH_WORKER_CONCURRENCY", "1") or 1)
     pool = _env("R4_WORKER_POOL", "prefork")
-    worker = WorkerSupervisor(concurrency=concurrency, pool=pool, log_prefix="celery_harness_worker")
-    worker_pid_initial = worker.start()
+    crash_worker = WorkerSupervisor(concurrency=crash_concurrency, pool=pool, log_prefix="celery_harness_worker_crash")
+    crash_worker_pid_initial = crash_worker.start()
     ping = _ping_worker_safe(timeout_s=25.0)
-    print("R4_WORKER_PING_INITIAL", json.dumps(ping, sort_keys=True))
+    print("R4_WORKER_PING_CRASH_INITIAL", json.dumps(ping, sort_keys=True))
 
+    main_worker: WorkerSupervisor | None = None
+
+    broker_transport_options = getattr(celery_app.conf, "broker_transport_options", None)
     config_dump = {
         "candidate_sha": candidate_sha,
         "run_url": run_url,
@@ -832,6 +861,7 @@ async def main() -> int:
         "celery": {
             "broker_url": celery_app.conf.broker_url,
             "result_backend": celery_app.conf.result_backend,
+            "broker_transport_options": broker_transport_options,
             "acks_late": bool(getattr(celery_app.conf, "task_acks_late", False)),
             "reject_on_worker_lost": bool(getattr(celery_app.conf, "task_reject_on_worker_lost", False)),
             "acks_on_failure_or_timeout": bool(getattr(celery_app.conf, "task_acks_on_failure_or_timeout", False)),
@@ -848,14 +878,16 @@ async def main() -> int:
         json.dumps(
             {
                 "concurrency": concurrency,
+                "crash_concurrency": crash_concurrency,
                 "prefetch": config_dump["celery"]["prefetch_multiplier"],
                 "acks_late": config_dump["celery"]["acks_late"],
                 "reject_on_worker_lost": config_dump["celery"]["reject_on_worker_lost"],
                 "acks_on_failure_or_timeout": config_dump["celery"]["acks_on_failure_or_timeout"],
+                "broker_transport_options": broker_transport_options,
                 "time_limits": {"runaway_soft_s": 2, "runaway_hard_s": 4},
                 "retry_policy": {"poison_max_retries": 3, "poison_backoff_cap_s": 4, "poison_jitter_s": "0..1"},
                 "worker_pool": pool,
-                "worker_pid_initial": worker_pid_initial,
+                "worker_pid_crash_initial": crash_worker_pid_initial,
                 "worker_ping": ping,
             },
             sort_keys=True,
@@ -886,7 +918,7 @@ async def main() -> int:
         s2 = await _run_safely(
             f"S2_CrashAfterWritePreAck_N{crash_n}",
             "S2_CrashAfterWritePreAck",
-            scenario_crash_after_write(ctx, conn, n=crash_n, worker=worker),
+            scenario_crash_after_write(ctx, conn, n=crash_n, worker=crash_worker),
             candidate_sha=candidate_sha,
             run_url=run_url,
             tenant_a=tenant_a,
@@ -894,6 +926,13 @@ async def main() -> int:
             n=crash_n,
         )
         print("R4_S2_WORKER_PING_AFTER", json.dumps(_ping_worker_safe(), sort_keys=True))
+
+        crash_worker.ensure_dead()
+
+        main_worker = WorkerSupervisor(concurrency=concurrency, pool=pool, log_prefix="celery_harness_worker_main")
+        worker_pid_initial = main_worker.start()
+        print(f"R4_WORKER_MAIN_STARTED pid={worker_pid_initial}")
+        print("R4_WORKER_PING_MAIN_INITIAL", json.dumps(_ping_worker_safe(timeout_s=20.0), sort_keys=True))
 
         s3 = await _run_safely(
             "S3_RLSProbe_N1",
@@ -932,7 +971,9 @@ async def main() -> int:
 
         all_passed = all(v.get("passed") is True for v in [s1, s2, s3, s4, s5])
     finally:
-        worker.ensure_dead()
+        crash_worker.ensure_dead()
+        if main_worker is not None:
+            main_worker.ensure_dead()
         await conn.close()
 
     window_end = _now_utc()

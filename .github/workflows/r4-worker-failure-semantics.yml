@@ -49,11 +49,15 @@ jobs:
       CELERY_TASK_REJECT_ON_WORKER_LOST: "true"
       CELERY_TASK_ACKS_ON_FAILURE_OR_TIMEOUT: "true"
       CELERY_WORKER_PREFETCH_MULTIPLIER: "1"
+      # R4 crash physics: make SQLAlchemy transport redelivery observable within harness windows.
+      CELERY_BROKER_VISIBILITY_TIMEOUT_S: "8"
+      CELERY_BROKER_POLLING_INTERVAL_S: "0.5"
       R4_ADMIN_DATABASE_URL: postgresql://r4_admin:r4_admin@127.0.0.1:5432/r4
       R4_POISON_N: "10"
       R4_CRASH_N: "10"
       R4_SENTINEL_N: "10"
       R4_WORKER_CONCURRENCY: "4"
+      R4_CRASH_WORKER_CONCURRENCY: "1"
 
     steps:
       - name: Checkout
@@ -212,5 +216,6 @@ jobs:
         run: |
           echo "---- uvicorn.log ----"
           tail -n 200 uvicorn.log || true
-          echo "---- celery.log ----"
-          tail -n 300 celery.log || true
+          echo "---- celery_harness_worker logs ----"
+          ls -la celery_harness_worker*.log || true
+          tail -n 300 celery_harness_worker*.log || true
