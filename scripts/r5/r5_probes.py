@@ -400,7 +400,8 @@ async def probe_p1_determinism(ctx: ProbeCtx) -> dict[str, Any]:
     window_start = datetime(2025, 1, 1, tzinfo=timezone.utc)
     window_end = window_start + timedelta(days=1)
 
-    async with await _pg(ctx.admin_db_url) as conn:
+    conn = await _pg(ctx.admin_db_url)
+    try:
         seed = await _seed_events(
             conn,
             tenant_id=tenant_id,
@@ -419,7 +420,9 @@ async def probe_p1_determinism(ctx: ProbeCtx) -> dict[str, Any]:
         run_metrics: list[dict[str, Any]] = []
 
         for i in range(runs):
-            run_meta = await _run_compute_with_count(tenant_id=tenant_id, window_start=window_start, window_end=window_end)
+            run_meta = await _run_compute_with_count(
+                tenant_id=tenant_id, window_start=window_start, window_end=window_end
+            )
             alloc = await _fetch_allocations(conn, tenant_id=tenant_id)
             jobs = await _fetch_recompute_jobs(conn, tenant_id=tenant_id, window_start=window_start, window_end=window_end)
 
@@ -427,7 +430,9 @@ async def probe_p1_determinism(ctx: ProbeCtx) -> dict[str, Any]:
             job_snapshots.append(jobs)
 
             full_alloc_checksums.append(_sha256_hex(_canonical_json_bytes(alloc)))
-            norm_alloc_checksums.append(_sha256_hex(_canonical_json_bytes(_strip_nondeterministic_allocation_fields(alloc))))
+            norm_alloc_checksums.append(
+                _sha256_hex(_canonical_json_bytes(_strip_nondeterministic_allocation_fields(alloc)))
+            )
             job_checksums.append(_sha256_hex(_canonical_json_bytes(jobs)))
             run_metrics.append(run_meta)
 
@@ -438,7 +443,7 @@ async def probe_p1_determinism(ctx: ProbeCtx) -> dict[str, Any]:
         first_diff_alloc = _first_diff(alloc_snapshots[0], alloc_snapshots[1]) if runs >= 2 else None
         first_diff_jobs = _first_diff(job_snapshots[0], job_snapshots[1]) if runs >= 2 else None
 
-        verdict = {
+        return {
             "probe": name,
             "candidate_sha": ctx.candidate_sha,
             "run_url": ctx.run_url,
@@ -464,7 +469,8 @@ async def probe_p1_determinism(ctx: ProbeCtx) -> dict[str, Any]:
             },
             "run_metrics": run_metrics,
         }
-        return verdict
+    finally:
+        await conn.close()
 
 
 async def probe_p3_scaling(ctx: ProbeCtx) -> dict[str, Any]:
@@ -479,7 +485,8 @@ async def probe_p3_scaling(ctx: ProbeCtx) -> dict[str, Any]:
     tenant_small = _uuid_det("r5", ctx.candidate_sha, "P3", "tenant_small")
     tenant_large = _uuid_det("r5", ctx.candidate_sha, "P3", "tenant_large")
 
-    async with await _pg(ctx.admin_db_url) as conn:
+    conn = await _pg(ctx.admin_db_url)
+    try:
         seed_small = await _seed_events(
             conn,
             tenant_id=tenant_small,
@@ -490,16 +497,10 @@ async def probe_p3_scaling(ctx: ProbeCtx) -> dict[str, Any]:
             occurred_at_step_us=1,
         )
 
-        small_meta = await _run_compute_with_count(
-            tenant_id=tenant_small, window_start=window_start, window_end=window_end
-        )
+        small_meta = await _run_compute_with_count(tenant_id=tenant_small, window_start=window_start, window_end=window_end)
         small_alloc = await _fetch_allocations(conn, tenant_id=tenant_small)
 
-        large_result: dict[str, Any] = {
-            "attempted": False,
-            "completed": False,
-            "error": None,
-        }
+        large_result: dict[str, Any] = {"attempted": False, "completed": False, "error": None}
 
         seed_large = await _seed_events(
             conn,
@@ -518,13 +519,7 @@ async def probe_p3_scaling(ctx: ProbeCtx) -> dict[str, Any]:
                 timeout=max_s,
             )
             large_alloc = await _fetch_allocations(conn, tenant_id=tenant_large)
-            large_result.update(
-                {
-                    "completed": True,
-                    "compute": large_meta,
-                    "allocations_row_count": len(large_alloc),
-                }
-            )
+            large_result.update({"completed": True, "compute": large_meta, "allocations_row_count": len(large_alloc)})
         except asyncio.TimeoutError:
             large_result.update({"completed": False, "error": f"timeout_after_s={max_s}"})
         except Exception as exc:  # noqa: BLE001
@@ -532,17 +527,11 @@ async def probe_p3_scaling(ctx: ProbeCtx) -> dict[str, Any]:
 
         ratio: dict[str, Any] = {"time_ratio": None, "stmt_ratio": None, "rss_ratio": None}
         if large_result.get("completed"):
-            ratio["time_ratio"] = round(
-                float(large_result["compute"]["compute_wall_s"]) / float(small_meta["compute_wall_s"]), 6
-            )
+            ratio["time_ratio"] = round(float(large_result["compute"]["compute_wall_s"]) / float(small_meta["compute_wall_s"]), 6)
             ratio["stmt_ratio"] = round(
-                float(large_result["compute"]["sqlalchemy_statement_count"]) / float(small_meta["sqlalchemy_statement_count"]),
-                6,
+                float(large_result["compute"]["sqlalchemy_statement_count"]) / float(small_meta["sqlalchemy_statement_count"]), 6
             )
-            ratio["rss_ratio"] = round(
-                float(large_result["compute"]["ru_maxrss_kb"]) / float(small_meta["ru_maxrss_kb"]),
-                6,
-            )
+            ratio["rss_ratio"] = round(float(large_result["compute"]["ru_maxrss_kb"]) / float(small_meta["ru_maxrss_kb"]), 6)
 
         return {
             "probe": name,
@@ -557,14 +546,11 @@ async def probe_p3_scaling(ctx: ProbeCtx) -> dict[str, Any]:
                 "compute": small_meta,
                 "allocations_row_count": len(small_alloc),
             },
-            "large": {
-                "tenant_id": str(tenant_large),
-                "N": n_large,
-                "seed": seed_large,
-                **large_result,
-            },
+            "large": {"tenant_id": str(tenant_large), "N": n_large, "seed": seed_large, **large_result},
             "ratios": ratio,
         }
+    finally:
+        await conn.close()
 
 
 def _print_verdict(name: str, payload: dict[str, Any]) -> None:
@@ -589,8 +575,11 @@ async def main() -> int:
 
     print(f"R5_WINDOW_START {_utc_iso()} {candidate_sha}")
 
-    async with await _pg(admin_db_url) as conn:
+    conn = await _pg(admin_db_url)
+    try:
         db_snapshot = await _db_version_snapshot(conn)
+    finally:
+        await conn.close()
 
     env_snapshot = {
         "candidate_sha": candidate_sha,
@@ -620,4 +609,3 @@ async def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(asyncio.run(main()))
-
