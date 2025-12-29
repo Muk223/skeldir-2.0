@@ -27,20 +27,6 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: r5_admin
-          POSTGRES_PASSWORD: r5_admin
-          POSTGRES_DB: r5
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U r5_admin -d r5"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
 
     env:
       CI: "true"
@@ -58,10 +44,48 @@ jobs:
       R5_DETERMINISM_CONCURRENCY: "10"
       R5_SCALE_N_SMALL: "10000"
       R5_SCALE_N_LARGE: "100000"
+      # Reduce statement overhead for 100k while preserving determinism.
+      ATTRIBUTION_BASELINE_BATCH_EVENTS: "10000"
 
     steps:
       - name: Checkout
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+
+      - name: Start Postgres (tuned for bulk inserts)
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name r5-postgres \
+            -p 5432:5432 \
+            --shm-size=1g \
+            -e POSTGRES_USER=r5_admin \
+            -e POSTGRES_PASSWORD=r5_admin \
+            -e POSTGRES_DB=r5 \
+            --health-cmd "pg_isready -U r5_admin -d r5" \
+            --health-interval 5s \
+            --health-timeout 5s \
+            --health-retries 40 \
+            postgres:16 \
+              -c shared_buffers=1GB \
+              -c work_mem=32MB \
+              -c maintenance_work_mem=256MB \
+              -c max_wal_size=4GB \
+              -c checkpoint_timeout=30min \
+              -c checkpoint_completion_target=0.9 \
+              -c wal_compression=on
+
+          for i in $(seq 1 60); do
+            status="$(docker inspect -f '{{.State.Health.Status}}' r5-postgres 2>/dev/null || true)"
+            if [ "$status" = "healthy" ]; then
+              echo "postgres_healthy=1"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "postgres_healthy=0"
+          docker logs r5-postgres || true
+          exit 1
 
       - name: Setup Python
         uses: actions/setup-python@82c7e631bb3cdc910f68e0081d67478d79c6982d
@@ -135,3 +159,10 @@ jobs:
           path: |
             r5_verification.log
 
+      - name: Stop Postgres
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker logs r5-postgres || true
+          docker rm -f r5-postgres || true
