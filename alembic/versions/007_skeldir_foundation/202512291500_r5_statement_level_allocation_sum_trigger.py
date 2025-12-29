@@ -32,10 +32,15 @@ def upgrade() -> None:
     # Drop the existing ROW-level trigger (created by earlier migrations).
     op.execute("DROP TRIGGER IF EXISTS trg_check_allocation_sum ON attribution_allocations;")
 
-    # Replace trigger function with a STATEMENT-level implementation.
+    # Replace trigger function(s) with STATEMENT-level implementations.
+    #
+    # Postgres requires transition-table triggers to be defined for exactly one
+    # event type (INSERT | UPDATE | DELETE), so we create three statement-level
+    # triggers that each validate only the affected (tenant_id, event_id, model_version)
+    # keys for that event.
     op.execute(
         """
-        CREATE OR REPLACE FUNCTION check_allocation_sum()
+        CREATE OR REPLACE FUNCTION check_allocation_sum_stmt_insert()
         RETURNS TRIGGER AS $$
         DECLARE
             tolerance_cents INTEGER := 1; -- ±1 cent rounding tolerance
@@ -46,6 +51,80 @@ def upgrade() -> None:
              * (tenant_id, event_id, model_version) keys and validate sums once
              * per statement (not once per row).
              */
+            WITH affected AS (
+                SELECT DISTINCT tenant_id, event_id, model_version
+                FROM newrows
+                WHERE event_id IS NOT NULL
+            ),
+            totals AS (
+                SELECT
+                    a.tenant_id,
+                    a.event_id,
+                    a.model_version,
+                    COALESCE(SUM(aa.allocated_revenue_cents), 0) AS allocated_sum
+                FROM affected a
+                LEFT JOIN attribution_allocations aa
+                  ON aa.tenant_id = a.tenant_id
+                 AND aa.event_id = a.event_id
+                 AND aa.model_version = a.model_version
+                GROUP BY a.tenant_id, a.event_id, a.model_version
+            ),
+            expected AS (
+                SELECT
+                    a.tenant_id,
+                    a.event_id,
+                    a.model_version,
+                    e.revenue_cents AS event_revenue_cents
+                FROM affected a
+                LEFT JOIN attribution_events e
+                  ON e.tenant_id = a.tenant_id
+                 AND e.id = a.event_id
+            )
+            SELECT
+                t.tenant_id,
+                t.event_id,
+                t.model_version,
+                t.allocated_sum,
+                x.event_revenue_cents,
+                ABS(t.allocated_sum - x.event_revenue_cents) AS drift_cents
+            INTO mismatch
+            FROM totals t
+            JOIN expected x
+              ON x.tenant_id = t.tenant_id
+             AND x.event_id = t.event_id
+             AND x.model_version = t.model_version
+            WHERE x.event_revenue_cents IS NOT NULL
+              AND ABS(t.allocated_sum - x.event_revenue_cents) > tolerance_cents
+            LIMIT 1;
+
+            IF FOUND THEN
+                RAISE EXCEPTION
+                    'Allocation sum mismatch: tenant_id=% event_id=% model_version=% allocated=% expected=% drift=%',
+                    mismatch.tenant_id, mismatch.event_id, mismatch.model_version,
+                    mismatch.allocated_sum, mismatch.event_revenue_cents, mismatch.drift_cents;
+            END IF;
+
+            RETURN NULL;
+        END;
+        $$ LANGUAGE plpgsql;
+        """
+    )
+
+    op.execute(
+        """
+        COMMENT ON FUNCTION check_allocation_sum_stmt_insert() IS
+        'STATEMENT-level validation for INSERT: allocations sum to event revenue per (tenant_id, event_id, model_version) with ±1 cent tolerance. Uses transition tables to avoid per-row amplification.';
+        """
+    )
+
+    op.execute(
+        """
+        CREATE OR REPLACE FUNCTION check_allocation_sum_stmt_update()
+        RETURNS TRIGGER AS $$
+        DECLARE
+            tolerance_cents INTEGER := 1; -- ±1 cent rounding tolerance
+            mismatch RECORD;
+        BEGIN
             WITH affected AS (
                 SELECT DISTINCT tenant_id, event_id, model_version
                 FROM newrows
@@ -111,25 +190,131 @@ def upgrade() -> None:
 
     op.execute(
         """
-        COMMENT ON FUNCTION check_allocation_sum() IS
-        'STATEMENT-level validation that allocations sum to event revenue per (tenant_id, event_id, model_version) with ±1 cent tolerance. Uses transition tables to avoid per-row amplification while preserving deterministic revenue accounting correctness.';
+        COMMENT ON FUNCTION check_allocation_sum_stmt_update() IS
+        'STATEMENT-level validation for UPDATE: allocations sum to event revenue per (tenant_id, event_id, model_version) with ±1 cent tolerance. Uses transition tables to avoid per-row amplification.';
         """
     )
 
-    # Recreate trigger as STATEMENT-level with transition tables.
+    op.execute(
+        """
+        CREATE OR REPLACE FUNCTION check_allocation_sum_stmt_delete()
+        RETURNS TRIGGER AS $$
+        DECLARE
+            tolerance_cents INTEGER := 1; -- ±1 cent rounding tolerance
+            mismatch RECORD;
+        BEGIN
+            WITH affected AS (
+                SELECT DISTINCT tenant_id, event_id, model_version
+                FROM oldrows
+                WHERE event_id IS NOT NULL
+            ),
+            totals AS (
+                SELECT
+                    a.tenant_id,
+                    a.event_id,
+                    a.model_version,
+                    COALESCE(SUM(aa.allocated_revenue_cents), 0) AS allocated_sum
+                FROM affected a
+                LEFT JOIN attribution_allocations aa
+                  ON aa.tenant_id = a.tenant_id
+                 AND aa.event_id = a.event_id
+                 AND aa.model_version = a.model_version
+                GROUP BY a.tenant_id, a.event_id, a.model_version
+            ),
+            expected AS (
+                SELECT
+                    a.tenant_id,
+                    a.event_id,
+                    a.model_version,
+                    e.revenue_cents AS event_revenue_cents
+                FROM affected a
+                LEFT JOIN attribution_events e
+                  ON e.tenant_id = a.tenant_id
+                 AND e.id = a.event_id
+            )
+            SELECT
+                t.tenant_id,
+                t.event_id,
+                t.model_version,
+                t.allocated_sum,
+                x.event_revenue_cents,
+                ABS(t.allocated_sum - x.event_revenue_cents) AS drift_cents
+            INTO mismatch
+            FROM totals t
+            JOIN expected x
+              ON x.tenant_id = t.tenant_id
+             AND x.event_id = t.event_id
+             AND x.model_version = t.model_version
+            WHERE x.event_revenue_cents IS NOT NULL
+              AND ABS(t.allocated_sum - x.event_revenue_cents) > tolerance_cents
+            LIMIT 1;
+
+            IF FOUND THEN
+                RAISE EXCEPTION
+                    'Allocation sum mismatch: tenant_id=% event_id=% model_version=% allocated=% expected=% drift=%',
+                    mismatch.tenant_id, mismatch.event_id, mismatch.model_version,
+                    mismatch.allocated_sum, mismatch.event_revenue_cents, mismatch.drift_cents;
+            END IF;
+
+            RETURN NULL;
+        END;
+        $$ LANGUAGE plpgsql;
+        """
+    )
+
+    op.execute(
+        """
+        COMMENT ON FUNCTION check_allocation_sum_stmt_delete() IS
+        'STATEMENT-level validation for DELETE: allocations sum to event revenue per (tenant_id, event_id, model_version) with ±1 cent tolerance. Uses transition tables to avoid per-row amplification.';
+        """
+    )
+
+    # Recreate triggers as STATEMENT-level with transition tables.
     op.execute(
         """
         CREATE TRIGGER trg_check_allocation_sum
-            AFTER INSERT OR UPDATE OR DELETE ON attribution_allocations
+            AFTER INSERT ON attribution_allocations
+            REFERENCING NEW TABLE AS newrows
+            FOR EACH STATEMENT EXECUTE FUNCTION check_allocation_sum_stmt_insert();
+        """
+    )
+
+    op.execute(
+        """
+        CREATE TRIGGER trg_check_allocation_sum_update
+            AFTER UPDATE ON attribution_allocations
             REFERENCING NEW TABLE AS newrows OLD TABLE AS oldrows
-            FOR EACH STATEMENT EXECUTE FUNCTION check_allocation_sum();
+            FOR EACH STATEMENT EXECUTE FUNCTION check_allocation_sum_stmt_update();
+        """
+    )
+
+    op.execute(
+        """
+        CREATE TRIGGER trg_check_allocation_sum_delete
+            AFTER DELETE ON attribution_allocations
+            REFERENCING OLD TABLE AS oldrows
+            FOR EACH STATEMENT EXECUTE FUNCTION check_allocation_sum_stmt_delete();
         """
     )
 
     op.execute(
         """
         COMMENT ON TRIGGER trg_check_allocation_sum ON attribution_allocations IS
-        'Enforces sum-equality invariant at STATEMENT granularity: allocations must sum to event revenue per (tenant_id, event_id, model_version) with ±1 cent tolerance.';
+        'Enforces sum-equality invariant at STATEMENT granularity (INSERT): allocations must sum to event revenue per (tenant_id, event_id, model_version) with ±1 cent tolerance.';
+        """
+    )
+
+    op.execute(
+        """
+        COMMENT ON TRIGGER trg_check_allocation_sum_update ON attribution_allocations IS
+        'Enforces sum-equality invariant at STATEMENT granularity (UPDATE): allocations must sum to event revenue per (tenant_id, event_id, model_version) with ±1 cent tolerance.';
+        """
+    )
+
+    op.execute(
+        """
+        COMMENT ON TRIGGER trg_check_allocation_sum_delete ON attribution_allocations IS
+        'Enforces sum-equality invariant at STATEMENT granularity (DELETE): allocations must sum to event revenue per (tenant_id, event_id, model_version) with ±1 cent tolerance.';
         """
     )
 
@@ -138,6 +323,8 @@ def downgrade() -> None:
     # Revert to ROW-level behavior (pre-R5). This restores the original shape:
     # - trigger fires per row
     # - function uses NEW/OLD row context
+    op.execute("DROP TRIGGER IF EXISTS trg_check_allocation_sum_delete ON attribution_allocations;")
+    op.execute("DROP TRIGGER IF EXISTS trg_check_allocation_sum_update ON attribution_allocations;")
     op.execute("DROP TRIGGER IF EXISTS trg_check_allocation_sum ON attribution_allocations;")
 
     op.execute(
