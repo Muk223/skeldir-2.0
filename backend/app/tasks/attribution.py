@@ -288,26 +288,6 @@ async def _compute_allocations_deterministic_baseline(
         # Set tenant context for RLS policy
         await set_tenant_guc(conn, tenant_id, local=True)
 
-        def _event_batch_query(*, has_cursor: bool) -> str:
-            cursor_clause = ""
-            if has_cursor:
-                cursor_clause = """
-                  AND (
-                        occurred_at > :last_occurred_at
-                     OR (occurred_at = :last_occurred_at AND id > :last_id)
-                  )
-                """
-            return f"""
-                SELECT id, revenue_cents, occurred_at
-                FROM attribution_events
-                WHERE tenant_id = :tenant_id
-                  AND occurred_at >= :window_start
-                  AND occurred_at < :window_end
-                  {cursor_clause}
-                ORDER BY occurred_at ASC, id ASC
-                LIMIT :limit
-            """
-
         async def _upsert_allocations_bulk(*, rows: dict[str, list]) -> None:
             if not rows["ids"]:
                 return
@@ -392,29 +372,42 @@ async def _compute_allocations_deterministic_baseline(
                 rows,
             )
 
-        event_count = 0
-        allocation_count = 0
-        batches_written = 0
-        last_occurred_at: Optional[datetime] = None
-        last_id: Optional[UUID] = None
-
-        while True:
-            query = _event_batch_query(has_cursor=last_occurred_at is not None)
-            params = {
+        events_result = await conn.execute(
+            text(
+                """
+                SELECT id, revenue_cents, occurred_at
+                FROM attribution_events
+                WHERE tenant_id = :tenant_id
+                  AND occurred_at >= :window_start
+                  AND occurred_at < :window_end
+                ORDER BY occurred_at ASC, id ASC
+                """
+            ),
+            {
                 "tenant_id": tenant_id,
                 "window_start": window_start,
                 "window_end": window_end,
-                "limit": batch_events,
-            }
-            if last_occurred_at is not None and last_id is not None:
-                params.update({"last_occurred_at": last_occurred_at, "last_id": last_id})
+            },
+        )
+        events = events_result.fetchall()
+        if not events:
+            logger.info(
+                "attribution_baseline_no_events_in_window",
+                extra={
+                    "tenant_id": str(tenant_id),
+                    "window_start": window_start.isoformat(),
+                    "window_end": window_end.isoformat(),
+                    "model_version": model_version,
+                },
+            )
+            return {"event_count": 0, "allocation_count": 0}
 
-            events_result = await conn.execute(text(query), params)
-            events = events_result.fetchall()
-            if not events:
-                break
+        event_count = len(events)
+        allocation_count = 0
+        batches_written = 0
 
-            event_count += len(events)
+        for offset in range(0, len(events), batch_events):
+            batch = events[offset : offset + batch_events]
 
             batch_rows: dict[str, list] = {
                 "ids": [],
@@ -431,7 +424,7 @@ async def _compute_allocations_deterministic_baseline(
                 "updated_ats": [],
             }
 
-            for event_id, revenue_cents, _occurred_at in events:
+            for event_id, revenue_cents, _occurred_at in batch:
                 allocated = _split_revenue_cents_evenly(int(revenue_cents), len(BASELINE_CHANNELS))
                 for channel_code, allocated_revenue_cents in zip(
                     BASELINE_CHANNELS, allocated, strict=True
@@ -474,21 +467,6 @@ async def _compute_allocations_deterministic_baseline(
                         },
                     )
                     raise RuntimeError("R5 retry injection: transient failure")
-
-            last_id = events[-1][0]
-            last_occurred_at = events[-1][2]
-
-        if event_count == 0:
-            logger.info(
-                "attribution_baseline_no_events_in_window",
-                extra={
-                    "tenant_id": str(tenant_id),
-                    "window_start": window_start.isoformat(),
-                    "window_end": window_end.isoformat(),
-                    "model_version": model_version,
-                },
-            )
-            return {"event_count": 0, "allocation_count": 0}
 
         logger.info(
             "attribution_baseline_allocations_computed",
