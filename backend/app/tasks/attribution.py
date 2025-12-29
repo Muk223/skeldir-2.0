@@ -318,18 +318,18 @@ async def _compute_allocations_deterministic_baseline(
                     WITH rows AS (
                         SELECT *
                         FROM unnest(
-                            :ids::uuid[],
-                            :tenant_ids::uuid[],
-                            :event_ids::uuid[],
-                            :channel_codes::text[],
-                            :allocation_ratios::numeric[],
-                            :model_versions::text[],
-                            :model_types::text[],
-                            :confidence_scores::numeric[],
-                            :verifieds::bool[],
-                            :allocated_revenue_cents::int[],
-                            :created_ats::timestamptz[],
-                            :updated_ats::timestamptz[]
+                            CAST(:ids AS uuid[]),
+                            CAST(:tenant_ids AS uuid[]),
+                            CAST(:event_ids AS uuid[]),
+                            CAST(:channel_codes AS text[]),
+                            CAST(:allocation_ratios AS numeric[]),
+                            CAST(:model_versions AS text[]),
+                            CAST(:model_types AS text[]),
+                            CAST(:confidence_scores AS numeric[]),
+                            CAST(:verifieds AS bool[]),
+                            CAST(:allocated_revenue_cents AS int[]),
+                            CAST(:created_ats AS timestamptz[]),
+                            CAST(:updated_ats AS timestamptz[])
                         ) AS t(
                             id,
                             tenant_id,
