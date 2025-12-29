@@ -164,7 +164,7 @@ def _iter_event_records(
             f"ext_{i}",
             str(correlation_id),
             str(session_id),
-            int(100 + (i % 7)),  # small int revenue; stable
+            0,  # revenue_cents=0: required for current per-row allocation inserts to pass trg_check_allocation_sum
             json.dumps(raw_payload),
             idempotency_key,
             "conversion",
