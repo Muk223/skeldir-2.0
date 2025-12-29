@@ -369,23 +369,14 @@ async def _cleanup_allocations(
     window_end: datetime,
     phase: str,
 ) -> None:
-    result = await conn.execute(
-        """
-        DELETE FROM attribution_allocations aa
-        USING attribution_events e
-        WHERE aa.tenant_id = $1
-          AND aa.model_version = $2
-          AND e.id = aa.event_id
-          AND e.tenant_id = aa.tenant_id
-          AND e.occurred_at >= $3
-          AND e.occurred_at < $4
-        """,
-        str(tenant_id),
-        model_version,
-        window_start,
-        window_end,
+    before = await _count_allocations(
+        conn,
+        tenant_id=tenant_id,
+        model_version=model_version,
+        window_start=window_start,
+        window_end=window_end,
     )
-    deleted = int(result.split()[-1]) if result else 0
+    await conn.execute("TRUNCATE TABLE attribution_allocations")
     remaining = await _count_allocations(
         conn,
         tenant_id=tenant_id,
@@ -393,7 +384,16 @@ async def _cleanup_allocations(
         window_start=window_start,
         window_end=window_end,
     )
-    print(f"R5_CLEANUP_PHASE={phase} R5_ALLOCATIONS_DELETED={deleted} R5_ALLOCATIONS_REMAINING={remaining}")
+    print(
+        " ".join(
+            [
+                f"R5_CLEANUP_PHASE={phase}",
+                "R5_CLEANUP_MODE=truncate_all",
+                f"R5_ALLOCATIONS_BEFORE={before}",
+                f"R5_ALLOCATIONS_REMAINING={remaining}",
+            ]
+        )
+    )
     _require(remaining == 0, f"R5 cleanup failed for {phase}: remaining allocations {remaining}")
 
 
