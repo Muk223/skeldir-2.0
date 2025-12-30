@@ -90,6 +90,7 @@ class ScenarioResult:
     passed: bool
     http_status_counts: dict[str, int]
     http_timeouts: int
+    http_connection_errors: int
     db: dict[str, Any]
 
 
@@ -153,13 +154,14 @@ async def _http_fire(
     requests: list[tuple[str, dict[str, str], bytes]],
     concurrency: int,
     timeout_s: float,
-) -> tuple[dict[str, int], int]:
+) -> tuple[dict[str, int], int, int]:
     sem = asyncio.Semaphore(concurrency)
     status_counts: dict[str, int] = {}
     timeouts = 0
+    connection_errors = 0
 
     async def _one(url: str, headers: dict[str, str], body: bytes) -> None:
-        nonlocal timeouts
+        nonlocal timeouts, connection_errors
         async with sem:
             try:
                 resp = await client.post(url, content=body, headers=headers, timeout=timeout_s)
@@ -168,9 +170,12 @@ async def _http_fire(
             except (httpx.TimeoutException, asyncio.TimeoutError):
                 timeouts += 1
                 status_counts["timeout"] = status_counts.get("timeout", 0) + 1
+            except httpx.RequestError:
+                connection_errors += 1
+                status_counts["request_error"] = status_counts.get("request_error", 0) + 1
 
     await asyncio.gather(*[_one(url, headers, body) for (url, headers, body) in requests])
-    return status_counts, timeouts
+    return status_counts, timeouts, connection_errors
 
 
 def _verdict_block(name: str, payload: dict[str, Any]) -> None:
@@ -348,23 +353,27 @@ async def scenario_s1_replay_storm(
         body=body,
     )
     reqs = [(url, headers, body) for _ in range(n)]
-    status_counts, timeouts = await _http_fire(client, reqs, concurrency=concurrency, timeout_s=timeout_s)
+    status_counts, timeouts, conn_errors = await _http_fire(
+        client, reqs, concurrency=concurrency, timeout_s=timeout_s
+    )
 
     canonical = await db_count_canonical_for_key(conn, tenant.tenant_id, idempotency_key)
     dlq = await db_count_dlq_for_key(conn, tenant.tenant_id, idempotency_key)
     http_5xx = sum(v for k, v in status_counts.items() if k.isdigit() and 500 <= int(k) <= 599)
 
-    passed = canonical == 1 and dlq == 0 and http_5xx == 0 and timeouts == 0
+    passed = canonical == 1 and dlq == 0 and http_5xx == 0 and timeouts == 0 and conn_errors == 0
     return ScenarioResult(
         name=name,
         passed=passed,
         http_status_counts=status_counts,
         http_timeouts=timeouts,
+        http_connection_errors=conn_errors,
         db={
             "CANONICAL_ROWS_FOR_KEY": canonical,
             "DLQ_ROWS_FOR_KEY": dlq,
             "HTTP_5XX_COUNT": http_5xx,
             "HTTP_TIMEOUT_COUNT": timeouts,
+            "HTTP_CONNECTION_ERRORS": conn_errors,
         },
     )
 
@@ -405,22 +414,26 @@ async def scenario_s2_unique_storm(
         )
         reqs.append((url, headers, body))
 
-    status_counts, timeouts = await _http_fire(client, reqs, concurrency=concurrency, timeout_s=timeout_s)
+    status_counts, timeouts, conn_errors = await _http_fire(
+        client, reqs, concurrency=concurrency, timeout_s=timeout_s
+    )
     canonical = await db_count_canonical_for_keys(conn, tenant.tenant_id, keys)
     dlq = await db_count_dlq_for_keys(conn, tenant.tenant_id, keys)
     http_5xx = sum(v for k, v in status_counts.items() if k.isdigit() and 500 <= int(k) <= 599)
 
-    passed = canonical == n and dlq == 0 and http_5xx == 0 and timeouts == 0
+    passed = canonical == n and dlq == 0 and http_5xx == 0 and timeouts == 0 and conn_errors == 0
     return ScenarioResult(
         name=name,
         passed=passed,
         http_status_counts=status_counts,
         http_timeouts=timeouts,
+        http_connection_errors=conn_errors,
         db={
             "CANONICAL_ROWS_CREATED": canonical,
             "DLQ_ROWS_CREATED": dlq,
             "HTTP_5XX_COUNT": http_5xx,
             "HTTP_TIMEOUT_COUNT": timeouts,
+            "HTTP_CONNECTION_ERRORS": conn_errors,
         },
     )
 
@@ -461,22 +474,26 @@ async def scenario_s3_malformed_storm(
         )
         reqs.append((url, headers, body))
 
-    status_counts, timeouts = await _http_fire(client, reqs, concurrency=concurrency, timeout_s=timeout_s)
+    status_counts, timeouts, conn_errors = await _http_fire(
+        client, reqs, concurrency=concurrency, timeout_s=timeout_s
+    )
     canonical = await db_count_canonical_for_keys(conn, tenant.tenant_id, keys)
     dlq = await db_count_dlq_for_keys(conn, tenant.tenant_id, keys)
     http_5xx = sum(v for k, v in status_counts.items() if k.isdigit() and 500 <= int(k) <= 599)
 
-    passed = canonical == 0 and dlq == n and http_5xx == 0 and timeouts == 0
+    passed = canonical == 0 and dlq == n and http_5xx == 0 and timeouts == 0 and conn_errors == 0
     return ScenarioResult(
         name=name,
         passed=passed,
         http_status_counts=status_counts,
         http_timeouts=timeouts,
+        http_connection_errors=conn_errors,
         db={
             "CANONICAL_ROWS_CREATED": canonical,
             "DLQ_ROWS_CREATED": dlq,
             "HTTP_5XX_COUNT": http_5xx,
             "HTTP_TIMEOUT_COUNT": timeouts,
+            "HTTP_CONNECTION_ERRORS": conn_errors,
         },
     )
 
@@ -517,18 +534,28 @@ async def scenario_s4_pii_storm(
         )
         reqs.append((url, headers, body))
 
-    status_counts, timeouts = await _http_fire(client, reqs, concurrency=concurrency, timeout_s=timeout_s)
+    status_counts, timeouts, conn_errors = await _http_fire(
+        client, reqs, concurrency=concurrency, timeout_s=timeout_s
+    )
     canonical = await db_count_canonical_for_keys(conn, tenant.tenant_id, keys)
     dlq = await db_count_dlq_for_keys(conn, tenant.tenant_id, keys)
     pii_hits = await db_pii_key_hits_since(conn, run_start_utc, [tenant.tenant_id])
     http_5xx = sum(v for k, v in status_counts.items() if k.isdigit() and 500 <= int(k) <= 599)
 
-    passed = canonical == 0 and dlq == n and http_5xx == 0 and timeouts == 0 and sum(pii_hits.values()) == 0
+    passed = (
+        canonical == 0
+        and dlq == n
+        and http_5xx == 0
+        and timeouts == 0
+        and conn_errors == 0
+        and sum(pii_hits.values()) == 0
+    )
     return ScenarioResult(
         name=name,
         passed=passed,
         http_status_counts=status_counts,
         http_timeouts=timeouts,
+        http_connection_errors=conn_errors,
         db={
             "CANONICAL_ROWS_CREATED": canonical,
             "DLQ_ROWS_CREATED": dlq,
@@ -536,6 +563,7 @@ async def scenario_s4_pii_storm(
             **pii_hits,
             "HTTP_5XX_COUNT": http_5xx,
             "HTTP_TIMEOUT_COUNT": timeouts,
+            "HTTP_CONNECTION_ERRORS": conn_errors,
         },
     )
 
@@ -580,23 +608,33 @@ async def scenario_s5_cross_tenant_collision(
         body=body,
     )
     reqs = [(url, headers_a, body), (url, headers_b, body)]
-    status_counts, timeouts = await _http_fire(client, reqs, concurrency=concurrency, timeout_s=timeout_s)
+    status_counts, timeouts, conn_errors = await _http_fire(
+        client, reqs, concurrency=concurrency, timeout_s=timeout_s
+    )
 
     a_canonical = await db_count_canonical_for_key(conn, tenant_a.tenant_id, idempotency_key)
     b_canonical = await db_count_canonical_for_key(conn, tenant_b.tenant_id, idempotency_key)
     http_5xx = sum(v for k, v in status_counts.items() if k.isdigit() and 500 <= int(k) <= 599)
 
-    passed = a_canonical == 1 and b_canonical == 1 and http_5xx == 0 and timeouts == 0
+    passed = (
+        a_canonical == 1
+        and b_canonical == 1
+        and http_5xx == 0
+        and timeouts == 0
+        and conn_errors == 0
+    )
     return ScenarioResult(
         name=name,
         passed=passed,
         http_status_counts=status_counts,
         http_timeouts=timeouts,
+        http_connection_errors=conn_errors,
         db={
             "TENANT_A_CANONICAL_ROWS_FOR_KEY": a_canonical,
             "TENANT_B_CANONICAL_ROWS_FOR_KEY": b_canonical,
             "HTTP_5XX_COUNT": http_5xx,
             "HTTP_TIMEOUT_COUNT": timeouts,
+            "HTTP_CONNECTION_ERRORS": conn_errors,
         },
     )
 
@@ -680,7 +718,9 @@ async def scenario_s6_mixed_storm(
 
     reqs.sort(key=lambda r: hashlib.sha256(r[1]["X-Idempotency-Key"].encode("utf-8")).hexdigest())
 
-    status_counts, timeouts = await _http_fire(client, reqs, concurrency=concurrency, timeout_s=timeout_s)
+    status_counts, timeouts, conn_errors = await _http_fire(
+        client, reqs, concurrency=concurrency, timeout_s=timeout_s
+    )
     http_5xx = sum(v for k, v in status_counts.items() if k.isdigit() and 500 <= int(k) <= 599)
 
     replay_canonical = await db_count_canonical_for_key(conn, tenant.tenant_id, replay_key)
@@ -693,18 +733,21 @@ async def scenario_s6_mixed_storm(
         and malformed_dlq == len(malformed_keys)
         and http_5xx == 0
         and timeouts == 0
+        and conn_errors == 0
     )
     return ScenarioResult(
         name=name,
         passed=passed,
         http_status_counts=status_counts,
         http_timeouts=timeouts,
+        http_connection_errors=conn_errors,
         db={
             "REPLAY_CANONICAL_ROWS_FOR_KEY": replay_canonical,
             "UNIQUE_CANONICAL_ROWS_CREATED": unique_canonical,
             "MALFORMED_DLQ_ROWS_CREATED": malformed_dlq,
             "HTTP_5XX_COUNT": http_5xx,
             "HTTP_TIMEOUT_COUNT": timeouts,
+            "HTTP_CONNECTION_ERRORS": conn_errors,
         },
     )
 
@@ -779,7 +822,8 @@ async def main() -> int:
     finally:
         await conn.close()
 
-    async with httpx.AsyncClient() as client:
+    limits = httpx.Limits(max_connections=concurrency, max_keepalive_connections=concurrency)
+    async with httpx.AsyncClient(limits=limits) as client:
         conn2 = await _pg_connect(db_url)
         try:
             all_results: list[ScenarioResult] = []

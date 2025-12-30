@@ -369,30 +369,44 @@ jobs:
           psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d r3 -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;" >/dev/null
 
           pkill -f "uvicorn app.main:app" || true
-          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/r7_uvicorn_r3.log 2>&1 &
+          nohup env PYTHONUNBUFFERED=1 python -u -m uvicorn app.main:app \
+            --host 127.0.0.1 \
+            --port 8000 \
+            --log-level debug \
+            --access-log \
+            --backlog 2048 > /tmp/r7_uvicorn_r3.log 2>&1 &
+          API_PID=$!
+          echo "R3_API_PID=${API_PID}"
+          sleep 1
+          if ! kill -0 "${API_PID}" 2>/dev/null; then
+            echo "R3 API process exited immediately"
+            ls -l /tmp/r7_uvicorn_r3.log || true
+            tail -n 200 /tmp/r7_uvicorn_r3.log || true
+            exit 1
+          fi
           for i in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
+            if curl -fsS http://127.0.0.1:8000/health/ready >/dev/null; then
               break
             fi
             sleep 1
           done
-          if ! curl -fsS http://127.0.0.1:8000/health >/dev/null; then
-            echo "R3 API failed to become healthy"
+          if ! curl -fsS http://127.0.0.1:8000/health/ready >/dev/null; then
+            echo "R3 API failed readiness checks"
+            ps -p "${API_PID}" -o pid,ppid,cmd || true
+            ss -ltnp | grep ":8000" || true
+            ls -l /tmp/r7_uvicorn_r3.log || true
             tail -n 200 /tmp/r7_uvicorn_r3.log || true
             exit 1
           fi
 
           python scripts/r3/ingestion_under_fire.py | tee /tmp/r3_harness.log
-          R3_STATUS=${PIPESTATUS[0]}
+          R3_HARNESS_EXIT=${PIPESTATUS[0]}
+          export R3_HARNESS_EXIT
           pkill -f "uvicorn app.main:app" || true
-          if [ "${R3_STATUS}" != "0" ]; then
-            echo "R3 harness failed; dumping uvicorn log"
-            tail -n 200 /tmp/r7_uvicorn_r3.log || true
-            exit "${R3_STATUS}"
-          fi
 
           python - <<'PY' > /tmp/r7_results/r3.json
           import json
+          import os
           from pathlib import Path
 
           scenarios = []
@@ -409,8 +423,15 @@ jobs:
                   continue
               if current is not None:
                   current["json"] += line + "\n"
-          passed = all(s.get("passed") for s in scenarios)
-          payload = {"phase": "R3", "status": "PASS" if passed else "FAIL", "scenarios": scenarios}
+          exit_code = int(os.environ.get("R3_HARNESS_EXIT", "1") or 1)
+          passed = bool(scenarios) and exit_code == 0 and all(s.get("passed") for s in scenarios)
+          payload = {
+              "phase": "R3",
+              "status": "PASS" if passed else "FAIL",
+              "harness_exit_code": exit_code,
+              "scenarios_executed": len(scenarios),
+              "scenarios": scenarios,
+          }
           print(json.dumps(payload, indent=2, sort_keys=True))
           PY
 
@@ -423,6 +444,9 @@ jobs:
           )
           if [ "${R3_STATUS}" != "PASS" ]; then
             echo "R3 verdict failed; dumping uvicorn log"
+            ps -p "${API_PID}" -o pid,ppid,cmd || true
+            ss -ltnp | grep ":8000" || true
+            ls -l /tmp/r7_uvicorn_r3.log || true
             tail -n 200 /tmp/r7_uvicorn_r3.log || true
             exit 1
           fi
