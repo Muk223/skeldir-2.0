@@ -188,8 +188,6 @@ jobs:
           import os
           import sys
           from pathlib import Path
-          import re
-
           sha = os.environ.get("GITHUB_SHA") or ""
           base = Path("docs/validation/runtime/R6_context_gathering") / sha
           def read_json(name):
@@ -228,7 +226,15 @@ jobs:
           if not timeout.get("soft_limit_observed") or not timeout.get("hard_limit_observed"):
               print("R6_VERIFY_TIMEOUT_FAIL")
               sys.exit(1)
-          print(f"R6_VERIFY_TIMEOUT_OK elapsed_s={timeout.get('elapsed_s')}")
+          elapsed_s = timeout.get("elapsed_s")
+          hard_limit = timeout.get("hard_limit_s")
+          if elapsed_s is None or hard_limit is None:
+              print("R6_VERIFY_TIMEOUT_FAIL missing elapsed or hard limit")
+              sys.exit(1)
+          if elapsed_s > (hard_limit + 5):
+              print(f"R6_VERIFY_TIMEOUT_FAIL elapsed_s={elapsed_s} hard_limit_s={hard_limit}")
+              sys.exit(1)
+          print(f"R6_VERIFY_TIMEOUT_OK elapsed_s={elapsed_s} hard_limit_s={hard_limit}")
 
           attempts = retry.get("attempt_numbers") or []
           attempt_max = retry.get("attempt_max")
@@ -241,18 +247,38 @@ jobs:
               sys.exit(1)
           print(f"R6_VERIFY_RETRY_OK attempts={attempts} terminal_state={terminal_state}")
 
-          unique_pids = recycle.get("unique_pid_count")
-          if unique_pids is None or unique_pids < 2:
-              print("R6_VERIFY_RECYCLE_FAIL")
+          pid_samples = recycle.get("pid_samples") or []
+          unique_pids = sorted(set(pid_samples))
+          unique_pid_count = recycle.get("unique_pid_count")
+          derived_checks = recycle.get("derived_checks") or {}
+          if unique_pid_count != len(unique_pids):
+              print(f"R6_VERIFY_RECYCLE_FAIL pid_samples={pid_samples} unique_pids={unique_pids}")
               sys.exit(1)
-          print(f"R6_VERIFY_RECYCLE_OK unique_pids={unique_pids}")
+          if recycle.get("unique_pids") != unique_pids:
+              print(f"R6_VERIFY_RECYCLE_FAIL unique_pids_mismatch json={recycle.get('unique_pids')} computed={unique_pids}")
+              sys.exit(1)
+          if not derived_checks.get("assert_unique_pid_count_matches_samples"):
+              print("R6_VERIFY_RECYCLE_FAIL derived_checks count mismatch")
+              sys.exit(1)
+          if not derived_checks.get("assert_unique_pids_matches_samples"):
+              print("R6_VERIFY_RECYCLE_FAIL derived_checks pid mismatch")
+              sys.exit(1)
+          if len(unique_pids) < 2:
+              print("R6_VERIFY_RECYCLE_FAIL insufficient unique pids")
+              sys.exit(1)
+          print(f"R6_VERIFY_RECYCLE_OK unique_pid_count={len(unique_pids)} pids={unique_pids}")
 
           max_wait = prefetch.get("max_short_wait_s")
           threshold = prefetch.get("short_wait_threshold_s")
+          short_start_count = prefetch.get("short_start_count")
+          probe_valid = prefetch.get("probe_valid")
+          if not probe_valid or not short_start_count or short_start_count < 1:
+              print(f"R6_VERIFY_PREFETCH_FAIL probe_valid={probe_valid} short_start_count={short_start_count}")
+              sys.exit(1)
           if max_wait is None or threshold is None or max_wait > threshold:
               print(f"R6_VERIFY_PREFETCH_FAIL max_wait={max_wait} threshold={threshold}")
               sys.exit(1)
-          print(f"R6_VERIFY_PREFETCH_OK max_wait={max_wait} threshold={threshold}")
+          print(f"R6_VERIFY_PREFETCH_OK max_wait={max_wait} threshold={threshold} short_start_count={short_start_count}")
 
           annotations = (conf.get("conf_full") or {}).get("task_annotations") or {}
           chord = annotations.get("celery.chord_unlock") or {}

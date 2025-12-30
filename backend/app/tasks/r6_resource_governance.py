@@ -199,11 +199,29 @@ def prefetch_short_task(self, run_id: str, index: int) -> dict:
         f"r6_prefetch_short_start run_id={run_id} task_id={self.request.id} index={index}",
         extra={"run_id": run_id, "task_id": self.request.id, "index": index, "started": started},
     )
+    _append_probe_log(
+        {
+            "event": "R6_SHORT_TASK_START",
+            "run_id": run_id,
+            "task_id": self.request.id,
+            "index": index,
+            "timestamp": started,
+        }
+    )
     time.sleep(0.2)
     finished = datetime.now(timezone.utc).isoformat()
     logger.info(
         f"r6_prefetch_short_end run_id={run_id} task_id={self.request.id} index={index}",
         extra={"run_id": run_id, "task_id": self.request.id, "index": index, "finished": finished},
+    )
+    _append_probe_log(
+        {
+            "event": "R6_SHORT_TASK_END",
+            "run_id": run_id,
+            "task_id": self.request.id,
+            "index": index,
+            "timestamp": finished,
+        }
     )
     return {"started": started, "finished": finished}
 
@@ -219,11 +237,29 @@ def prefetch_long_task(self, run_id: str, index: int, sleep_s: float = 2.0) -> d
         f"r6_prefetch_long_start run_id={run_id} task_id={self.request.id} index={index}",
         extra={"run_id": run_id, "task_id": self.request.id, "index": index, "started": started},
     )
+    _append_probe_log(
+        {
+            "event": "R6_LONG_TASK_START",
+            "run_id": run_id,
+            "task_id": self.request.id,
+            "index": index,
+            "timestamp": started,
+        }
+    )
     time.sleep(float(sleep_s))
     finished = datetime.now(timezone.utc).isoformat()
     logger.info(
         f"r6_prefetch_long_end run_id={run_id} task_id={self.request.id} index={index}",
         extra={"run_id": run_id, "task_id": self.request.id, "index": index, "finished": finished},
+    )
+    _append_probe_log(
+        {
+            "event": "R6_LONG_TASK_END",
+            "run_id": run_id,
+            "task_id": self.request.id,
+            "index": index,
+            "timestamp": finished,
+        }
     )
     return {"started": started, "finished": finished}
 

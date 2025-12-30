@@ -393,7 +393,7 @@ def _probe_retry(ctx: R6Context) -> dict[str, Any]:
 
 def _probe_prefetch(ctx: R6Context) -> dict[str, Any]:
     run_id = f"prefetch-{uuid4()}"
-    sent_at = time.time()
+    sent_at = datetime.now(timezone.utc)
     long_ids = [
         celery_app.send_task(
             "app.tasks.r6_resource_governance.prefetch_long_task",
@@ -414,34 +414,41 @@ def _probe_prefetch(ctx: R6Context) -> dict[str, Any]:
     long_results = [AsyncResult(tid).get(timeout=30) for tid in long_ids]
     short_results = [AsyncResult(tid).get(timeout=30) for tid in short_ids]
 
+    events = _read_probe_events(ctx.probe_log_path)
+    short_start_events = [
+        event
+        for event in events
+        if event.get("event") == "R6_SHORT_TASK_START" and event.get("run_id") == run_id
+    ]
+    long_start_events = [
+        event
+        for event in events
+        if event.get("event") == "R6_LONG_TASK_START" and event.get("run_id") == run_id
+    ]
+
     short_wait_s = []
-    for result in short_results:
-        if isinstance(result, dict) and result.get("started"):
-            started = datetime.fromisoformat(result["started"]).timestamp()
-            short_wait_s.append(started - sent_at)
+    for event in short_start_events:
+        ts = event.get("timestamp")
+        if isinstance(ts, str):
+            started = datetime.fromisoformat(ts)
+            short_wait_s.append((started - sent_at).total_seconds())
     max_short_wait_s = max(short_wait_s) if short_wait_s else None
     wait_threshold_s = 20.0
     wait_within_threshold = (
         max_short_wait_s is not None and max_short_wait_s <= wait_threshold_s
     )
-
-    log_text = (
-        ctx.worker_log_path.read_text(encoding="utf-8", errors="replace")
-        if ctx.worker_log_path.exists()
-        else ""
-    )
-    short_starts = [
-        line for line in log_text.splitlines() if "r6_prefetch_short_start" in line and run_id in line
-    ]
+    probe_valid = bool(short_start_events)
     payload = {
         "run_id": run_id,
-        "short_start_log_lines": short_starts,
-        "short_start_count": len(short_starts),
+        "short_start_events": short_start_events,
+        "short_start_count": len(short_start_events),
+        "long_start_count": len(long_start_events),
         "long_task_count": len(long_ids),
         "short_result_count": len(short_results),
         "max_short_wait_s": max_short_wait_s,
         "short_wait_threshold_s": wait_threshold_s,
         "short_wait_within_threshold": wait_within_threshold,
+        "probe_valid": probe_valid,
     }
     _write_json(
         ctx.output_dir / "R6_PROBE_PREFETCH.json",
@@ -465,6 +472,10 @@ def _probe_recycle(ctx: R6Context) -> dict[str, Any]:
         if isinstance(payload, dict) and payload.get("pid"):
             pids.append(int(payload["pid"]))
     unique_pids = sorted(set(pids))
+    derived_checks = {
+        "assert_unique_pid_count_matches_samples": len(unique_pids) == len(set(pids)),
+        "assert_unique_pids_matches_samples": unique_pids == sorted(set(pids)),
+    }
     payload = {
         "run_id": run_id,
         "pid_samples": pids,
@@ -472,6 +483,7 @@ def _probe_recycle(ctx: R6Context) -> dict[str, Any]:
         "unique_pids": unique_pids,
         "sample_count": len(pids),
         "recycled_per_task": len(unique_pids) == len(pids) if pids else False,
+        "derived_checks": derived_checks,
     }
     _write_json(
         ctx.output_dir / "R6_PROBE_RECYCLE.json",
