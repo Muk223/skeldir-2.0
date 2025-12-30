@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import os
 import platform
-import re
 import subprocess
 import sys
 import time
@@ -30,6 +29,7 @@ from app.celery_app import celery_app  # noqa: E402
 
 
 WORKER_LOG_ENV = "R6_WORKER_LOG_PATH"
+PROBE_LOG_ENV = "R6_PROBE_LOG_PATH"
 
 
 @dataclass(frozen=True)
@@ -39,6 +39,7 @@ class R6Context:
     run_url: str
     output_dir: Path
     worker_log_path: Path
+    probe_log_path: Path
 
 
 def _utc_now() -> str:
@@ -99,6 +100,18 @@ def _ensure_output_dir(base_dir: Path, sha: str) -> Path:
     out = base_dir / sha
     out.mkdir(parents=True, exist_ok=True)
     return out
+
+
+def _read_probe_events(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    events = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            events.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return events
 
 
 def _resolve_task_route(task_name: str, routes: dict) -> dict[str, str]:
@@ -308,13 +321,12 @@ def _probe_timeout(ctx: R6Context) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         error = f"{exc.__class__.__name__}:{exc}"
 
-    log_text = (
-        ctx.worker_log_path.read_text(encoding="utf-8", errors="replace")
-        if ctx.worker_log_path.exists()
-        else ""
+    events = _read_probe_events(ctx.probe_log_path)
+    soft_hit = any(
+        event.get("event") == "timeout_soft_limit" and event.get("run_id") == run_id
+        for event in events
     )
-    soft_hit = "r6_timeout_soft_limit_exceeded" in log_text
-    hard_hit = "Hard time limit" in log_text or "TimeLimitExceeded" in log_text
+    hard_hit = error is not None and "TimeLimitExceeded" in error
     payload = {
         "run_id": run_id,
         "soft_limit_observed": soft_hit,
@@ -343,25 +355,21 @@ def _probe_retry(ctx: R6Context) -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         error = f"{exc.__class__.__name__}:{exc}"
 
-    log_text = (
-        ctx.worker_log_path.read_text(encoding="utf-8", errors="replace")
-        if ctx.worker_log_path.exists()
-        else ""
-    )
-    attempt_lines = [
-        line
-        for line in log_text.splitlines()
-        if "r6_retry_attempt" in line and run_id in line
+    events = _read_probe_events(ctx.probe_log_path)
+    attempt_events = [
+        event
+        for event in events
+        if event.get("event") == "retry_attempt" and event.get("run_id") == run_id
     ]
-    attempt_numbers = []
-    for line in attempt_lines:
-        match = re.search(r"attempt=(\d+)", line)
-        if match:
-            attempt_numbers.append(int(match.group(1)))
+    attempt_numbers = [
+        int(event["attempt"])
+        for event in attempt_events
+        if isinstance(event.get("attempt"), int)
+    ]
     payload = {
         "run_id": run_id,
-        "attempt_lines": attempt_lines,
-        "attempt_count": len(attempt_lines),
+        "attempt_events": attempt_events,
+        "attempt_count": len(attempt_events),
         "attempt_numbers": attempt_numbers,
         "attempt_max": max(attempt_numbers) if attempt_numbers else None,
         "result_error": error,
@@ -474,13 +482,17 @@ def main() -> int:
     output_dir = _ensure_output_dir(output_root, sha)
 
     worker_log_path = Path(os.getenv(WORKER_LOG_ENV, "r6_worker.log"))
+    probe_log_path = Path(os.getenv(PROBE_LOG_ENV, "r6_probe.log"))
     ctx = R6Context(
         sha=sha,
         timestamp_utc=timestamp,
         run_url=run_url,
         output_dir=output_dir,
         worker_log_path=worker_log_path,
+        probe_log_path=probe_log_path,
     )
+    if probe_log_path.exists():
+        probe_log_path.unlink()
 
     env_snapshot = {
         "R6_SHA": sha,

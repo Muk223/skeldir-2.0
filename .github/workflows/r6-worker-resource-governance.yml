@@ -53,6 +53,7 @@ jobs:
       CELERY_RESULT_BACKEND_ENGINE_POOL_SIZE: "2"
       R6_POSTGRES_IMAGE: "postgres:16"
       R6_WORKER_LOG_PATH: r6_worker.log
+      R6_PROBE_LOG_PATH: r6_probe.log
 
     steps:
       - name: Checkout
@@ -159,6 +160,9 @@ jobs:
           echo "R6_PROBE_RECYCLE_JSON_BEGIN"
           cat "$base/R6_PROBE_RECYCLE.json" || true
           echo "R6_PROBE_RECYCLE_JSON_END"
+          echo "R6_PROBE_LOG_BEGIN"
+          cat r6_probe.log || true
+          echo "R6_PROBE_LOG_END"
 
       - name: Stop Celery worker
         if: always()
@@ -176,4 +180,5 @@ jobs:
           name: r6-context-gathering-${{ github.sha }}
           path: |
             r6_worker.log
+            r6_probe.log
             docs/validation/runtime/R6_context_gathering/${{ github.sha }}/

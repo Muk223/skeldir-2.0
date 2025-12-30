@@ -18,6 +18,15 @@ from app.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 
+def _append_probe_log(event: dict) -> None:
+    path = os.getenv("R6_PROBE_LOG_PATH", "r6_probe.log")
+    try:
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(event, sort_keys=True) + "\n")
+    except Exception:
+        logger.warning("r6_probe_log_write_failed", extra={"path": path})
+
+
 def _dsn_scheme_and_hash(dsn: str) -> dict[str, str]:
     if not dsn:
         return {"scheme": "", "sha256": ""}
@@ -123,6 +132,14 @@ def timeout_probe(self, run_id: str) -> None:
         f"r6_timeout_probe_start run_id={run_id} task_id={self.request.id}",
         extra={"run_id": run_id, "task_id": self.request.id},
     )
+    _append_probe_log(
+        {
+            "event": "timeout_probe_start",
+            "run_id": run_id,
+            "task_id": self.request.id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    )
     try:
         while True:
             time.sleep(0.2)
@@ -130,6 +147,14 @@ def timeout_probe(self, run_id: str) -> None:
         logger.warning(
             f"r6_timeout_soft_limit_exceeded run_id={run_id} task_id={self.request.id}",
             extra={"run_id": run_id, "task_id": self.request.id},
+        )
+        _append_probe_log(
+            {
+                "event": "timeout_soft_limit",
+                "run_id": run_id,
+                "task_id": self.request.id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
         )
         while True:
             time.sleep(0.2)
@@ -150,6 +175,15 @@ def retry_probe(self, run_id: str) -> None:
     logger.warning(
         f"r6_retry_attempt run_id={run_id} task_id={self.request.id} attempt={attempt}",
         extra={"run_id": run_id, "task_id": self.request.id, "attempt": attempt},
+    )
+    _append_probe_log(
+        {
+            "event": "retry_attempt",
+            "run_id": run_id,
+            "task_id": self.request.id,
+            "attempt": attempt,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
     )
     raise self.retry(exc=RuntimeError("r6 retry probe failure"), countdown=1)
 
