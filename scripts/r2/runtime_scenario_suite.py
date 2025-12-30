@@ -319,13 +319,18 @@ async def _scenario_4_revenue_reconciliation_insert(tenant_id: UUID) -> None:
         _ = res.scalar_one()
 
 
-async def _scenario_5_worker_context_db_roundtrip(tenant_id: UUID) -> None:
+async def _scenario_5_worker_context_db_roundtrip(
+    tenant_id: UUID,
+    *,
+    capture_sql: Callable[[str], None] | None = None,
+) -> None:
     from app.tasks.context import run_in_worker_loop
     from app.db.session import set_tenant_guc_async
 
     async def _worker_coro() -> None:
         from sqlalchemy.ext.asyncio import create_async_engine
         from sqlalchemy.pool import NullPool
+        from sqlalchemy import event as sa_event
 
         db_url = os.getenv("DATABASE_URL")
         if not db_url:
@@ -334,6 +339,10 @@ async def _scenario_5_worker_context_db_roundtrip(tenant_id: UUID) -> None:
             db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
         worker_engine = create_async_engine(db_url, poolclass=NullPool)
+        if capture_sql is not None:
+            def _before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+                capture_sql(statement)
+            sa_event.listen(worker_engine.sync_engine, "before_cursor_execute", _before_cursor_execute)
         try:
             async with worker_engine.begin() as conn:
                 await set_tenant_guc_async(conn, tenant_id, local=True)
@@ -378,12 +387,15 @@ async def _run_suite(candidate_sha: str, window_id: str, orm_verdict_json: str |
     await _assert_prereqs(tenant_id)
 
     normalized_sqls: list[str] = []
+    def _capture_sql(statement: str) -> None:
+        normalized_sqls.append(_normalize_sql(statement))
+
     try:
         from app.db.session import engine as _engine
         from sqlalchemy import event as _event
 
         def _before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
-            normalized_sqls.append(_normalize_sql(statement))
+            _capture_sql(statement)
 
         _event.listen(_engine.sync_engine, "before_cursor_execute", _before_cursor_execute)
     except Exception as exc:
@@ -394,7 +406,11 @@ async def _run_suite(candidate_sha: str, window_id: str, orm_verdict_json: str |
         Scenario(2, "event_ingestion_duplicate", lambda: _scenario_2_ingestion_duplicate(tenant_id)),
         Scenario(3, "validation_failure_routes_to_dlq", lambda: _scenario_3_validation_failure_routes_to_dlq(tenant_id)),
         Scenario(4, "revenue_ledger_read_only_query", lambda: _scenario_4_revenue_reconciliation_insert(tenant_id)),
-        Scenario(5, "worker_context_db_roundtrip", lambda: _scenario_5_worker_context_db_roundtrip(tenant_id)),
+        Scenario(
+            5,
+            "worker_context_db_roundtrip",
+            lambda: _scenario_5_worker_context_db_roundtrip(tenant_id, capture_sql=_capture_sql),
+        ),
         Scenario(6, "channel_correction_is_append_only", lambda: _scenario_6_channel_correction_does_not_update_events(tenant_id)),
     ]
 
