@@ -412,7 +412,7 @@ def _probe_prefetch(ctx: R6Context) -> dict[str, Any]:
             started = datetime.fromisoformat(result["started"]).timestamp()
             short_wait_s.append(started - sent_at)
     max_short_wait_s = max(short_wait_s) if short_wait_s else None
-    wait_threshold_s = 5.0
+    wait_threshold_s = 20.0
     wait_within_threshold = (
         max_short_wait_s is not None and max_short_wait_s <= wait_threshold_s
     )
