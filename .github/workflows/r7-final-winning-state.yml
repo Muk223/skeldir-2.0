@@ -179,20 +179,38 @@ jobs:
             psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d "${db}" -c "GRANT USAGE ON SCHEMA public TO app_user;" >/dev/null
             psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d "${db}" -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user;" >/dev/null
             psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d "${db}" -c "GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO app_user;" >/dev/null
+            psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d "${db}" -c "ALTER DEFAULT PRIVILEGES FOR ROLE ${R7_PG_ADMIN_USER} IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_user;" >/dev/null
+            psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d "${db}" -c "ALTER DEFAULT PRIVILEGES FOR ROLE ${R7_PG_ADMIN_USER} IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO app_user;" >/dev/null
           done
 
       - name: "R7 Phase R1: Live invokable engine"
         shell: bash
         env:
-          DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/r1
+          DATABASE_URL: postgresql+asyncpg://app_user:app_user@127.0.0.1:5432/r1
           MIGRATION_DATABASE_URL: postgresql://r7_admin:r7_admin@127.0.0.1:5432/r1
         run: |
           set -euo pipefail
           echo "R7_PHASE_START=R1 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ) sha=${GITHUB_SHA}"
           alembic upgrade heads
+          export PGPASSWORD="${R7_PG_ADMIN_PASSWORD}"
+          psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d r1 -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user;" >/dev/null
+          psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d r1 -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;" >/dev/null
 
+          python - <<'PY'
+          import app.main
+          print("R1_APP_IMPORT_OK")
+          PY
+
+          pkill -f "uvicorn app.main:app" || true
           nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/r7_uvicorn_r1.log 2>&1 &
           API_PID=$!
+          sleep 1
+          if ! kill -0 "${API_PID}" 2>/dev/null; then
+            echo "R1 API process exited immediately"
+            echo "---- r7_uvicorn_r1.log ----"
+            tail -n 200 /tmp/r7_uvicorn_r1.log || true
+            exit 1
+          fi
 
           for i in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
@@ -248,13 +266,15 @@ jobs:
       - name: "R7 Phase R2: Data-Truth hardening"
         shell: bash
         env:
-          DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/r2
+          DATABASE_URL: postgresql+asyncpg://app_user:app_user@127.0.0.1:5432/r2
           MIGRATION_DATABASE_URL: postgresql://r7_admin:r7_admin@127.0.0.1:5432/r2
         run: |
           set -euo pipefail
           echo "R7_PHASE_START=R2 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ) sha=${GITHUB_SHA}"
           alembic upgrade heads
           export PGPASSWORD="${R7_PG_ADMIN_PASSWORD}"
+          psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d r2 -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user;" >/dev/null
+          psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d r2 -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;" >/dev/null
           psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d postgres -c "ALTER SYSTEM SET log_statement='all';" >/dev/null
           psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d postgres -c "SELECT pg_reload_conf();" >/dev/null
           psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d r2 <<'SQL'
@@ -330,7 +350,7 @@ jobs:
       - name: "R7 Phase R3: Ingestion under fire"
         shell: bash
         env:
-          DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/r3
+          DATABASE_URL: postgresql+asyncpg://app_user:app_user@127.0.0.1:5432/r3
           MIGRATION_DATABASE_URL: postgresql://r7_admin:r7_admin@127.0.0.1:5432/r3
           R3_DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/r3
           R3_API_BASE_URL: http://127.0.0.1:8000
@@ -341,6 +361,9 @@ jobs:
           set -euo pipefail
           echo "R7_PHASE_START=R3 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ) sha=${GITHUB_SHA}"
           alembic upgrade heads
+          export PGPASSWORD="${R7_PG_ADMIN_PASSWORD}"
+          psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d r3 -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user;" >/dev/null
+          psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d r3 -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;" >/dev/null
 
           pkill -f "uvicorn app.main:app" || true
           nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/r7_uvicorn_r3.log 2>&1 &
@@ -392,7 +415,7 @@ jobs:
       - name: "R7 Phase R4: Worker failure semantics"
         shell: bash
         env:
-          DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/r4
+          DATABASE_URL: postgresql+asyncpg://app_user:app_user@127.0.0.1:5432/r4
           MIGRATION_DATABASE_URL: postgresql://r7_admin:r7_admin@127.0.0.1:5432/r4
           CELERY_BROKER_URL: sqla+postgresql://app_user:app_user@127.0.0.1:5432/r4
           CELERY_RESULT_BACKEND: db+postgresql://app_user:app_user@127.0.0.1:5432/r4
@@ -410,6 +433,9 @@ jobs:
           set -euo pipefail
           echo "R7_PHASE_START=R4 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ) sha=${GITHUB_SHA}"
           alembic upgrade heads
+          export PGPASSWORD="${R7_PG_ADMIN_PASSWORD}"
+          psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d r4 -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user;" >/dev/null
+          psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d r4 -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;" >/dev/null
 
           pkill -f "uvicorn app.main:app" || true
           nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/r7_uvicorn_r4.log 2>&1 &
@@ -462,7 +488,7 @@ jobs:
       - name: "R7 Phase R5: Determinism + scaling"
         shell: bash
         env:
-          DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/r5
+          DATABASE_URL: postgresql+asyncpg://app_user:app_user@127.0.0.1:5432/r5
           MIGRATION_DATABASE_URL: postgresql://r7_admin:r7_admin@127.0.0.1:5432/r5
           R5_ADMIN_DATABASE_URL: postgresql://r7_admin:r7_admin@127.0.0.1:5432/r5
         run: |
@@ -470,6 +496,8 @@ jobs:
           echo "R7_PHASE_START=R5 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ) sha=${GITHUB_SHA}"
           alembic upgrade heads
           export PGPASSWORD="${R7_PG_ADMIN_PASSWORD}"
+          psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d r5 -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user;" >/dev/null
+          psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d r5 -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;" >/dev/null
           psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d postgres -c "ALTER SYSTEM SET log_statement='none';" >/dev/null
           psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d postgres -c "SELECT pg_reload_conf();" >/dev/null
 
@@ -506,7 +534,7 @@ jobs:
       - name: "R7 Phase R6: Governance under load"
         shell: bash
         env:
-          DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/r6
+          DATABASE_URL: postgresql+asyncpg://app_user:app_user@127.0.0.1:5432/r6
           MIGRATION_DATABASE_URL: postgresql://r7_admin:r7_admin@127.0.0.1:5432/r6
           CELERY_BROKER_URL: sqla+postgresql://app_user:app_user@127.0.0.1:5432/r6
           CELERY_RESULT_BACKEND: db+postgresql://app_user:app_user@127.0.0.1:5432/r6
@@ -516,6 +544,9 @@ jobs:
           set -euo pipefail
           echo "R7_PHASE_START=R6 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ) sha=${GITHUB_SHA}"
           alembic upgrade heads
+          export PGPASSWORD="${R7_PG_ADMIN_PASSWORD}"
+          psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d r6 -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user;" >/dev/null
+          psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d r6 -c "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;" >/dev/null
 
           nohup celery -A app.celery_app.celery_app worker \
             --loglevel=INFO \
