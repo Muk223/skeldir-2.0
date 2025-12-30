@@ -194,6 +194,13 @@ jobs:
           nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/r7_uvicorn_r1.log 2>&1 &
           API_PID=$!
 
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
           health_code="$(curl -s -o /tmp/r7_health.json -w "%{http_code}" http://127.0.0.1:8000/health || true)"
           metrics_code="$(curl -s -o /tmp/r7_metrics.txt -w "%{http_code}" http://127.0.0.1:8000/metrics || true)"
           openapi_code="$(curl -s -o /tmp/r7_openapi.json -w "%{http_code}" http://127.0.0.1:8000/openapi.json || true)"
