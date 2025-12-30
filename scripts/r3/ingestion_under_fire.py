@@ -98,6 +98,16 @@ async def _pg_connect(database_url: str) -> asyncpg.Connection:
     return await asyncpg.connect(database_url)
 
 
+async def _pg_connect_with_retry(database_url: str, *, attempts: int = 5, delay_s: float = 1.0) -> asyncpg.Connection:
+    last_exc: Exception | None = None
+    for _ in range(attempts):
+        try:
+            return await _pg_connect(database_url)
+        except Exception as exc:  # noqa: BLE001 - retryable connection failures
+            last_exc = exc
+            await asyncio.sleep(delay_s)
+    raise RuntimeError(f"Failed to connect to Postgres after {attempts} attempts: {last_exc}")
+
 async def _set_tenant_context(conn: asyncpg.Connection, tenant_id: UUID) -> None:
     await conn.execute(
         "SELECT set_config('app.current_tenant_id', $1, false)",
@@ -183,6 +193,20 @@ async def _http_fire(
 
     await asyncio.gather(*[_one(url, headers, body) for (url, headers, body) in requests])
     return status_counts, timeouts, connection_errors
+
+
+async def _wait_for_http_ready(client: httpx.AsyncClient, base_url: str, *, attempts: int = 10, delay_s: float = 1.0) -> None:
+    last_status = None
+    for _ in range(attempts):
+        try:
+            resp = await client.get(f"{base_url}/health/ready", timeout=5)
+            last_status = resp.status_code
+            if resp.status_code == 200:
+                return
+        except httpx.RequestError:
+            last_status = "request_error"
+        await asyncio.sleep(delay_s)
+    raise RuntimeError(f"API readiness check failed; last_status={last_status}")
 
 
 def _verdict_block(name: str, payload: dict[str, Any]) -> None:
@@ -828,7 +852,7 @@ async def main() -> int:
     print(f"TENANT_A_ID={tenant_a.tenant_id}")
     print(f"TENANT_B_ID={tenant_b.tenant_id}")
 
-    conn = await _pg_connect(db_url)
+    conn = await _pg_connect_with_retry(db_url)
     try:
         await seed_channel_taxonomy(conn)
         await seed_tenant(conn, tenant_a)
@@ -838,7 +862,8 @@ async def main() -> int:
 
     limits = httpx.Limits(max_connections=concurrency, max_keepalive_connections=concurrency)
     async with httpx.AsyncClient(limits=limits) as client:
-        conn2 = await _pg_connect(db_url)
+        await _wait_for_http_ready(client, base_url)
+        conn2 = await _pg_connect_with_retry(db_url)
         try:
             all_results: list[ScenarioResult] = []
 
