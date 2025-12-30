@@ -100,7 +100,7 @@ jobs:
             --concurrency=2 \
             -Q housekeeping,maintenance,llm,attribution \
             --logfile r6_worker.log \
-            --pidfile r6_worker.pid >/dev/null 2>&1 &
+            --pidfile /tmp/r6_worker.pid >/dev/null 2>&1 &
           sleep 5
 
       - name: Run R6 context gathering
@@ -117,8 +117,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ -f r6_worker.pid ]; then
-            kill "$(cat r6_worker.pid)" || true
+          if [ -f /tmp/r6_worker.pid ]; then
+            kill "$(cat /tmp/r6_worker.pid)" || true
           fi
 
       - name: Upload R6 artifacts
