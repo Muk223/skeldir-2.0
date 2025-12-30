@@ -383,7 +383,13 @@ jobs:
           fi
 
           python scripts/r3/ingestion_under_fire.py | tee /tmp/r3_harness.log
+          R3_STATUS=${PIPESTATUS[0]}
           pkill -f "uvicorn app.main:app" || true
+          if [ "${R3_STATUS}" != "0" ]; then
+            echo "R3 harness failed; dumping uvicorn log"
+            tail -n 200 /tmp/r7_uvicorn_r3.log || true
+            exit "${R3_STATUS}"
+          fi
 
           python - <<'PY' > /tmp/r7_results/r3.json
           import json
