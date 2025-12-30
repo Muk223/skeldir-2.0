@@ -4,9 +4,9 @@
 
 R3 = **COMPLETE** as of:
 
-- **Candidate SHA:** `d4b10b66135e77dcefed91d732c84690419f23d3`
-- **CI run:** https://github.com/Muk223/skeldir-2.0/actions/runs/20545539639
-- **Generated at:** `2025-12-27T23:06:04.263861+00:00`
+- **Candidate SHA:** `72c71f1073a8ce62f3bf251605a0e388ad5994c1`
+- **CI run:** https://github.com/Muk223/skeldir-2.0/actions/runs/20603836492
+- **Generated at:** `2025-12-30T19:05:39.222309+00:00`
 
 ## Run Configuration (from harness log)
 
@@ -14,7 +14,7 @@ R3 = **COMPLETE** as of:
 - `R3_LADDER` = `[50, 250, 1000]`
 - `R3_CONCURRENCY` = `200`
 - `R3_TIMEOUT_S` = `10.0`
-- `RUN_START_UTC` = `2025-12-27T23:05:20.845907+00:00`
+- `RUN_START_UTC` = `2025-12-30T19:04:38.777763+00:00`
 
 ## Exit Gates (Pass Matrix)
 
