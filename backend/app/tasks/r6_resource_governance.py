@@ -3,6 +3,7 @@ R6 worker resource governance probes and runtime diagnostics.
 
 These tasks are instrumentation-only for context gathering.
 """
+import json
 import logging
 import os
 import time
@@ -24,6 +25,22 @@ def _dsn_scheme_and_hash(dsn: str) -> dict[str, str]:
     return {"scheme": parsed.scheme, "sha256": sha256(dsn.encode("utf-8")).hexdigest()}
 
 
+def _sanitize_value(value):
+    if isinstance(value, dict):
+        return {k: _sanitize_value(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_sanitize_value(v) for v in value]
+    return value
+
+
+def _coerce_json_safe(value):
+    try:
+        json.dumps(value)
+        return value
+    except Exception:
+        return str(value)
+
+
 def _sanitize_conf(conf) -> dict:
     sanitized: dict = {}
     for key, value in dict(conf).items():
@@ -37,7 +54,7 @@ def _sanitize_conf(conf) -> dict:
         ):
             sanitized[key] = _dsn_scheme_and_hash(value)
             continue
-        sanitized[key] = value
+        sanitized[key] = _coerce_json_safe(_sanitize_value(value))
     return sanitized
 
 
