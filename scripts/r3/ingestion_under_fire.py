@@ -98,6 +98,13 @@ async def _pg_connect(database_url: str) -> asyncpg.Connection:
     return await asyncpg.connect(database_url)
 
 
+async def _set_tenant_context(conn: asyncpg.Connection, tenant_id: UUID) -> None:
+    await conn.execute(
+        "SELECT set_config('app.current_tenant_id', $1, false)",
+        str(tenant_id),
+    )
+
+
 async def seed_tenant(conn: asyncpg.Connection, seed: TenantSeed) -> None:
     await conn.execute(
         """
@@ -192,6 +199,7 @@ def _parse_int_list(csv: str) -> list[int]:
 
 
 async def db_count_canonical_for_key(conn: asyncpg.Connection, tenant_id: UUID, key: str) -> int:
+    await _set_tenant_context(conn, tenant_id)
     return int(
         await conn.fetchval(
             "SELECT COUNT(*) FROM attribution_events WHERE tenant_id=$1 AND idempotency_key=$2",
@@ -202,6 +210,7 @@ async def db_count_canonical_for_key(conn: asyncpg.Connection, tenant_id: UUID, 
 
 
 async def db_count_dlq_for_key(conn: asyncpg.Connection, tenant_id: UUID, key: str) -> int:
+    await _set_tenant_context(conn, tenant_id)
     return int(
         await conn.fetchval(
             "SELECT COUNT(*) FROM dead_events WHERE tenant_id=$1 AND raw_payload->>'idempotency_key'=$2",
@@ -216,6 +225,7 @@ async def db_count_canonical_for_keys(
 ) -> int:
     if not keys:
         return 0
+    await _set_tenant_context(conn, tenant_id)
     return int(
         await conn.fetchval(
             "SELECT COUNT(*) FROM attribution_events WHERE tenant_id=$1 AND idempotency_key = ANY($2::text[])",
@@ -228,6 +238,7 @@ async def db_count_canonical_for_keys(
 async def db_count_dlq_for_keys(conn: asyncpg.Connection, tenant_id: UUID, keys: list[str]) -> int:
     if not keys:
         return 0
+    await _set_tenant_context(conn, tenant_id)
     return int(
         await conn.fetchval(
             "SELECT COUNT(*) FROM dead_events WHERE tenant_id=$1 AND raw_payload->>'idempotency_key' = ANY($2::text[])",
@@ -241,27 +252,30 @@ async def db_pii_key_hits_since(
     conn: asyncpg.Connection, since_utc: datetime, tenant_ids: list[UUID]
 ) -> dict[str, int]:
     clauses = " OR ".join([f"jsonb_path_exists(raw_payload, '$.**.{k}')" for k in PII_KEYS])
-    tenants = [str(t) for t in tenant_ids]
-    canonical_hits = int(
-        await conn.fetchval(
-            f"""
-            SELECT COUNT(*) FROM attribution_events
-            WHERE created_at >= $1 AND tenant_id = ANY($2::uuid[]) AND ({clauses})
-            """,
-            since_utc,
-            tenants,
+    canonical_hits = 0
+    dlq_hits = 0
+    for tenant_id in tenant_ids:
+        await _set_tenant_context(conn, tenant_id)
+        canonical_hits += int(
+            await conn.fetchval(
+                f"""
+                SELECT COUNT(*) FROM attribution_events
+                WHERE created_at >= $1 AND tenant_id = $2 AND ({clauses})
+                """,
+                since_utc,
+                str(tenant_id),
+            )
         )
-    )
-    dlq_hits = int(
-        await conn.fetchval(
-            f"""
-            SELECT COUNT(*) FROM dead_events
-            WHERE ingested_at >= $1 AND tenant_id = ANY($2::uuid[]) AND ({clauses})
-            """,
-            since_utc,
-            tenants,
+        dlq_hits += int(
+            await conn.fetchval(
+                f"""
+                SELECT COUNT(*) FROM dead_events
+                WHERE ingested_at >= $1 AND tenant_id = $2 AND ({clauses})
+                """,
+                since_utc,
+                str(tenant_id),
+            )
         )
-    )
     return {
         "attribution_events_raw_payload_hits": canonical_hits,
         "dead_events_raw_payload_hits": dlq_hits,
