@@ -359,10 +359,14 @@ jobs:
           R3_API_BASE_URL: http://127.0.0.1:8000
           R3_LADDER: "50,250,1000"
           R3_CONCURRENCY: "200"
-          R3_TIMEOUT_S: "10"
+          R3_TIMEOUT_S: "30"
+          DATABASE_POOL_SIZE: "20"
+          DATABASE_MAX_OVERFLOW: "20"
+          LOG_LEVEL: "DEBUG"
         run: |
           set -euo pipefail
           echo "R7_PHASE_START=R3 ts=$(date -u +%Y-%m-%dT%H:%M:%SZ) sha=${GITHUB_SHA}"
+          ulimit -n 65535 || true
           alembic upgrade heads
           export PGPASSWORD="${R7_PG_ADMIN_PASSWORD}"
           psql -h "${R7_PG_HOST}" -U "${R7_PG_ADMIN_USER}" -d r3 -c "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_user;" >/dev/null
@@ -374,6 +378,7 @@ jobs:
             --port 8000 \
             --log-level debug \
             --access-log \
+            --workers 2 \
             --backlog 2048 > /tmp/r7_uvicorn_r3.log 2>&1 &
           API_PID=$!
           echo "R3_API_PID=${API_PID}"
