@@ -1,0 +1,8 @@
+{
+  "R6_SHA": "540b1eab47622080a2d4447e674af8d7b3c6b0b6",
+  "R6_TIMESTAMP_UTC": "2025-12-30T16:24:59.421047+00:00",
+  "hard_limit_observed": true,
+  "result_error": "TimeLimitExceeded:TimeLimitExceeded(4,)",
+  "run_id": "timeout-17e2a5d9-98d1-4fda-b267-524133d525fa",
+  "soft_limit_observed": false
+}

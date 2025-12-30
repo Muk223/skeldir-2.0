@@ -1,0 +1,8 @@
+{
+  "R6_SHA": "540b1eab47622080a2d4447e674af8d7b3c6b0b6",
+  "R6_TIMESTAMP_UTC": "2025-12-30T16:24:59.421047+00:00",
+  "attempt_count": 0,
+  "attempt_lines": [],
+  "result_error": "RuntimeError:r6 retry probe failure",
+  "run_id": "retry-71b36610-26de-4cab-84a0-f70eac9e10e9"
+}
