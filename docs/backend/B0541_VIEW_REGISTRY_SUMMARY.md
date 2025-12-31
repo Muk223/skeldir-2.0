@@ -1,7 +1,7 @@
 # B0.5.4.1 View Registry Summary
 
-SHA: a5bb63e140ad027640b9c7bb2a0496b366ba9d73  
-Branch: local-working-copy (update with branch name when pushed)
+SHA: 4a578e9d83ca48897764209aff83cfb4f7c4ac0e  
+Branch: main
 
 ## Scope
 
