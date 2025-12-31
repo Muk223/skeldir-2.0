@@ -678,6 +678,20 @@ jobs:
                       f"::error file=.github/workflows/r7-final-winning-state.yml,line=1,col=1::"
                       f"R4_{key}_ERRORS={json.dumps(err_list, sort_keys=True)}"
                   )
+              verdict = (result.get("results") or {}).get(key) if isinstance(result, dict) else None
+              if verdict and not verdict.get("passed"):
+                  detail = {
+                      "scenario": verdict.get("scenario"),
+                      "db_truth": verdict.get("db_truth"),
+                      "worker_observed": verdict.get("worker_observed"),
+                  }
+                  detail_json = json.dumps(detail, sort_keys=True)
+                  if len(detail_json) > 800:
+                      detail_json = detail_json[:800] + "..."
+                  print(
+                      f"::error file=.github/workflows/r7-final-winning-state.yml,line=1,col=1::"
+                      f"R4_{key}_DETAILS={detail_json}"
+                  )
           passed = not missing and not failed and not errors
           payload = {
               "phase": "R4",
