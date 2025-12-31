@@ -91,14 +91,14 @@ psql_app -d skeldir_zg_fresh -t -A -c "SELECT matviewname FROM pg_matviews WHERE
 cat /tmp/pg_matviews.txt
 echo "Registry from code:"
 python - <<'PY'
-from app.core.matview_registry import MATERIALIZED_VIEWS
-print(MATERIALIZED_VIEWS)
+from app.matviews.registry import list_names
+print(list_names())
 PY
 python - <<'PY'
 from pathlib import Path
-from app.core.matview_registry import MATERIALIZED_VIEWS
+from app.matviews.registry import list_names
 db_list = [line.strip() for line in Path("/tmp/pg_matviews.txt").read_text().splitlines() if line.strip()]
-reg_set, db_set = set(MATERIALIZED_VIEWS), set(db_list)
+reg_set, db_set = set(list_names()), set(db_list)
 print(f"registry={sorted(reg_set)}")
 print(f"db={sorted(db_set)}")
 missing = reg_set - db_set

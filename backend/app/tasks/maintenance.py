@@ -17,7 +17,7 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.compiler import IdentifierPreparer
 
 from app.celery_app import celery_app
-from app.core.matview_registry import MATERIALIZED_VIEWS
+from app.matviews.registry import get_entry, list_names
 from app.core.pg_locks import try_acquire_refresh_lock, release_refresh_lock
 from app.db.session import engine, set_tenant_guc
 from app.observability.context import set_request_correlation_id, set_tenant_id
@@ -37,9 +37,9 @@ def _validated_matview_identifier(
     Using IdentifierPreparer prevents SQL injection even if a malicious name is passed
     in; validation further constrains the surface to the closed registry set.
     """
-    from app.core.matview_registry import validate_matview_name
-
-    if not validate_matview_name(view_name):
+    try:
+        get_entry(view_name)
+    except ValueError:
         logger.error(
             "matview_refresh_invalid_view_name",
             extra={
@@ -77,6 +77,7 @@ async def _refresh_view(view_name: str, task_id: str, tenant_id: Optional[UUID] 
     Returns:
         "success" if refreshed, "skipped_already_running" if lock held
     """
+    entry = get_entry(view_name)
     qualified_view = _qualified_matview_identifier(view_name, task_id=task_id, tenant_id=tenant_id)
     async with engine.begin() as conn:
         # Try to acquire advisory lock
@@ -89,8 +90,10 @@ async def _refresh_view(view_name: str, task_id: str, tenant_id: Optional[UUID] 
             return "skipped_already_running"
 
         try:
-            # Refresh the view using a schema-qualified, identifier-quoted name to prevent SQL injection
-            await conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY " + qualified_view))
+            if not entry.refresh_sql:
+                raise ValueError(f"View '{view_name}' missing refresh_sql")
+            refresh_sql = entry.refresh_sql.format(qualified_name=qualified_view)
+            await conn.execute(text(refresh_sql))
             logger.info(
                 "matview_refreshed",
                 extra={"view_name": view_name, "task_id": task_id},
@@ -124,7 +127,7 @@ def refresh_all_matviews_global_legacy(self) -> Dict[str, str]:
     set_request_correlation_id(correlation_id)
     results: Dict[str, str] = {}
     try:
-        for view_name in MATERIALIZED_VIEWS:
+        for view_name in list_names():
             results[view_name] = asyncio.run(_refresh_view(view_name, self.request.id))
         return results
     except Exception as exc:
@@ -164,8 +167,6 @@ def refresh_matview_for_tenant(self, tenant_id: UUID, view_name: str, correlatio
     Raises:
         ValueError: If view_name not in canonical registry
     """
-    from app.core.matview_registry import validate_matview_name
-
     correlation_id = correlation_id or str(uuid4())
     set_request_correlation_id(correlation_id)
     set_tenant_id(tenant_id)

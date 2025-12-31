@@ -12,13 +12,13 @@ from pathlib import Path
 import pytest
 from sqlalchemy import text
 
-from app.core.matview_registry import get_all_matviews
+from app.matviews.registry import list_names
 from app.db.session import engine
 
 EVIDENCE_JSON = Path("backend/validation/evidence/value_traces/value_04_summary.json")
 EVIDENCE_MD = Path("docs/evidence/value_traces/value_04_registry_trace.md")
 
-REGISTRY = get_all_matviews()
+REGISTRY = list_names()
 
 
 @pytest.mark.asyncio

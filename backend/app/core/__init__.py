@@ -6,7 +6,7 @@ This package contains foundational types and utilities used across the applicati
 - config.py: Application configuration
 - tenant_context.py: Multi-tenant RLS context
 - channel_service.py: Channel management
-- matview_registry.py: Materialized view registry
+- matviews/registry.py: Materialized view registry
 """
 
 from app.core.money import (
