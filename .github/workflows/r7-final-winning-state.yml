@@ -645,7 +645,8 @@ jobs:
             fi
             echo "R4_RESULT_FILE_END ${f}"
           done
-          python - <<'PY' > /tmp/r7_results/r4.json
+          set +e
+          python - <<'PY'
           import json
           from pathlib import Path
 
@@ -677,7 +678,11 @@ jobs:
               "errors": errors,
               "results": results,
           }
-          print(json.dumps(payload, indent=2, sort_keys=True))
+          Path("/tmp/r7_results").mkdir(parents=True, exist_ok=True)
+          Path("/tmp/r7_results/r4.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True),
+              encoding="utf-8",
+          )
           if missing:
               print(
                   f"::error file=.github/workflows/r7-final-winning-state.yml,line=1,col=1::"
@@ -696,10 +701,15 @@ jobs:
           if not passed:
               raise SystemExit(1)
           PY
+          R4_EXIT=$?
+          set -e
 
           echo "R7_R4_RESULT_JSON_BEGIN"
           cat /tmp/r7_results/r4.json
           echo "R7_R4_RESULT_JSON_END"
+          if [ "${R4_EXIT}" -ne 0 ]; then
+            exit "${R4_EXIT}"
+          fi
           echo "R7_PHASE_END=R4 status=PASS"
           pkill -f "uvicorn app.main:app" || true
           pkill -f "celery -A app.celery_app.celery_app worker" || true
