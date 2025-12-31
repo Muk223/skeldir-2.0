@@ -1,0 +1,33 @@
+name: B0.5.4.1 View Registry Gates
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  b0541-gates:
+    name: B0.5.4.1 Gates (G1A/G1B/G1C)
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}/backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Run B0.5.4.1 gate tests
+        run: |
+          cd backend
+          pytest tests/test_b0541_view_registry.py -q
