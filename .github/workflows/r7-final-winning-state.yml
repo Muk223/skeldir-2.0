@@ -428,6 +428,31 @@ jobs:
           LOG_LEVEL: "DEBUG"
         run: |
           set -euo pipefail
+          if ! curl -fsS http://127.0.0.1:8000/health/ready >/dev/null; then
+            echo "R3 API not healthy at harness start; restarting"
+            pkill -f "uvicorn app.main:app" || true
+            nohup env PYTHONUNBUFFERED=1 python -u -m uvicorn app.main:app \
+              --host 127.0.0.1 \
+              --port 8000 \
+              --log-level debug \
+              --access-log \
+              --workers 2 \
+              --backlog 2048 > /tmp/r7_uvicorn_r3.log 2>&1 &
+            R3_API_PID=$!
+            echo "R3_API_PID=${R3_API_PID}" >> "${GITHUB_ENV}"
+            sleep 1
+            for i in $(seq 1 60); do
+              if curl -fsS http://127.0.0.1:8000/health/ready >/dev/null; then
+                break
+              fi
+              sleep 1
+            done
+            if ! curl -fsS http://127.0.0.1:8000/health/ready >/dev/null; then
+              echo "R3 API failed readiness checks at harness start"
+              tail -n 200 /tmp/r7_uvicorn_r3.log || true
+              exit 1
+            fi
+          fi
           python scripts/r3/ingestion_under_fire.py | tee /tmp/r3_harness.log
           R3_HARNESS_EXIT=${PIPESTATUS[0]}
           export R3_HARNESS_EXIT
