@@ -633,6 +633,18 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
+          echo "R4_RESULTS_DIR_LIST_BEGIN"
+          ls -la tmp/r4_results || true
+          echo "R4_RESULTS_DIR_LIST_END"
+          for f in tmp/r4_results/r4_s1.json tmp/r4_results/r4_s2.json tmp/r4_results/r4_s3.json tmp/r4_results/r4_s4.json tmp/r4_results/r4_s5.json; do
+            echo "R4_RESULT_FILE_BEGIN ${f}"
+            if [ -f "${f}" ]; then
+              cat "${f}"
+            else
+              echo "MISSING"
+            fi
+            echo "R4_RESULT_FILE_END ${f}"
+          done
           python - <<'PY' > /tmp/r7_results/r4.json
           import json
           from pathlib import Path

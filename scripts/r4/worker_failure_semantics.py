@@ -1035,18 +1035,28 @@ async def main(*, scenario: str, output_json: str | None = None) -> int:
     print(f"R4_BROKER_DSN_SHA256={broker_hash}")
     print(f"R4_BACKEND_DSN_SHA256={backend_hash}")
 
+    output_payload: dict[str, Any] = {
+        "candidate_sha": candidate_sha,
+        "run_url": run_url,
+        "scenario": scenario_key,
+        "passed": False,
+        "results": {"S1": None, "S2": None, "S3": None, "S4": None, "S5": None},
+        "errors": [],
+    }
+    exit_code = 0
+    skip_run = False
+
     if broker_scheme != "sqla+postgresql" or backend_scheme != "db+postgresql":
-        print(
-            "R4_FAIL_NON_POSTGRES_FABRIC",
-            json.dumps(
-                {
-                    "broker_scheme": broker_scheme,
-                    "backend_scheme": backend_scheme,
-                },
-                sort_keys=True,
-            ),
+        output_payload["errors"].append(
+            {
+                "error": "R4_FAIL_NON_POSTGRES_FABRIC",
+                "broker_scheme": broker_scheme,
+                "backend_scheme": backend_scheme,
+            }
         )
-        return 2
+        print("R4_FAIL_NON_POSTGRES_FABRIC", json.dumps(output_payload["errors"][-1], sort_keys=True))
+        skip_run = True
+        exit_code = 2
 
     concurrency = int(_env("R4_WORKER_CONCURRENCY", "4") or 4)
     crash_concurrency = int(_env("R4_CRASH_WORKER_CONCURRENCY", "1") or 1)
@@ -1058,7 +1068,7 @@ async def main(*, scenario: str, output_json: str | None = None) -> int:
     poison_worker = WorkerSupervisor(concurrency=concurrency, pool=poison_pool, log_prefix="celery_harness_worker_poison")
     poison_worker_pid_initial = None
     ping = {"ok": False, "error": "skipped"}
-    if run_s1:
+    if run_s1 and not skip_run:
         poison_worker_pid_initial = poison_worker.start()
         ping = _ping_worker_safe(timeout_s=25.0)
         print("R4_WORKER_PING_POISON_INITIAL", json.dumps(ping, sort_keys=True))
@@ -1122,149 +1132,160 @@ async def main(*, scenario: str, output_json: str | None = None) -> int:
         ),
     )
 
-    conn = await _pg(admin_db)
+    s1 = None
+    s2 = None
+    s3 = None
+    s4 = None
+    s5 = None
+
     try:
-        print("R4_DB_CONN_SNAPSHOT_START", json.dumps(await _db_conn_snapshot(conn), sort_keys=True))
-        await _seed_tenant(conn, tenant_a, label="A")
-        await _seed_tenant(conn, tenant_b, label="B")
+        if not skip_run:
+            conn = await _pg(admin_db)
+            try:
+                print("R4_DB_CONN_SNAPSHOT_START", json.dumps(await _db_conn_snapshot(conn), sort_keys=True))
+                await _seed_tenant(conn, tenant_a, label="A")
+                await _seed_tenant(conn, tenant_b, label="B")
 
-        poison_n = int(_env("R4_POISON_N", "10"))
-        crash_n = int(_env("R4_CRASH_N", "10"))
-        sentinel_n = int(_env("R4_SENTINEL_N", "10"))
+                poison_n = int(_env("R4_POISON_N", "10"))
+                crash_n = int(_env("R4_CRASH_N", "10"))
+                sentinel_n = int(_env("R4_SENTINEL_N", "10"))
 
-        s1 = None
-        if run_s1:
-            s1 = await _run_safely(
-                f"S1_PoisonPill_N{poison_n}",
-                "S1_PoisonPill",
-                scenario_poison_pill(ctx, conn, n=poison_n),
-                candidate_sha=candidate_sha,
-                run_url=run_url,
-                tenant_a=tenant_a,
-                tenant_b=tenant_b,
-                n=poison_n,
-                conn=conn,
-            )
-            print("R4_S1_WORKER_PING_AFTER", json.dumps(_ping_worker_safe(), sort_keys=True))
-            print("R4_DB_CONN_SNAPSHOT_AFTER_S1", json.dumps(await _db_conn_snapshot(conn), sort_keys=True))
+                if run_s1:
+                    s1 = await _run_safely(
+                        f"S1_PoisonPill_N{poison_n}",
+                        "S1_PoisonPill",
+                        scenario_poison_pill(ctx, conn, n=poison_n),
+                        candidate_sha=candidate_sha,
+                        run_url=run_url,
+                        tenant_a=tenant_a,
+                        tenant_b=tenant_b,
+                        n=poison_n,
+                        conn=conn,
+                    )
+                    print("R4_S1_WORKER_PING_AFTER", json.dumps(_ping_worker_safe(), sort_keys=True))
+                    print("R4_DB_CONN_SNAPSHOT_AFTER_S1", json.dumps(await _db_conn_snapshot(conn), sort_keys=True))
 
-            poison_worker.ensure_dead()
-            _kill_stray_celery_workers()
-            print("R4_DB_CONN_SNAPSHOT_AFTER_POISON_WORKER_STOP", json.dumps(await _db_conn_snapshot(conn), sort_keys=True))
+                    poison_worker.ensure_dead()
+                    _kill_stray_celery_workers()
+                    print(
+                        "R4_DB_CONN_SNAPSHOT_AFTER_POISON_WORKER_STOP",
+                        json.dumps(await _db_conn_snapshot(conn), sort_keys=True),
+                    )
 
-        s2 = None
-        if run_s2:
-            crash_worker = WorkerSupervisor(
-                concurrency=crash_concurrency, pool=crash_pool, log_prefix="celery_harness_worker_crash"
-            )
-            crash_worker_pid_initial = crash_worker.start()
-            print(f"R4_WORKER_CRASH_STARTED pid={crash_worker_pid_initial}")
-            print("R4_WORKER_PING_CRASH_INITIAL", json.dumps(_ping_worker_safe(timeout_s=20.0), sort_keys=True))
-            print("R4_DB_CONN_SNAPSHOT_AFTER_CRASH_WORKER_START", json.dumps(await _db_conn_snapshot(conn), sort_keys=True))
+                if run_s2:
+                    crash_worker = WorkerSupervisor(
+                        concurrency=crash_concurrency, pool=crash_pool, log_prefix="celery_harness_worker_crash"
+                    )
+                    crash_worker_pid_initial = crash_worker.start()
+                    print(f"R4_WORKER_CRASH_STARTED pid={crash_worker_pid_initial}")
+                    print("R4_WORKER_PING_CRASH_INITIAL", json.dumps(_ping_worker_safe(timeout_s=20.0), sort_keys=True))
+                    print(
+                        "R4_DB_CONN_SNAPSHOT_AFTER_CRASH_WORKER_START",
+                        json.dumps(await _db_conn_snapshot(conn), sort_keys=True),
+                    )
 
-            s2 = await _run_safely(
-                f"S2_CrashAfterWritePreAck_N{crash_n}",
-                "S2_CrashAfterWritePreAck",
-                scenario_crash_after_write(ctx, conn, n=crash_n, worker=crash_worker),
-                candidate_sha=candidate_sha,
-                run_url=run_url,
-                tenant_a=tenant_a,
-                tenant_b=tenant_b,
-                n=crash_n,
-                conn=conn,
-            )
-            print("R4_S2_WORKER_PING_AFTER", json.dumps(_ping_worker_safe(), sort_keys=True))
-            print("R4_DB_CONN_SNAPSHOT_AFTER_S2", json.dumps(await _db_conn_snapshot(conn), sort_keys=True))
+                    s2 = await _run_safely(
+                        f"S2_CrashAfterWritePreAck_N{crash_n}",
+                        "S2_CrashAfterWritePreAck",
+                        scenario_crash_after_write(ctx, conn, n=crash_n, worker=crash_worker),
+                        candidate_sha=candidate_sha,
+                        run_url=run_url,
+                        tenant_a=tenant_a,
+                        tenant_b=tenant_b,
+                        n=crash_n,
+                        conn=conn,
+                    )
+                    print("R4_S2_WORKER_PING_AFTER", json.dumps(_ping_worker_safe(), sort_keys=True))
+                    print("R4_DB_CONN_SNAPSHOT_AFTER_S2", json.dumps(await _db_conn_snapshot(conn), sort_keys=True))
 
-            crash_worker.ensure_dead()
-            _kill_stray_celery_workers()
-            print("R4_DB_CONN_SNAPSHOT_AFTER_CRASH_WORKER_STOP", json.dumps(await _db_conn_snapshot(conn), sort_keys=True))
+                    crash_worker.ensure_dead()
+                    _kill_stray_celery_workers()
+                    print(
+                        "R4_DB_CONN_SNAPSHOT_AFTER_CRASH_WORKER_STOP",
+                        json.dumps(await _db_conn_snapshot(conn), sort_keys=True),
+                    )
 
-        s3 = None
-        s4 = None
-        s5 = None
-        if run_s3 or run_s4 or run_s5:
-            main_worker = WorkerSupervisor(concurrency=concurrency, pool=main_pool, log_prefix="celery_harness_worker_main")
-            worker_pid_initial = main_worker.start()
-            print(f"R4_WORKER_MAIN_STARTED pid={worker_pid_initial}")
-            print("R4_WORKER_PING_MAIN_INITIAL", json.dumps(_ping_worker_safe(timeout_s=20.0), sort_keys=True))
-            print("R4_DB_CONN_SNAPSHOT_AFTER_MAIN_WORKER_START", json.dumps(await _db_conn_snapshot(conn), sort_keys=True))
+                if run_s3 or run_s4 or run_s5:
+                    main_worker = WorkerSupervisor(
+                        concurrency=concurrency, pool=main_pool, log_prefix="celery_harness_worker_main"
+                    )
+                    worker_pid_initial = main_worker.start()
+                    print(f"R4_WORKER_MAIN_STARTED pid={worker_pid_initial}")
+                    print("R4_WORKER_PING_MAIN_INITIAL", json.dumps(_ping_worker_safe(timeout_s=20.0), sort_keys=True))
+                    print(
+                        "R4_DB_CONN_SNAPSHOT_AFTER_MAIN_WORKER_START",
+                        json.dumps(await _db_conn_snapshot(conn), sort_keys=True),
+                    )
 
-        if run_s3:
-            s3 = await _run_safely(
-                "S3_RLSProbe_N1",
-                "S3_RLSProbe",
-                scenario_rls_probe(ctx, conn),
-                candidate_sha=candidate_sha,
-                run_url=run_url,
-                tenant_a=tenant_a,
-                tenant_b=tenant_b,
-                n=1,
-                conn=conn,
-            )
-            print("R4_S3_WORKER_PING_AFTER", json.dumps(_ping_worker_safe(), sort_keys=True))
+                if run_s3:
+                    s3 = await _run_safely(
+                        "S3_RLSProbe_N1",
+                        "S3_RLSProbe",
+                        scenario_rls_probe(ctx, conn),
+                        candidate_sha=candidate_sha,
+                        run_url=run_url,
+                        tenant_a=tenant_a,
+                        tenant_b=tenant_b,
+                        n=1,
+                        conn=conn,
+                    )
+                    print("R4_S3_WORKER_PING_AFTER", json.dumps(_ping_worker_safe(), sort_keys=True))
 
-        if run_s4:
-            s4 = await _run_safely(
-                f"S4_RunawayNoStarve_N{sentinel_n}",
-                "S4_RunawayNoStarve",
-                scenario_runaway(ctx, conn, sentinel_n=sentinel_n),
-                candidate_sha=candidate_sha,
-                run_url=run_url,
-                tenant_a=tenant_a,
-                tenant_b=tenant_b,
-                n=sentinel_n,
-                conn=conn,
-            )
-            print("R4_S4_WORKER_PING_AFTER", json.dumps(_ping_worker_safe(), sort_keys=True))
+                if run_s4:
+                    s4 = await _run_safely(
+                        f"S4_RunawayNoStarve_N{sentinel_n}",
+                        "S4_RunawayNoStarve",
+                        scenario_runaway(ctx, conn, sentinel_n=sentinel_n),
+                        candidate_sha=candidate_sha,
+                        run_url=run_url,
+                        tenant_a=tenant_a,
+                        tenant_b=tenant_b,
+                        n=sentinel_n,
+                        conn=conn,
+                    )
+                    print("R4_S4_WORKER_PING_AFTER", json.dumps(_ping_worker_safe(), sort_keys=True))
 
-        if run_s5:
-            s5 = await _run_safely(
-                "S5_LeastPrivilege_N1",
-                "S5_LeastPrivilege",
-                scenario_least_privilege(ctx, conn),
-                candidate_sha=candidate_sha,
-                run_url=run_url,
-                tenant_a=tenant_a,
-                tenant_b=tenant_b,
-                n=1,
-                conn=conn,
-            )
+                if run_s5:
+                    s5 = await _run_safely(
+                        "S5_LeastPrivilege_N1",
+                        "S5_LeastPrivilege",
+                        scenario_least_privilege(ctx, conn),
+                        candidate_sha=candidate_sha,
+                        run_url=run_url,
+                        tenant_a=tenant_a,
+                        tenant_b=tenant_b,
+                        n=1,
+                        conn=conn,
+                    )
 
-        scenario_results = [s for s in [s1, s2, s3, s4, s5] if s is not None]
-        all_passed = all(v.get("passed") is True for v in scenario_results)
-    finally:
-        poison_worker.ensure_dead()
-        _kill_stray_celery_workers()
-        if crash_worker is not None:
-            crash_worker.ensure_dead()
-            _kill_stray_celery_workers()
-        if main_worker is not None:
-            main_worker.ensure_dead()
-            _kill_stray_celery_workers()
-        await conn.close()
+                scenario_results = [s for s in [s1, s2, s3, s4, s5] if s is not None]
+                all_passed = all(v.get("passed") is True for v in scenario_results)
+                output_payload["passed"] = all_passed
+                exit_code = 0 if all_passed else 1
+            finally:
+                poison_worker.ensure_dead()
+                _kill_stray_celery_workers()
+                if crash_worker is not None:
+                    crash_worker.ensure_dead()
+                    _kill_stray_celery_workers()
+                if main_worker is not None:
+                    main_worker.ensure_dead()
+                    _kill_stray_celery_workers()
+                await conn.close()
+    except Exception as exc:  # noqa: BLE001 - ensure output JSON on harness failures
+        output_payload["errors"].append({"error": f"{exc.__class__.__name__}: {exc}"})
+        output_payload["passed"] = False
+        exit_code = 1
 
+    output_payload["results"] = {"S1": s1, "S2": s2, "S3": s3, "S4": s4, "S5": s5}
     window_end = _now_utc()
     print(f"R4_WINDOW_END {_utc_iso(window_end)} {candidate_sha}")
 
     if output_json:
-        payload = {
-            "candidate_sha": candidate_sha,
-            "run_url": run_url,
-            "scenario": scenario_key,
-            "passed": all_passed,
-            "results": {
-                "S1": s1,
-                "S2": s2,
-                "S3": s3,
-                "S4": s4,
-                "S5": s5,
-            },
-        }
         with open(output_json, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, indent=2, sort_keys=True)
+            json.dump(output_payload, handle, indent=2, sort_keys=True)
 
-    return 0 if all_passed else 1
+    return exit_code
 
 
 if __name__ == "__main__":
