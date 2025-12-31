@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PYTHONPATH: ${{ github.workspace }}/backend
+      DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/skeldir_validation
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
