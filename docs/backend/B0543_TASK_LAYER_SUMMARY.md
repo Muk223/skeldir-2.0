@@ -1,4 +1,4 @@
-﻿# B0543 Task Layer Summary (Matview Task Wrapper)
+# B0543 Task Layer Summary (Matview Task Wrapper)
 
 ## Candidate Completion SHA (C)
 
@@ -35,6 +35,7 @@ PENDING (set after commit C)
 - `backend/tests/test_b0543_matview_task_layer.py`
 - `docs/backend/B0543_TASK_LAYER_SUMMARY.md`
 - `scripts/r2/static_audit_allowlist.json` (R2 static audit allowlist for R5 probe cleanup)
+- `.github/workflows/b0543-matview-task-layer.yml`
 
 ## Wrapper API + Outcome Strategy
 
@@ -42,9 +43,9 @@ PENDING (set after commit C)
   - `app.tasks.matviews.refresh_single`
   - `app.tasks.matviews.refresh_all_for_tenant`
 - Strategy mapping:
-  - `RefreshOutcome.SUCCESS` → `TaskOutcomeStrategy.SUCCESS`
-  - `RefreshOutcome.SKIPPED_LOCK_HELD` → `TaskOutcomeStrategy.SILENT_SKIP`
-  - `RefreshOutcome.FAILED` → `TaskOutcomeStrategy.DEAD_LETTER`
+  - `RefreshOutcome.SUCCESS` -> `TaskOutcomeStrategy.SUCCESS`
+  - `RefreshOutcome.SKIPPED_LOCK_HELD` -> `TaskOutcomeStrategy.SILENT_SKIP`
+  - `RefreshOutcome.FAILED` -> `TaskOutcomeStrategy.DEAD_LETTER`
   - Unmapped outcomes raise `UnmappedOutcomeError` (fail-fast).
 
 ## Metrics & Observability
