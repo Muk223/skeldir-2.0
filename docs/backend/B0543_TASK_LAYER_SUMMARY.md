@@ -65,6 +65,30 @@ assert b"matview_refresh_total" in metrics_payload
 assert b"matview_refresh_duration_seconds" in metrics_payload
 ```
 
+Captured output (metrics excerpt):
+
+```
+METRICS_EXCERPT_START
+matview_refresh_total{outcome="SUCCESS",strategy="SUCCESS",view_name="mv_allocation_summary"} 1.0
+matview_refresh_created{outcome="SUCCESS",strategy="SUCCESS",view_name="mv_allocation_summary"} 1.7673034559294152e+09
+matview_refresh_duration_seconds_bucket{le="0.01",outcome="SUCCESS",view_name="mv_allocation_summary"} 0.0
+matview_refresh_duration_seconds_bucket{le="0.05",outcome="SUCCESS",view_name="mv_allocation_summary"} 1.0
+matview_refresh_duration_seconds_bucket{le="0.1",outcome="SUCCESS",view_name="mv_allocation_summary"} 1.0
+matview_refresh_duration_seconds_bucket{le="0.25",outcome="SUCCESS",view_name="mv_allocation_summary"} 1.0
+matview_refresh_duration_seconds_bucket{le="0.5",outcome="SUCCESS",view_name="mv_allocation_summary"} 1.0
+matview_refresh_duration_seconds_bucket{le="1.0",outcome="SUCCESS",view_name="mv_allocation_summary"} 1.0
+matview_refresh_duration_seconds_bucket{le="2.0",outcome="SUCCESS",view_name="mv_allocation_summary"} 1.0
+matview_refresh_duration_seconds_bucket{le="5.0",outcome="SUCCESS",view_name="mv_allocation_summary"} 1.0
+matview_refresh_duration_seconds_bucket{le="10.0",outcome="SUCCESS",view_name="mv_allocation_summary"} 1.0
+matview_refresh_duration_seconds_bucket{le="30.0",outcome="SUCCESS",view_name="mv_allocation_summary"} 1.0
+matview_refresh_duration_seconds_bucket{le="60.0",outcome="SUCCESS",view_name="mv_allocation_summary"} 1.0
+matview_refresh_duration_seconds_bucket{le="+Inf",outcome="SUCCESS",view_name="mv_allocation_summary"} 1.0
+matview_refresh_duration_seconds_count{outcome="SUCCESS",view_name="mv_allocation_summary"} 1.0
+matview_refresh_duration_seconds_sum{outcome="SUCCESS",view_name="mv_allocation_summary"} 0.025
+matview_refresh_duration_seconds_created{outcome="SUCCESS",view_name="mv_allocation_summary"} 1.7673034559294152e+09
+METRICS_EXCERPT_END
+```
+
 ## DLQ Compatibility
 
 - Schema supports correlation/payload: `alembic/versions/006_celery_foundation/202512131200_worker_dlq.py:50-74`
@@ -79,6 +103,14 @@ $env:DATABASE_URL="postgresql+asyncpg://app_user:app_user@localhost:5432/skeldir
 SELECT correlation_id, task_kwargs FROM worker_failed_jobs WHERE task_name = 'app.tasks.matviews.refresh_single' ...
 assert str(row[0]) == correlation_id
 assert str(row[1].get("correlation_id")) == correlation_id
+```
+
+Captured output (DLQ proof):
+
+```
+DLQ_PROOF_START
+(UUID('7a6ea2b7-5641-4393-a3c5-81c8d09a3e0e'), {'tenant_id': '96d9f9aa-1b2b-46fd-924e-329d0dbc5c05', 'view_name': 'mv_allocation_summary', 'correlation_id': '7a6ea2b7-5641-4393-a3c5-81c8d09a3e0e'})
+DLQ_PROOF_END
 ```
 
 ## Evidence Checklist (Exit Gates)
