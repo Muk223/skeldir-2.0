@@ -2,13 +2,13 @@
 
 ## Candidate Completion SHA (C)
 
-PENDING (set after commit C)
+89f2400191fe72274bb8c7bf69075dde59c869c4
 
 ## CI Evidence (to be filled post-run)
 
-- CI_RUN_URL: PENDING
-- CI_JOB_URL: PENDING
-- R7_RUN_URL: PENDING
+- CI_RUN_URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20645831499
+- CI_JOB_URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20645831499/job/59283452787
+- R7_RUN_URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20645851495
 
 ## Pre-Remediation Hypothesis Verdict
 
@@ -98,4 +98,4 @@ assert str(row[1].get("correlation_id")) == correlation_id
 - EG-B0543-7 Governance Gate: LOCALLY VERIFIED
   - Evidence: global R6 limits in `backend/app/celery_app.py:146-154` with defaults `backend/app/core/config.py:62-101`; matview tasks do not override.
 
-CI/R7 evidence required post-commit C (do not fill until runs complete).
+CI/R7 evidence bound to commit C via the URLs above.
