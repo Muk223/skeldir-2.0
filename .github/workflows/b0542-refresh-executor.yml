@@ -54,7 +54,7 @@ jobs:
 
       - name: Apply migrations
         run: |
-          alembic -c alembic.ini upgrade head
+          alembic -c alembic.ini upgrade heads
 
       - name: Run B0.5.4.2 gate tests
         run: |
