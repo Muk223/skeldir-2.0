@@ -1,8 +1,9 @@
 # B0.5.4.2 Refresh Executor Summary (Draft)
 
-Candidate Completion SHA: PENDING
-CI_RUN_URL: PENDING
-R7_RUN_URL: PENDING
+Candidate Completion SHA: 789f36c3470c0a1cf67f05ca3c2de52076b5807e
+CI_RUN_URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20643300770
+CI_JOB_URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20643300770/job/59277886121
+R7_RUN_URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20643326718
 
 ## Pre-Remediation Hypothesis Verdicts
 
