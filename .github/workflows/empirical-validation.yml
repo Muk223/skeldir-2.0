@@ -364,7 +364,7 @@ jobs:
         run: |
           cd backend
           pip install -r requirements-science.txt
-          pip install numpy==1.26.4 scipy==1.11.4 pymc==5.10.0 arviz==0.17.0
+          pip install numpy==1.26.4 scipy==1.11.4 pymc==5.10.0 arviz==0.17.0 ipython
       
       - name: Phase 3.1 - Direct Import Test
         run: |
