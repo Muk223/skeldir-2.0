@@ -2109,17 +2109,19 @@ CREATE INDEX IF NOT EXISTS idx_dead_events_tenant_ingested_at ON public.dead_eve
 
 
 --
--- Name: idx_events_idempotency; Type: INDEX; Schema: public; Owner: -
+--
+-- Name: uq_attribution_events_tenant_idempotency_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_events_idempotency ON public.attribution_events USING btree (idempotency_key);
+ALTER TABLE ONLY public.attribution_events
+    ADD CONSTRAINT uq_attribution_events_tenant_idempotency_key UNIQUE (tenant_id, idempotency_key);
 
 
 --
--- Name: INDEX idx_events_idempotency; Type: COMMENT; Schema: public; Owner: -
+-- Name: CONSTRAINT uq_attribution_events_tenant_idempotency_key; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON INDEX public.idx_events_idempotency IS 'Ensures idempotency_key uniqueness for deduplication. Purpose: Prevent duplicate event ingestion. Required for: B0.4 ingestion.';
+COMMENT ON CONSTRAINT uq_attribution_events_tenant_idempotency_key ON public.attribution_events IS 'Ensures tenant-correct idempotency_key uniqueness for deduplication. Purpose: Prevent duplicate event ingestion. Required for: B0.4 ingestion.';
 
 
 --
