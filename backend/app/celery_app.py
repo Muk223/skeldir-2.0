@@ -195,6 +195,9 @@ def _ensure_celery_configured():
     from app.tasks.beat_schedule import BEAT_SCHEDULE
     celery_app.conf.beat_schedule = BEAT_SCHEDULE
 
+    # Ensure include modules are imported so task registry is complete for tests/workers.
+    celery_app.loader.import_default_modules()
+
     logger.info(
         "celery_app_configured",
         extra={
