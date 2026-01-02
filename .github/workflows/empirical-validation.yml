@@ -282,7 +282,8 @@ jobs:
       - name: Phase 2.2 - Backend Route Extraction
         run: |
           cd backend
-          pip install -q fastapi uvicorn
+          pip install -r requirements-lock.txt
+          pip install email-validator
           
           python - << 'PYEOF' > ../evidence_registry/contracts/backend_routes_raw.txt 2>&1
           import sys
