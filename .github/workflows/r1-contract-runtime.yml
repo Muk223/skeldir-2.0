@@ -38,11 +38,11 @@ jobs:
     runs-on: ubuntu-22.04
     services:
       postgres:
-        image: ${{ env.POSTGRES_DIGEST }}
+        image: postgres@sha256:b3968e348b48f1198cc6de6611d055dbad91cd561b7990c406c3fc28d7095b21
         env:
-          POSTGRES_USER: ${{ env.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: skeldir_test
+          POSTGRES_PASSWORD: skeldir_test_password
+          POSTGRES_DB: skeldir_test
         ports:
           - 5432:5432
         options: >-
