@@ -55,8 +55,7 @@ jobs:
             "node_version": "$(node --version)",
             "npm_version": "$(npm --version)",
             "python_version": "$(python3 --version)",
-            "docker_version": "$(docker --version)",
-            "docker_compose_version": "$(docker-compose --version)"
+            "container_runtime": "not_applicable"
           }
           EOF
           cat $ARTIFACT_DIR/ENV_SNAPSHOT.json
@@ -514,20 +513,20 @@ jobs:
 
       - name: Start Prism mocks
         run: |
-          docker-compose -f docker-compose.mock.yml up -d 2>&1 | tee $ARTIFACT_DIR/prism_compose_up.log
+          bash scripts/start-mocks.sh | tee $ARTIFACT_DIR/prism_mocks_start.log
 
           # Wait for services to be healthy
           echo "Waiting for mock services to be healthy..."
           sleep 10
 
-          docker-compose -f docker-compose.mock.yml ps > $ARTIFACT_DIR/prism_health_ps.log
+          bash scripts/health-check-mocks.sh | tee $ARTIFACT_DIR/prism_health_check.log
 
           # Check health
-          if grep -q "healthy" $ARTIFACT_DIR/prism_health_ps.log; then
+          if grep -q "healthy" $ARTIFACT_DIR/prism_health_check.log; then
             echo "✓ Mock services are healthy"
           else
             echo "⚠ Mock services status:"
-            cat $ARTIFACT_DIR/prism_health_ps.log
+            cat $ARTIFACT_DIR/prism_health_check.log
           fi
 
       - name: Test sample requests
@@ -551,7 +550,7 @@ jobs:
       - name: Cleanup mocks
         if: always()
         run: |
-          docker-compose -f docker-compose.mock.yml down || true
+          bash scripts/stop-mocks-prism.sh || true
 
       - name: Upload EG-R1-2 artifacts
         uses: actions/upload-artifact@v4
@@ -813,7 +812,7 @@ jobs:
           psql <DATABASE_URL> -c "SELECT * FROM <table>" # DB interaction proof
 
           # EG-R1-2: Prism Mocks
-          docker-compose -f docker-compose.mock.yml up -d
+          bash scripts/start-mocks.sh
           curl http://localhost:4010/auth/health
           ```
 
@@ -822,7 +821,7 @@ jobs:
           All artifacts are stored in `artifacts/runtime_r1/<date>_<sha>/` and include:
 
           ### EG-R1-0
-          - `ENV_SNAPSHOT.json` - Environment configuration (OS, Node, Python, Docker versions)
+          - `ENV_SNAPSHOT.json` - Environment configuration (OS, Node, Python, runtime)
           - `COMMAND_LOG.txt` - Candidate SHA and git status verification
 
           ### EG-R1-1
