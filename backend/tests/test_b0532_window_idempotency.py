@@ -211,6 +211,8 @@ class TestWindowIdempotency:
         event_id_2 = uuid4()
         session_id_1 = uuid4()
         session_id_2 = uuid4()
+        idempotency_key_1 = f"{test_tenant_id}:{event_id_1}"
+        idempotency_key_2 = f"{test_tenant_id}:{event_id_2}"
 
         try:
             async with engine.begin() as conn:
@@ -225,16 +227,18 @@ class TestWindowIdempotency:
                     text(
                         """
                         INSERT INTO attribution_events (
-                            id, tenant_id, occurred_at, session_id, revenue_cents, raw_payload
+                            id, tenant_id, occurred_at, session_id, idempotency_key, revenue_cents, raw_payload
                         ) VALUES
-                            (:id1, :tenant_id, '2025-02-01T10:00:00Z'::timestamptz, :session_id_1, 10000, '{}'::jsonb),
-                            (:id2, :tenant_id, '2025-02-01T15:00:00Z'::timestamptz, :session_id_2, 20000, '{}'::jsonb)
+                            (:id1, :tenant_id, '2025-02-01T10:00:00Z'::timestamptz, :session_id_1, :idempotency_key_1, 10000, '{}'::jsonb),
+                            (:id2, :tenant_id, '2025-02-01T15:00:00Z'::timestamptz, :session_id_2, :idempotency_key_2, 20000, '{}'::jsonb)
                         ON CONFLICT DO NOTHING
                         """
                     ),
                     {
                         "id1": event_id_1,
                         "id2": event_id_2,
+                        "idempotency_key_1": idempotency_key_1,
+                        "idempotency_key_2": idempotency_key_2,
                         "session_id_1": session_id_1,
                         "session_id_2": session_id_2,
                         "tenant_id": test_tenant_id,
