@@ -202,6 +202,10 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/WebhookAccepted'
+        '401':
+          $ref: '../_common/base.yaml#/components/responses/UnauthorizedError'
+        '422':
+          $ref: '../_common/base.yaml#/components/responses/ValidationError'
 
 components:
   securitySchemes:
