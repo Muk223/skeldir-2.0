@@ -1990,17 +1990,17 @@ CREATE INDEX IF NOT EXISTS idx_attribution_allocations_tenant_created_at ON publ
 
 
 --
--- Name: idx_attribution_allocations_event_model_channel; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_attribution_allocations_tenant_event_model_channel; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_attribution_allocations_event_model_channel ON public.attribution_allocations USING btree (tenant_id, event_id, model_version, channel_code) WHERE (model_version IS NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_attribution_allocations_tenant_event_model_channel ON public.attribution_allocations USING btree (tenant_id, event_id, model_version, channel_code) WHERE (model_version IS NOT NULL);
 
 
 --
--- Name: INDEX idx_attribution_allocations_event_model_channel; Type: COMMENT; Schema: public; Owner: -
+-- Name: INDEX idx_attribution_allocations_tenant_event_model_channel; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON INDEX public.idx_attribution_allocations_event_model_channel IS 'Unique index ensuring idempotency per (tenant_id, event_id, model_version, channel). Purpose: Prevent duplicate allocations for the same event/model/channel combination. Supports sum-equality validation.';
+COMMENT ON INDEX public.idx_attribution_allocations_tenant_event_model_channel IS 'Unique index ensuring idempotency per (tenant_id, event_id, model_version, channel). Purpose: Prevent duplicate allocations for the same event/model/channel combination. Supports sum-equality validation.';
 
 
 --

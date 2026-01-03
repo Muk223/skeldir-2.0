@@ -384,7 +384,7 @@ tables:
         columns: [channel_code]
         unique: false
         
-      - name: idx_attribution_allocations_event_model_channel
+      - name: idx_attribution_allocations_tenant_event_model_channel
         columns: [tenant_id, event_id, model_version, channel_code]
         unique: true
         
