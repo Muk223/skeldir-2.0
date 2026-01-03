@@ -2,7 +2,7 @@ name: Contract Artifacts CI
 
 # Purpose: Operationalize contract tests, mocks, and docs with hard gates
 # Implements: Jamie's operational rigor + Schmidt's scientific methodology
-# Sequence: Bundling → Integrity → Provider → Docs
+# Sequence: Bundling -> Integrity -> Provider -> Docs
 
 on:
   push:
@@ -89,7 +89,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           cd backend
-          pip install -r requirements-dev.txt
+          pip install -r requirements.txt -r requirements-dev.txt
       
       - name: Start mock servers
         run: bash scripts/start-mocks.sh
@@ -130,7 +130,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           cd backend
-          pip install -r requirements-dev.txt
+          pip install -r requirements.txt -r requirements-dev.txt
       
       - name: Run provider contract tests
         run: |
@@ -209,7 +209,7 @@ jobs:
              [[ "${{ needs.contract-provider-tests.result }}" != "success" ]] || \
              [[ "${{ needs.contract-docs.result }}" != "success" ]]; then
             echo ""
-            echo "❌ Contract artifacts pipeline FAILED"
+            echo "Contract artifacts pipeline FAILED"
             echo ""
             echo "Failure interpretation:"
             if [[ "${{ needs.contract-bundling.result }}" != "success" ]]; then
@@ -217,26 +217,26 @@ jobs:
             fi
             if [[ "${{ needs.contract-integrity-tests.result }}" != "success" ]]; then
               echo "  - Integrity tests failed: Contract examples violate their own schemas"
-              echo "    → Action: Fix contract examples in source YAML files"
+              echo "    -> Action: Fix contract examples in source YAML files"
             fi
             if [[ "${{ needs.contract-provider-tests.result }}" != "success" ]]; then
               echo "  - Provider tests failed: Implementation diverges from contracts"
-              echo "    → Action: Fix FastAPI implementation to match contracts"
+              echo "    -> Action: Fix FastAPI implementation to match contracts"
             fi
             if [[ "${{ needs.contract-docs.result }}" != "success" ]]; then
               echo "  - Documentation failed: Unable to build or validate docs"
-              echo "    → Action: Check Redocly CLI errors or validation output"
+              echo "    -> Action: Check Redocly CLI errors or validation output"
             fi
             exit 1
           else
             echo ""
-            echo "✅ Contract artifacts pipeline PASSED"
+            echo "Contract artifacts pipeline PASSED"
             echo ""
             echo "All gates passed:"
-            echo "  ✓ Contracts bundled and validated"
-            echo "  ✓ Mock servers serve contract-compliant responses"
-            echo "  ✓ Implementation conforms to contracts"
-            echo "  ✓ Documentation built and validated"
+            echo "  - Contracts bundled and validated"
+            echo "  - Mock servers serve contract-compliant responses"
+            echo "  - Implementation conforms to contracts"
+            echo "  - Documentation built and validated"
           fi
 
 

@@ -257,7 +257,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -r backend/requirements-dev.txt
+          pip install -r backend/requirements.txt -r backend/requirements-dev.txt
 
       - name: Bundle contracts
         run: |
@@ -356,7 +356,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -r backend/requirements-dev.txt
+          pip install -r backend/requirements.txt -r backend/requirements-dev.txt
 
       - name: Bundle and generate models
         run: |
@@ -445,7 +445,7 @@ jobs:
 
       - name: Validate provider coverage matrix
         run: |
-          python scripts/governance/validate-coverage-matrix.py
+          python scripts/governance/validate_coverage_matrix.py
 
   validate-contract-coverage:
     name: Validate Contract Coverage (C2)
