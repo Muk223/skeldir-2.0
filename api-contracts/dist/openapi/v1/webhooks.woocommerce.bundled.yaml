@@ -16,7 +16,7 @@ tags:
   - name: WooCommerce Webhooks
     description: WooCommerce webhook endpoints for order events
 paths:
-  /webhooks/woocommerce/order/created:
+  /api/webhooks/woocommerce/order/created:
     post:
       summary: WooCommerce order created webhook
       description: Triggered when a new order is created in WooCommerce
@@ -279,7 +279,7 @@ paths:
                 description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
                 required: *ref_0
                 properties: *ref_1
-  /webhooks/woocommerce/order/updated:
+  /api/webhooks/woocommerce/order/updated:
     post:
       summary: WooCommerce order updated webhook
       description: Triggered when an order is updated in WooCommerce
@@ -329,7 +329,7 @@ paths:
         '200':
           description: Webhook processed successfully
           content: *ref_4
-  /webhooks/woocommerce/order/completed:
+  /api/webhooks/woocommerce/order_completed:
     post:
       summary: WooCommerce order completed webhook
       description: Triggered when an order is marked as completed
@@ -368,7 +368,7 @@ paths:
         '200':
           description: Webhook processed successfully
           content: *ref_4
-  /webhooks/woocommerce/order/refunded:
+  /api/webhooks/woocommerce/order/refunded:
     post:
       summary: WooCommerce order refunded webhook
       description: Triggered when an order refund is initiated

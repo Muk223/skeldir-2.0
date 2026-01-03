@@ -16,7 +16,7 @@ tags:
   - name: Shopify Webhooks
     description: Shopify webhook endpoints for order and checkout events
 paths:
-  /webhooks/shopify/orders/create:
+  /api/webhooks/shopify/order_create:
     post:
       summary: Shopify order created webhook
       description: Triggered when a new order is created in Shopify
@@ -252,7 +252,7 @@ paths:
                 description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
                 required: *ref_0
                 properties: *ref_1
-  /webhooks/shopify/orders/paid:
+  /api/webhooks/shopify/orders/paid:
     post:
       summary: Shopify order paid webhook
       description: Triggered when a Shopify order transitions to paid
@@ -303,7 +303,7 @@ paths:
           description: Bad Request - validation failed
           headers: *ref_5
           content: *ref_6
-  /webhooks/shopify/refunds/create:
+  /api/webhooks/shopify/refunds/create:
     post:
       summary: Shopify refund created webhook
       description: Triggered when a refund is issued for a Shopify order
@@ -389,7 +389,7 @@ paths:
           description: Bad Request - validation failed
           headers: *ref_5
           content: *ref_6
-  /webhooks/shopify/checkouts/update:
+  /api/webhooks/shopify/checkouts/update:
     post:
       summary: Shopify checkout updated webhook
       description: Triggered when a checkout is updated in Shopify

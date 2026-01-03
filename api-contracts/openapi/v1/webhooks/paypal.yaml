@@ -19,7 +19,7 @@ tags:
     description: PayPal webhook endpoints for payment events
 
 paths:
-  /webhooks/paypal/payment/sale/completed:
+  /api/webhooks/paypal/sale_completed:
     post:
       summary: PayPal sale completed webhook
       description: Triggered when a PayPal payment sale is completed
@@ -71,7 +71,7 @@ paths:
         '500':
           $ref: '../_common/base.yaml#/components/responses/ServerError'
 
-  /webhooks/paypal/payment/capture/completed:
+  /api/webhooks/paypal/payment/capture/completed:
     post:
       summary: PayPal payment capture completed webhook
       description: Triggered when a PayPal payment capture is completed
@@ -116,7 +116,7 @@ paths:
         '200':
           $ref: '#/components/responses/WebhookAccepted'
 
-  /webhooks/paypal/payment/sale/refunded:
+  /api/webhooks/paypal/payment/sale/refunded:
     post:
       summary: PayPal sale refunded webhook
       description: Triggered when a PayPal payment is refunded
