@@ -282,7 +282,8 @@ jobs:
       - name: Phase 2.2 - Backend Route Extraction
         run: |
           cd backend
-          pip install -q fastapi uvicorn
+          pip install -r requirements-lock.txt
+          pip install email-validator
           
           python - << 'PYEOF' > ../evidence_registry/contracts/backend_routes_raw.txt 2>&1
           import sys
@@ -297,10 +298,10 @@ jobs:
               
               for route in app.routes:
                   if hasattr(route, 'methods') and hasattr(route, 'path'):
-            methods = ",".join(sorted(route.methods - {'HEAD', 'OPTIONS'}))
-            path = route.path
-            name = getattr(route, 'name', 'unknown')
-            print(f"{methods:10} {path:50} -> {name}")
+                      methods = ",".join(sorted(route.methods - {'HEAD', 'OPTIONS'}))
+                      path = route.path
+                      name = getattr(route, 'name', 'unknown')
+                      print(f"{methods:10} {path:50} -> {name}")
           except Exception as e:
               print(f"Error extracting routes: {e}")
               import traceback
@@ -362,13 +363,15 @@ jobs:
       - name: Install scientific stack
         run: |
           cd backend
-          pip install -q -r requirements-science.txt || pip install numpy pandas scipy matplotlib pymc arviz
+          pip install -r requirements-science.txt
+          pip install numpy==1.26.4 scipy==1.11.4 pymc==5.10.0 arviz==0.17.0 ipython
       
       - name: Phase 3.1 - Direct Import Test
         run: |
           mkdir -p evidence_registry/statistics
           
-          python - << 'PYEOF' > evidence_registry/statistics/imports_raw.txt 2>&1
+          set +e
+          python - << 'PYEOF' 2>&1 | tee evidence_registry/statistics/imports_raw.txt
           try:
               import numpy
               import pandas
@@ -388,6 +391,9 @@ jobs:
               import sys
               sys.exit(1)
           PYEOF
+          PY_EXIT=$?
+          set -e
+          echo "python_exit_code=$PY_EXIT" >> evidence_registry/statistics/imports_raw.txt
           
           if grep -q "OK: imports succeeded" evidence_registry/statistics/imports_raw.txt; then
             echo "✓ Direct imports: PASS" > evidence_registry/statistics/phase_3_status.txt

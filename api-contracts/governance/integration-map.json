@@ -65,8 +65,8 @@
       "contract": "openapi/v1/webhooks/shopify.yaml",
       "description": "Shopify webhook receiver",
       "endpoints": [
-        "/webhooks/shopify/orders/create",
-        "/webhooks/shopify/checkouts/update"
+        "/api/webhooks/shopify/order_create",
+        "/api/webhooks/shopify/checkouts/update"
       ],
       "dependencies": []
     },
@@ -75,9 +75,9 @@
       "contract": "openapi/v1/webhooks/woocommerce.yaml",
       "description": "WooCommerce webhook receiver",
       "endpoints": [
-        "/webhooks/woocommerce/order/created",
-        "/webhooks/woocommerce/order/updated",
-        "/webhooks/woocommerce/order/completed"
+        "/api/webhooks/woocommerce/order/created",
+        "/api/webhooks/woocommerce/order/updated",
+        "/api/webhooks/woocommerce/order_completed"
       ],
       "dependencies": []
     },
@@ -86,9 +86,10 @@
       "contract": "openapi/v1/webhooks/stripe.yaml",
       "description": "Stripe webhook receiver",
       "endpoints": [
-        "/webhooks/stripe/charge/succeeded",
-        "/webhooks/stripe/payment_intent/succeeded",
-        "/webhooks/stripe/charge/refunded"
+        "/api/webhooks/stripe/charge/succeeded",
+        "/api/webhooks/stripe/payment_intent/succeeded",
+        "/api/webhooks/stripe/payment_intent_succeeded",
+        "/api/webhooks/stripe/charge/refunded"
       ],
       "dependencies": []
     },
@@ -97,9 +98,9 @@
       "contract": "openapi/v1/webhooks/paypal.yaml",
       "description": "PayPal webhook receiver",
       "endpoints": [
-        "/webhooks/paypal/payment/sale/completed",
-        "/webhooks/paypal/payment/capture/completed",
-        "/webhooks/paypal/payment/sale/refunded"
+        "/api/webhooks/paypal/sale_completed",
+        "/api/webhooks/paypal/payment/capture/completed",
+        "/api/webhooks/paypal/payment/sale/refunded"
       ],
       "dependencies": []
     }

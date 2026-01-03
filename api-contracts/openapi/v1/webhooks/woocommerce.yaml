@@ -19,7 +19,7 @@ tags:
     description: WooCommerce webhook endpoints for order events
 
 paths:
-  /webhooks/woocommerce/order/created:
+  /api/webhooks/woocommerce/order/created:
     post:
       summary: WooCommerce order created webhook
       description: Triggered when a new order is created in WooCommerce
@@ -71,11 +71,11 @@ paths:
         '200':
           $ref: '#/components/responses/WebhookAccepted'
         '401':
-          $ref: '../_common/base.yaml#/components/responses/UnauthorizedError'
+          $ref: '#/components/responses/WebhookUnauthorized'
         '500':
           $ref: '../_common/base.yaml#/components/responses/ServerError'
 
-  /webhooks/woocommerce/order/updated:
+  /api/webhooks/woocommerce/order/updated:
     post:
       summary: WooCommerce order updated webhook
       description: Triggered when an order is updated in WooCommerce
@@ -120,8 +120,10 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/WebhookAccepted'
+        '401':
+          $ref: '#/components/responses/WebhookUnauthorized'
 
-  /webhooks/woocommerce/order/completed:
+  /api/webhooks/woocommerce/order_completed:
     post:
       summary: WooCommerce order completed webhook
       description: Triggered when an order is marked as completed
@@ -155,8 +157,10 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/WebhookAccepted'
+        '401':
+          $ref: '#/components/responses/WebhookUnauthorized'
 
-  /webhooks/woocommerce/order/refunded:
+  /api/webhooks/woocommerce/order/refunded:
     post:
       summary: WooCommerce order refunded webhook
       description: Triggered when an order refund is initiated
@@ -205,6 +209,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/WebhookAccepted'
+        '401':
+          $ref: '#/components/responses/WebhookUnauthorized'
 
 components:
   responses:
@@ -218,6 +224,34 @@ components:
             success: true
             correlation_id: 00000000-0000-0000-0000-000000000000
             message: Webhook received
+    WebhookUnauthorized:
+      description: Unauthorized - invalid tenant key or signature
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - type: object
+                required:
+                  - detail
+                properties:
+                  detail:
+                    type: object
+                    required:
+                      - status
+                    properties:
+                      status:
+                        type: string
+                        example: invalid_tenant_key
+              - type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    example: invalid_signature
+                  vendor:
+                    type: string
+                    example: woocommerce
 
   schemas:
     WooCommerceOrder:

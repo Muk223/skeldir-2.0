@@ -27,6 +27,21 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: r5_admin
+          POSTGRES_PASSWORD: r5_admin
+          POSTGRES_DB: r5
+        ports:
+          - 5432:5432
+        options: >-
+          --shm-size=1g
+          --health-cmd "pg_isready -U r5_admin -d r5"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 40
 
     env:
       CI: "true"
@@ -51,45 +66,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
 
-      - name: Start Postgres (tuned for bulk inserts)
+      - name: Wait for Postgres readiness
         shell: bash
+        env:
+          PGPASSWORD: r5_admin
         run: |
           set -euo pipefail
-          docker run -d --name r5-postgres \
-            -p 5432:5432 \
-            --shm-size=1g \
-            -e POSTGRES_USER=r5_admin \
-            -e POSTGRES_PASSWORD=r5_admin \
-            -e POSTGRES_DB=r5 \
-            --health-cmd "pg_isready -U r5_admin -d r5" \
-            --health-interval 5s \
-            --health-timeout 5s \
-            --health-retries 40 \
-            postgres:16 \
-              -c shared_buffers=1GB \
-              -c work_mem=32MB \
-              -c maintenance_work_mem=256MB \
-              -c max_wal_size=4GB \
-              -c checkpoint_timeout=30min \
-              -c checkpoint_completion_target=0.9 \
-              -c wal_compression=on \
-              -c fsync=off \
-              -c synchronous_commit=off \
-              -c full_page_writes=off \
-              -c max_wal_senders=0 \
-              -c wal_level=minimal
-
           for i in $(seq 1 60); do
-            status="$(docker inspect -f '{{.State.Health.Status}}' r5-postgres 2>/dev/null || true)"
-            if [ "$status" = "healthy" ]; then
-              echo "postgres_healthy=1"
+            if pg_isready -h 127.0.0.1 -U r5_admin -d r5 >/dev/null 2>&1; then
+              echo "postgres_ready=1"
               exit 0
             fi
             sleep 2
           done
-
-          echo "postgres_healthy=0"
-          docker logs r5-postgres || true
+          echo "postgres_ready=0"
           exit 1
 
       - name: Setup Python
@@ -163,11 +153,3 @@ jobs:
           name: r5-remediation-${{ github.sha }}
           path: |
             r5_verification.log
-
-      - name: Stop Postgres
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker logs r5-postgres || true
-          docker rm -f r5-postgres || true

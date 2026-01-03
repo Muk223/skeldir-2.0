@@ -110,20 +110,28 @@ class TestRevenueInputContract:
             # Insert synthetic events within window
             event_id_1 = uuid4()
             event_id_2 = uuid4()
+            session_id_1 = uuid4()
+            session_id_2 = uuid4()
+            idempotency_key_1 = f"{test_tenant_id}:{event_id_1}"
+            idempotency_key_2 = f"{test_tenant_id}:{event_id_2}"
 
             # RAW_SQL_ALLOWLIST: seed deterministic events for revenue input contract baseline
             await conn.execute(
                 text("""
                     INSERT INTO attribution_events (
-                        id, tenant_id, occurred_at, revenue_cents, raw_payload
+                        id, tenant_id, occurred_at, event_timestamp, session_id, idempotency_key, event_type, channel, revenue_cents, raw_payload
                     ) VALUES
-                        (:id1, :tenant_id, '2025-05-01T10:00:00Z'::timestamptz, 10000, '{}'::jsonb),
-                        (:id2, :tenant_id, '2025-05-01T15:00:00Z'::timestamptz, 20000, '{}'::jsonb)
+                        (:id1, :tenant_id, '2025-05-01T10:00:00Z'::timestamptz, '2025-05-01T10:00:00Z'::timestamptz, :session_id_1, :idempotency_key_1, 'purchase', 'direct', 10000, '{}'::jsonb),
+                        (:id2, :tenant_id, '2025-05-01T15:00:00Z'::timestamptz, '2025-05-01T15:00:00Z'::timestamptz, :session_id_2, :idempotency_key_2, 'purchase', 'direct', 20000, '{}'::jsonb)
                     ON CONFLICT DO NOTHING
                 """),
                 {
                     "id1": event_id_1,
                     "id2": event_id_2,
+                    "session_id_1": session_id_1,
+                    "session_id_2": session_id_2,
+                    "idempotency_key_1": idempotency_key_1,
+                    "idempotency_key_2": idempotency_key_2,
                     "tenant_id": test_tenant_id,
                 }
             )
@@ -145,12 +153,12 @@ class TestRevenueInputContract:
 
             allocations_result = await conn.execute(
                 text("""
-                    SELECT event_id, channel, allocation_ratio, allocated_revenue_cents
+                    SELECT event_id, channel_code, allocation_ratio, allocated_revenue_cents
                     FROM attribution_allocations
                     WHERE tenant_id = :tenant_id
                       AND model_version = :model_version
                       AND event_id IN (:event_id_1, :event_id_2)
-                    ORDER BY event_id, channel
+                    ORDER BY event_id, channel_code
                 """),
                 {
                     "tenant_id": test_tenant_id,
@@ -230,20 +238,28 @@ class TestRevenueInputContract:
             # Insert synthetic events within window
             event_id_1 = uuid4()
             event_id_2 = uuid4()
+            session_id_1 = uuid4()
+            session_id_2 = uuid4()
+            idempotency_key_1 = f"{test_tenant_id}:{event_id_1}"
+            idempotency_key_2 = f"{test_tenant_id}:{event_id_2}"
 
             # RAW_SQL_ALLOWLIST: seed deterministic events for revenue input contract rerun
             await conn.execute(
                 text("""
                     INSERT INTO attribution_events (
-                        id, tenant_id, occurred_at, revenue_cents, raw_payload
+                        id, tenant_id, occurred_at, event_timestamp, session_id, idempotency_key, event_type, channel, revenue_cents, raw_payload
                     ) VALUES
-                        (:id1, :tenant_id, '2025-06-01T10:00:00Z'::timestamptz, 10000, '{}'::jsonb),
-                        (:id2, :tenant_id, '2025-06-01T15:00:00Z'::timestamptz, 20000, '{}'::jsonb)
+                        (:id1, :tenant_id, '2025-06-01T10:00:00Z'::timestamptz, '2025-06-01T10:00:00Z'::timestamptz, :session_id_1, :idempotency_key_1, 'purchase', 'direct', 10000, '{}'::jsonb),
+                        (:id2, :tenant_id, '2025-06-01T15:00:00Z'::timestamptz, '2025-06-01T15:00:00Z'::timestamptz, :session_id_2, :idempotency_key_2, 'purchase', 'direct', 20000, '{}'::jsonb)
                     ON CONFLICT DO NOTHING
                 """),
                 {
                     "id1": event_id_1,
                     "id2": event_id_2,
+                    "session_id_1": session_id_1,
+                    "session_id_2": session_id_2,
+                    "idempotency_key_1": idempotency_key_1,
+                    "idempotency_key_2": idempotency_key_2,
                     "tenant_id": test_tenant_id,
                 }
             )
@@ -264,12 +280,12 @@ class TestRevenueInputContract:
 
             baseline_result = await conn.execute(
                 text("""
-                    SELECT id, event_id, channel, allocation_ratio, allocated_revenue_cents
+                    SELECT id, event_id, channel_code, allocation_ratio, allocated_revenue_cents
                     FROM attribution_allocations
                     WHERE tenant_id = :tenant_id
                       AND model_version = :model_version
                       AND event_id IN (:event_id_1, :event_id_2)
-                    ORDER BY event_id, channel
+                    ORDER BY event_id, channel_code
                 """),
                 {
                     "tenant_id": test_tenant_id,
@@ -303,14 +319,26 @@ class TestRevenueInputContract:
             await conn.execute(
                 text("""
                     INSERT INTO revenue_ledger (
-                        id, tenant_id, revenue_cents, is_verified, verified_at
+                        id,
+                        tenant_id,
+                        revenue_cents,
+                        is_verified,
+                        verified_at,
+                        transaction_id,
+                        state,
+                        amount_cents,
+                        currency,
+                        verification_source,
+                        verification_timestamp
                     ) VALUES
-                        (:id1, :tenant_id, 5000, true, '2025-06-01T09:00:00Z'::timestamptz),
-                        (:id2, :tenant_id, 7000, true, '2025-06-01T14:00:00Z'::timestamptz)
+                        (:id1, :tenant_id, 5000, true, '2025-06-01T09:00:00Z'::timestamptz, :transaction_id_1, 'captured', 5000, 'USD', 'test_fixture', '2025-06-01T09:00:00Z'::timestamptz),
+                        (:id2, :tenant_id, 7000, true, '2025-06-01T14:00:00Z'::timestamptz, :transaction_id_2, 'captured', 7000, 'USD', 'test_fixture', '2025-06-01T14:00:00Z'::timestamptz)
                 """),
                 {
                     "id1": ledger_row_1_id,
                     "id2": ledger_row_2_id,
+                    "transaction_id_1": f"txn_{ledger_row_1_id}",
+                    "transaction_id_2": f"txn_{ledger_row_2_id}",
                     "tenant_id": test_tenant_id,
                 }
             )
@@ -357,12 +385,12 @@ class TestRevenueInputContract:
 
             populated_result = await conn.execute(
                 text("""
-                    SELECT id, event_id, channel, allocation_ratio, allocated_revenue_cents
+                    SELECT id, event_id, channel_code, allocation_ratio, allocated_revenue_cents
                     FROM attribution_allocations
                     WHERE tenant_id = :tenant_id
                       AND model_version = :model_version
                       AND event_id IN (:event_id_1, :event_id_2)
-                    ORDER BY event_id, channel
+                    ORDER BY event_id, channel_code
                 """),
                 {
                     "tenant_id": test_tenant_id,

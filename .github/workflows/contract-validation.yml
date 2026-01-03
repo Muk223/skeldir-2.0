@@ -257,7 +257,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -r backend/requirements-dev.txt
+          pip install -r backend/requirements.txt -r backend/requirements-dev.txt
 
       - name: Bundle contracts
         run: |
@@ -336,6 +336,9 @@ jobs:
     name: Validate Generated Model Structures
     runs-on: ubuntu-latest
     needs: generate-models
+    env:
+      CI: "true"
+      DATABASE_URL: postgresql://test_user:test_password@localhost:5432/skeldir_test
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -356,7 +359,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -r backend/requirements-dev.txt
+          pip install -r backend/requirements.txt -r backend/requirements-dev.txt
 
       - name: Bundle and generate models
         run: |
@@ -445,7 +448,7 @@ jobs:
 
       - name: Validate provider coverage matrix
         run: |
-          python scripts/governance/validate-coverage-matrix.py
+          python scripts/governance/validate_coverage_matrix.py
 
   validate-contract-coverage:
     name: Validate Contract Coverage (C2)

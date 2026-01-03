@@ -20,7 +20,7 @@ on:
       - 'scripts/r0/**'
       - '.github/workflows/r0-preflight-validation.yml'
       - 'backend/requirements*.txt'
-      - 'docker-compose*.yml'
+      - 'compose*.yml'
 
 concurrency:
   group: r0-${{ github.sha }}
@@ -36,6 +36,20 @@ jobs:
     name: R0 Preflight Validation
     runs-on: ubuntu-22.04  # IMMUTABLE: Ubuntu 22.04 LTS (not ubuntu-latest)
     timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres@sha256:b3968e348b48f1198cc6de6611d055dbad91cd561b7990c406c3fc28d7095b21
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: skeldir_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d skeldir_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 40
 
     steps:
       # ====================================================================
@@ -64,13 +78,8 @@ jobs:
         run: |
           mkdir -p "$ARTIFACTS_DIR"
 
-          # Capture container digests being used
-          docker pull $POSTGRES_DIGEST
-          POSTGRES_ACTUAL_DIGEST=$(docker inspect $POSTGRES_DIGEST --format='{{index .RepoDigests 0}}')
-
-          # Capture Alpine digest for network probe
-          docker pull alpine:3.18
-          ALPINE_DIGEST=$(docker inspect alpine:3.18 --format='{{index .RepoDigests 0}}')
+          POSTGRES_ACTUAL_DIGEST="$POSTGRES_DIGEST"
+          ALPINE_DIGEST="not_applicable"
 
           # Generate comprehensive fingerprint
           cat > "$ARTIFACTS_DIR/CI_ENV_FINGERPRINT.json" <<EOF
@@ -106,10 +115,8 @@ jobs:
                 "version": "$(node --version 2>&1 || echo 'not installed')",
                 "npm_version": "$(npm --version 2>&1 || echo 'not installed')"
               },
-              "docker": {
-                "client_version": "$(docker version --format '{{.Client.Version}}')",
-                "server_version": "$(docker version --format '{{.Server.Version}}')",
-                "compose_version": "$(docker compose version)"
+              "container_runtime": {
+                "mode": "service"
               }
             },
             "container_digests": {
@@ -118,7 +125,7 @@ jobs:
                 "actual_digest": "$POSTGRES_ACTUAL_DIGEST"
               },
               "alpine_probe": {
-                "tag": "alpine:3.18",
+                "tag": "not_applicable",
                 "actual_digest": "$ALPINE_DIGEST"
               }
             },
@@ -198,17 +205,15 @@ jobs:
         run: |
           echo "=== Container Digest Enforcement ===" | tee -a $GITHUB_STEP_SUMMARY
 
-          # Pull by digest and verify
-          docker pull $POSTGRES_DIGEST
-          POSTGRES_ACTUAL=$(docker inspect $POSTGRES_DIGEST --format='{{index .RepoDigests 0}}')
+          POSTGRES_ACTUAL="$POSTGRES_DIGEST"
 
-          cat > "$ARTIFACTS_DIR/DOCKER_IMAGE_DIGESTS.json" <<EOF
+          cat > "$ARTIFACTS_DIR/CONTAINER_IMAGE_DIGESTS.json" <<EOF
           {
             "postgres": {
               "env_reference": "$POSTGRES_DIGEST",
               "actual_digest": "$POSTGRES_ACTUAL",
               "pinning_status": "IMMUTABLE",
-              "verification": "PASS"
+              "verification": "ASSUMED_SERVICE_IMAGE"
             }
           }
           EOF
@@ -221,21 +226,29 @@ jobs:
       # ====================================================================
       - name: "EG-R0-6: Enforce network isolation with proof"
         run: |
-          # Create isolated Docker network (--internal = no internet route)
-          docker network create --internal skeldir-r0-isolated
+          echo "Using host-level network isolation rules"
 
           # Verify isolation with probe (MUST FAIL to prove isolation)
           echo "Running egress probe (MUST FAIL)..." | tee -a $GITHUB_STEP_SUMMARY
 
           mkdir -p "$ARTIFACTS_DIR/NETWORK_ISOLATION_PROOF"
 
+          if ! command -v iptables >/dev/null 2>&1; then
+            echo "FAIL: iptables unavailable for isolation proof" | tee -a $GITHUB_STEP_SUMMARY
+            echo "FAIL_NO_IPTABLES" > "$ARTIFACTS_DIR/NETWORK_ISOLATION_PROOF/probe_result.txt"
+            exit 1
+          fi
+
+          sudo iptables -I OUTPUT -d 127.0.0.1/32 -j ACCEPT
+          sudo iptables -I OUTPUT -j REJECT
+
           # Probe public internet from isolated network
-          if docker run --rm --network skeldir-r0-isolated alpine:3.18 \
-            sh -c "wget --timeout=2 --tries=1 https://www.google.com -O /dev/null" \
-            > "$ARTIFACTS_DIR/NETWORK_ISOLATION_PROOF/egress_probe_output.txt" 2>&1; then
+          if curl -fsS https://www.google.com > "$ARTIFACTS_DIR/NETWORK_ISOLATION_PROOF/egress_probe_output.txt" 2>&1; then
             # Probe succeeded = isolation FAILED
             echo "❌ CRITICAL FAIL: Egress NOT blocked - isolation broken!" | tee -a $GITHUB_STEP_SUMMARY
             echo "FAIL_ISOLATION_BROKEN" > "$ARTIFACTS_DIR/NETWORK_ISOLATION_PROOF/probe_result.txt"
+            sudo iptables -D OUTPUT -j REJECT || true
+            sudo iptables -D OUTPUT -d 127.0.0.1/32 -j ACCEPT || true
             exit 1
           else
             # Probe failed = isolation SUCCESS
@@ -243,15 +256,17 @@ jobs:
             echo "PASS_EGRESS_BLOCKED" > "$ARTIFACTS_DIR/NETWORK_ISOLATION_PROOF/probe_result.txt"
           fi
 
-          # Capture network configuration
-          docker network inspect skeldir-r0-isolated > "$ARTIFACTS_DIR/NETWORK_ISOLATION_PROOF/network_config.json"
+          sudo iptables -D OUTPUT -j REJECT || true
+          sudo iptables -D OUTPUT -d 127.0.0.1/32 -j ACCEPT || true
+
+          echo "network_isolation=host_iptables" > "$ARTIFACTS_DIR/NETWORK_ISOLATION_PROOF/network_config.json"
 
           cat > "$ARTIFACTS_DIR/NETWORK_ISOLATION_PROOF/summary.txt" <<EOF
           Network Isolation Proof
           =======================
           Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          Network: skeldir-r0-isolated (--internal flag)
-          Probe: wget https://www.google.com from alpine:3.18
+          Network: host-level iptables reject (egress blocked)
+          Probe: curl https://www.google.com from host
           Result: PASS (egress blocked as expected)
           EOF
 
@@ -262,26 +277,16 @@ jobs:
         run: |
           echo "=== EG-R0-8: DB Fresh-Boot Determinism (Normalized) ===" | tee -a $GITHUB_STEP_SUMMARY
           mkdir -p "$ARTIFACTS_DIR/DB_DETERMINISM/RUN1"
+          export PGPASSWORD=postgres
+          DB_NAME_RUN1="skeldir_test_run1"
+          psql -h 127.0.0.1 -U postgres -d postgres -c "DROP DATABASE IF EXISTS ${DB_NAME_RUN1};" >/dev/null
+          psql -h 127.0.0.1 -U postgres -d postgres -c "CREATE DATABASE ${DB_NAME_RUN1};" >/dev/null
 
-          # Start Postgres on isolated network (by digest)
-          docker run -d \
-            --name skeldir-r0-postgres-run1 \
-            --network skeldir-r0-isolated \
-            -e POSTGRES_USER=postgres \
-            -e POSTGRES_PASSWORD=postgres \
-            -e POSTGRES_DB=skeldir_test \
-            $POSTGRES_DIGEST
-
-          # Wait for ready
-          sleep 10
-          docker exec skeldir-r0-postgres-run1 pg_isready -U postgres
 
           # Run Alembic migrations if available
           if [ -f backend/alembic.ini ]; then
             echo "Running Alembic migrations..." | tee -a $GITHUB_STEP_SUMMARY
             cd backend
-            docker cp alembic.ini skeldir-r0-postgres-run1:/tmp/
-            docker cp alembic skeldir-r0-postgres-run1:/tmp/
             # Note: Alembic would need connection string - this is a placeholder
             # For now, just note migration availability
             cd ..
@@ -289,9 +294,8 @@ jobs:
           fi
 
           # Capture schema with canonical pg_dump flags (no owner, no privileges)
-          docker exec skeldir-r0-postgres-run1 \
-            pg_dump --schema-only --no-owner --no-privileges --no-comments \
-            -U postgres skeldir_test \
+          pg_dump --schema-only --no-owner --no-privileges --no-comments \
+            -h 127.0.0.1 -U postgres "${DB_NAME_RUN1}" \
             > "$ARTIFACTS_DIR/DB_DETERMINISM/RUN1/schema_raw.sql"
 
           # Normalize schema (remove volatile fields)
@@ -312,9 +316,7 @@ jobs:
             echo "Alembic: Not configured" | tee -a $GITHUB_STEP_SUMMARY
           fi
 
-          # Teardown
-          docker stop skeldir-r0-postgres-run1
-          docker rm skeldir-r0-postgres-run1
+          psql -h 127.0.0.1 -U postgres -d postgres -c "DROP DATABASE IF EXISTS ${DB_NAME_RUN1};" >/dev/null
 
       - name: "EG-R0-8: DB determinism test (Run2)"
         run: |
@@ -322,23 +324,15 @@ jobs:
 
           # Read Run1 hash from file
           SCHEMA_HASH_RUN1=$(cat "$ARTIFACTS_DIR/DB_DETERMINISM/RUN1/schema_hash.txt")
+          export PGPASSWORD=postgres
+          DB_NAME_RUN2="skeldir_test_run2"
+          psql -h 127.0.0.1 -U postgres -d postgres -c "DROP DATABASE IF EXISTS ${DB_NAME_RUN2};" >/dev/null
+          psql -h 127.0.0.1 -U postgres -d postgres -c "CREATE DATABASE ${DB_NAME_RUN2};" >/dev/null
 
-          # Repeat: fresh container, no volumes (full teardown between runs)
-          docker run -d \
-            --name skeldir-r0-postgres-run2 \
-            --network skeldir-r0-isolated \
-            -e POSTGRES_USER=postgres \
-            -e POSTGRES_PASSWORD=postgres \
-            -e POSTGRES_DB=skeldir_test \
-            $POSTGRES_DIGEST
-
-          sleep 10
-          docker exec skeldir-r0-postgres-run2 pg_isready -U postgres
 
           # Capture schema with same canonical flags
-          docker exec skeldir-r0-postgres-run2 \
-            pg_dump --schema-only --no-owner --no-privileges --no-comments \
-            -U postgres skeldir_test \
+          pg_dump --schema-only --no-owner --no-privileges --no-comments \
+            -h 127.0.0.1 -U postgres "${DB_NAME_RUN2}" \
             > "$ARTIFACTS_DIR/DB_DETERMINISM/RUN2/schema_raw.sql"
 
           # Normalize schema
@@ -371,9 +365,7 @@ jobs:
                  > "$ARTIFACTS_DIR/DB_DETERMINISM/schema_diff.txt" || true
           fi
 
-          # Teardown
-          docker stop skeldir-r0-postgres-run2
-          docker rm skeldir-r0-postgres-run2
+          psql -h 127.0.0.1 -U postgres -d postgres -c "DROP DATABASE IF EXISTS ${DB_NAME_RUN2};" >/dev/null
 
       # ====================================================================
       # EG-R0-9: Preflight Apparatus Determinism (Two-Pass Normalized Output)
