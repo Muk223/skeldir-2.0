@@ -2,13 +2,13 @@
 
 ## Candidate Completion SHA (C)
 
-PENDING (set after commit C)
+acbdb4335c92371c33de183175b9efd10b5e35c9
 
 ## CI Evidence (to be filled post-run)
 
-- CI_RUN_URL: PENDING
-- CI_JOB_URL: PENDING
-- R7_RUN_URL: PENDING
+- CI_RUN_URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20682769852
+- CI_JOB_URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20682769852/job/59379192919
+- R7_RUN_URL: not required for B0543 candidate acbdb4335c92371c33de183175b9efd10b5e35c9
 
 ## Pre-Remediation Hypothesis Verdict
 
