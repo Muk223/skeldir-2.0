@@ -58,6 +58,12 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/WebhookAccepted'
+        '400':
+          $ref: '../_common/base.yaml#/components/responses/ValidationError'
+        '401':
+          $ref: '../_common/base.yaml#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '../_common/base.yaml#/components/responses/ServerError'
 
   /api/webhooks/stripe/payment_intent_succeeded:
     post:
@@ -134,6 +140,12 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/WebhookAccepted'
+        '400':
+          $ref: '../_common/base.yaml#/components/responses/ValidationError'
+        '401':
+          $ref: '../_common/base.yaml#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '../_common/base.yaml#/components/responses/ServerError'
 
   /api/webhooks/stripe/charge/refunded:
     post:
@@ -169,6 +181,12 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/WebhookAccepted'
+        '400':
+          $ref: '../_common/base.yaml#/components/responses/ValidationError'
+        '401':
+          $ref: '../_common/base.yaml#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '../_common/base.yaml#/components/responses/ServerError'
 
 components:
   securitySchemes:
