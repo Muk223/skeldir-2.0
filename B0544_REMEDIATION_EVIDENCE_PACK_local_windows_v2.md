@@ -1,12 +1,5 @@
-# B0544_EVIDENCE_PACK_local_windows.md
+# B0544_REMEDIATION_EVIDENCE_PACK_local_windows_v2.md
 
-## CI Binding
-- candidate_sha: ee7de3f85a816fc5c42382eaceb9744e2f4d4cb5
-- ci_run_url: https://github.com/Muk223/skeldir-2.0/actions/runs/20698785263
-- ci_job_url: https://github.com/Muk223/skeldir-2.0/actions/runs/20698785263/job/59417973028
-- r7_run_url: https://github.com/Muk223/skeldir-2.0/actions/runs/20698786714
-
-## Evidence Pack v2
 ## EG-1 Truth Anchor
 
 Command:
