@@ -1283,7 +1283,7 @@ Output:
 
 - Beat schedule exists and is loaded in celery_app; schedule keys and tasks are shown in the beat_schedule dump.
 - Global beat-safe adapter task exists for tenant fan-out; refresh_all_for_tenant still requires tenant_id.
-- Beat entrypoint appears only in CI harness (scripts/ci/zero_drift_v3_2.sh); Procfile/compose do not run beat.
+- Beat entrypoint exists in Procfile (beat: ...); compose does not run beat.
 - Competing schedulers (cron/APScheduler/database schedulers) are not present in code.
 - R6 fuses are configured globally in backend/app/core/config.py and applied in backend/app/celery_app.py.
 
