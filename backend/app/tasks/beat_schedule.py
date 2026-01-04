@@ -34,9 +34,10 @@ def build_beat_schedule() -> Dict[str, Dict[str, Any]]:
     interval = _refresh_interval_seconds()
     return {
         "refresh-matviews-every-5-min": {
-            "task": "app.tasks.maintenance.refresh_all_matviews_global_legacy",
+            "task": "app.tasks.matviews.pulse_matviews_global",
             "schedule": interval,
             "options": {"expires": max(int(interval), 1) * 2},
+            "kwargs": {"schedule_class": "minute"},
         },
         "pii-audit-scanner": {
             "task": "app.tasks.maintenance.scan_for_pii_contamination",

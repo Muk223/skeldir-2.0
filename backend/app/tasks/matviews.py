@@ -11,9 +11,12 @@ from enum import Enum
 from typing import Optional
 from uuid import UUID, uuid4
 
+from sqlalchemy.engine.url import make_url
+
 from app.celery_app import celery_app
 from app.matviews.executor import RefreshOutcome, RefreshResult, refresh_all_for_tenant, refresh_single
 from app.observability import metrics
+from app.observability.context import set_request_correlation_id
 from app.tasks.context import tenant_task
 
 logger = logging.getLogger(__name__)
@@ -65,6 +68,43 @@ def _record_metrics(result: RefreshResult, strategy: TaskOutcomeStrategy) -> Non
             view_name=result.view_name,
             error_type=result.error_type or "unknown",
         ).inc()
+
+
+def _build_sync_dsn() -> str:
+    from app.core.config import settings
+    url = make_url(settings.DATABASE_URL.unicode_string())
+    query = dict(url.query)
+    query.pop("channel_binding", None)
+    url = url.set(query=query)
+    if url.drivername.startswith("postgresql+"):
+        url = url.set(drivername="postgresql")
+
+    dsn_parts = ["postgresql://"]
+    if url.username:
+        dsn_parts.append(url.username)
+        if url.password:
+            dsn_parts.append(":")
+            dsn_parts.append(url.password)
+        dsn_parts.append("@")
+    dsn_parts.append(url.host or "localhost")
+    if url.port:
+        dsn_parts.append(f":{url.port}")
+    if url.database:
+        dsn_parts.append(f"/{url.database}")
+    return "".join(dsn_parts)
+
+
+def _fetch_tenant_ids_sync() -> list[UUID]:
+    import psycopg2
+    dsn = _build_sync_dsn()
+    conn = psycopg2.connect(dsn)
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM tenants ORDER BY id")
+        rows = cur.fetchall()
+        return [UUID(str(row[0])) for row in rows]
+    finally:
+        conn.close()
 
 
 def _log_start(
@@ -225,3 +265,47 @@ def matview_refresh_all_for_tenant(
         "results": [r.to_log_dict() for r in results],
         "strategy": overall.value,
     }
+
+
+@celery_app.task(
+    bind=True,
+    name="app.tasks.matviews.pulse_matviews_global",
+    routing_key="maintenance.task",
+    max_retries=3,
+    default_retry_delay=60,
+)
+def pulse_matviews_global(
+    self,
+    correlation_id: Optional[str] = None,
+    schedule_class: Optional[str] = None,
+) -> dict:
+    correlation_id = correlation_id or str(uuid4())
+    set_request_correlation_id(correlation_id)
+    try:
+        logger.info(
+            "matview_pulse_task_start",
+            extra={
+                "task_id": self.request.id,
+                "correlation_id": correlation_id,
+                "schedule_class": schedule_class,
+            },
+        )
+        tenant_ids = _fetch_tenant_ids_sync()
+        for tenant_id in tenant_ids:
+            matview_refresh_all_for_tenant.delay(
+                tenant_id=str(tenant_id),
+                correlation_id=correlation_id,
+                schedule_class=schedule_class,
+            )
+        logger.info(
+            "matview_pulse_task_dispatched",
+            extra={
+                "task_id": self.request.id,
+                "correlation_id": correlation_id,
+                "tenant_count": len(tenant_ids),
+                "schedule_class": schedule_class,
+            },
+        )
+        return {"status": "ok", "tenant_count": len(tenant_ids), "correlation_id": correlation_id}
+    finally:
+        set_request_correlation_id(None)
