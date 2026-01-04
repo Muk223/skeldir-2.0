@@ -146,3 +146,82 @@ async def test_matview_failure_persists_correlation_id(monkeypatch):
                 ),
                 {"correlation_id": UUID(correlation_id)},
             )
+
+
+@pytest.mark.asyncio
+async def test_worker_survives_matview_failure(monkeypatch):
+    original = celery_app.conf.task_always_eager
+    celery_app.conf.task_always_eager = True
+    fail_correlation_id = None
+    success_correlation_id = None
+    try:
+        tenant_id = uuid4()
+        fail_correlation_id = str(uuid4())
+        success_correlation_id = str(uuid4())
+        calls = {"count": 0}
+
+        def fake_refresh_single(view_name, tenant_id_arg, correlation_id_arg):
+            calls["count"] += 1
+            outcome = executor.RefreshOutcome.FAILED if calls["count"] == 1 else executor.RefreshOutcome.SUCCESS
+            return _make_result(outcome, tenant_id=tenant_id_arg, correlation_id=correlation_id_arg)
+
+        monkeypatch.setattr(matview_tasks, "refresh_single", fake_refresh_single)
+
+        failure_counter = metrics.matview_refresh_failures_total.labels(
+            view_name="mv_allocation_summary",
+            error_type="unit_test",
+        )
+        failures_before = failure_counter._value.get()
+
+        with pytest.raises(matview_tasks.MatviewTaskFailure):
+            matview_tasks.matview_refresh_single.delay(
+                tenant_id=str(tenant_id),
+                view_name="mv_allocation_summary",
+                correlation_id=fail_correlation_id,
+            ).get(propagate=True)
+
+        failures_after = failure_counter._value.get()
+        assert failures_after == failures_before + 1
+
+        async with engine.begin() as conn:
+            row = await conn.execute(
+                text(
+                    """
+                    SELECT correlation_id
+                    FROM worker_failed_jobs
+                    WHERE task_name = 'app.tasks.matviews.refresh_single'
+                    AND correlation_id = :correlation_id
+                    """
+                ),
+                {"correlation_id": UUID(fail_correlation_id)},
+            )
+            row = row.fetchone()
+
+        assert row is not None
+
+        result = matview_tasks.matview_refresh_single.delay(
+            tenant_id=str(tenant_id),
+            view_name="mv_allocation_summary",
+            correlation_id=success_correlation_id,
+        ).get(propagate=True)
+        assert result["status"] == "ok"
+        assert calls["count"] == 2
+    finally:
+        celery_app.conf.task_always_eager = original
+        if fail_correlation_id:
+            async with engine.begin() as conn:
+                await conn.execute(
+                    text(
+                        """
+                        DELETE FROM worker_failed_jobs
+                        WHERE task_name = 'app.tasks.matviews.refresh_single'
+                        AND correlation_id IN (:fail_correlation_id, :success_correlation_id)
+                        """
+                    ),
+                    {
+                        "fail_correlation_id": UUID(fail_correlation_id),
+                        "success_correlation_id": UUID(success_correlation_id)
+                        if success_correlation_id
+                        else None,
+                    },
+                )
