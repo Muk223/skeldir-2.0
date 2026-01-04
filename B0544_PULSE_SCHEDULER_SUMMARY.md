@@ -1,14 +1,14 @@
-# B0544_PULSE_SCHEDULER_SUMMARY.md
+﻿# B0544_PULSE_SCHEDULER_SUMMARY.md
 
 ## Candidate Completion SHA
 
-- candidate_sha: 00f3c3f54a47bf684ef50b9b04f96f94338567ac
+- candidate_sha: 4c3f1d5e31e1c6e025216f6ff7fa0bbd3a0e6eb0
 
 ## Status
 
-- CI_RUN_URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20699750227
-- CI_JOB_URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20699750227/job/59420341072
-- R7_RUN_URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20699751733
+- CI_RUN_URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20700005995
+- CI_JOB_URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20700005995/job/59420921942
+- R7_RUN_URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20700007606
 
 ## Files Changed
 
@@ -25,7 +25,7 @@
 - Repointed the existing `refresh-matviews-every-5-min` schedule key to the pulse adapter (no new schedule keys added).
 - Preserved governance schedules (`pii-audit-scanner`, `enforce-data-retention`) unchanged.
 - Added a single beat entrypoint in Procfile to avoid split-brain scheduler behavior.
-- Added a worker survival regression test that proves failure → DLQ/metrics → subsequent task success.
+- Added a worker survival regression test that proves failure to DLQ/metrics and subsequent task success.
 
 ## Evidence Summary
 
