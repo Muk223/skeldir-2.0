@@ -2,13 +2,13 @@
 
 ## Candidate Completion SHA
 
-- candidate_sha: PENDING
+- candidate_sha: 92a0d5a80fdea4fc57e5409cee080bab86690831
 
 ## Status
 
-- CI_RUN_URL: PENDING
-- CI_JOB_URL: PENDING
-- R7_RUN_URL: PENDING (if required)
+- CI_RUN_URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20686051379
+- CI_JOB_URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20686051379/job/59386839837
+- R7_RUN_URL: https://github.com/Muk223/skeldir-2.0/actions/runs/20686109639
 
 ## Files Changed
 
