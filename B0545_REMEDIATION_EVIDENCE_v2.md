@@ -4,16 +4,16 @@
 PR URL: https://github.com/Muk223/skeldir-2.0/pull/13
 Head branch: b0545-convergence-v2
 Candidate SHA (Commit C): b44ec5f81d8187a844d2d09153056a55064a16ef
-git rev-parse HEAD: b44ec5f81d8187a844d2d09153056a55064a16ef
-CI head SHA (b0545-convergence run): b44ec5f81d8187a844d2d09153056a55064a16ef
-CI Run URL (b0545-convergence): https://github.com/Muk223/skeldir-2.0/actions/runs/20883349059
-CI Run URL (full CI): https://github.com/Muk223/skeldir-2.0/actions/runs/20883349050
+git rev-parse HEAD: 1e35e08bca6be14eb424ca12c77b423503c654d0
+CI head SHA (b0545-convergence run): 1e35e08bca6be14eb424ca12c77b423503c654d0
+CI Run URL (b0545-convergence): https://github.com/Muk223/skeldir-2.0/actions/runs/20883741633
+CI Run URL (full CI): https://github.com/Muk223/skeldir-2.0/actions/runs/20883444278
 
 All PR checks green: YES
 
 ## Artifact
-Artifact name: b0545-kinetic-evidence-2e65adbdf6e0da757f650b6069e6319e5cd833a3
-Artifact size: 21292 bytes
+Artifact name: b0545-kinetic-evidence-1e35e08bca6be14eb424ca12c77b423503c654d0
+Artifact size: 21291 bytes
 Artifact inventory:
 - beat.log (755 bytes)
 - beat.pid (5 bytes)
@@ -29,7 +29,7 @@ Artifact inventory:
 - kombu_message_after.txt (32 bytes)
 - kombu_message_before.txt (32 bytes)
 - metadata.txt (280 bytes)
-- worker.log (15787 bytes)
+- worker.log (15786 bytes)
 - worker.pid (5 bytes)
 - worker_failed_jobs_after.txt (32 bytes)
 - worker_failed_jobs_before.txt (32 bytes)
@@ -43,12 +43,12 @@ Artifact inventory:
 ## Kinetic Evidence
 Beat dispatch excerpt (beat_due_task.txt):
 ```
-2:[2026-01-10 19:36:16,530: INFO/MainProcess] Scheduler: Sending due task refresh-matviews-every-5-min (app.tasks.matviews.pulse_matviews_global)
+2:[2026-01-10 20:12:25,388: INFO/MainProcess] Scheduler: Sending due task refresh-matviews-every-5-min (app.tasks.matviews.pulse_matviews_global)
 ```
 
 Worker receipt excerpt (worker_pulse_received.txt):
 ```
-57:{"level": "INFO", "logger": "celery.worker.strategy", "message": "Task app.tasks.matviews.pulse_matviews_global[7e8f65ba-fd1d-41f4-9738-8c8ff4011ae8] received"}
+57:{"level": "INFO", "logger": "celery.worker.strategy", "message": "Task app.tasks.matviews.pulse_matviews_global[0c88134f-b33c-4010-9e55-50b4f28e331a] received"}
 ```
 
 Inspect ping output (inspect_ping.txt):
@@ -80,6 +80,6 @@ worker_failed_jobs_row.txt:
 ```
              task_name             |            correlation_id            |    error_type    |             error_message             
 -----------------------------------+--------------------------------------+------------------+---------------------------------------
- app.tasks.matviews.refresh_single | 5889e4f7-569d-406c-b569-67c6823cabfa | validation_error | View 'mv_nonexistent' not in registry
+ app.tasks.matviews.refresh_single | 8469f29f-23be-4b9f-bf00-4648a9647f8c | validation_error | View 'mv_nonexistent' not in registry
 (1 row)
 ```
