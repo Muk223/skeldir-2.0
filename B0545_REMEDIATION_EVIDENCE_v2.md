@@ -4,12 +4,13 @@
 PR URL: https://github.com/Muk223/skeldir-2.0/pull/13
 Head branch: b0545-convergence-v2
 Candidate SHA (Commit C): b44ec5f81d8187a844d2d09153056a55064a16ef
-git rev-parse HEAD: 1e35e08bca6be14eb424ca12c77b423503c654d0
+Main merge commit SHA: 1e35e08bca6be14eb424ca12c77b423503c654d0
+git rev-parse HEAD: 109445979616aec9a15ad55edc93735ec820f5dc
 CI head SHA (b0545-convergence run): 1e35e08bca6be14eb424ca12c77b423503c654d0
 CI Run URL (b0545-convergence): https://github.com/Muk223/skeldir-2.0/actions/runs/20883741633
-CI Run URL (full CI): https://github.com/Muk223/skeldir-2.0/actions/runs/20883444278
+CI Run URL (full CI): https://github.com/Muk223/skeldir-2.0/actions/runs/20883783616
 
-All PR checks green: YES
+All main checks green: YES
 
 ## Artifact
 Artifact name: b0545-kinetic-evidence-1e35e08bca6be14eb424ca12c77b423503c654d0
