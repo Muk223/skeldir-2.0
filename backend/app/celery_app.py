@@ -193,6 +193,8 @@ def _ensure_celery_configured():
         control_exchange_type="direct",
     )
 
+    celery_app.control_cls = "app.celery_control:SkeldirControl"
+
     # B0.5.4.0: Load Beat schedule (closes G11 drift - beat not deployed)
     from app.tasks.beat_schedule import BEAT_SCHEDULE
     celery_app.conf.beat_schedule = BEAT_SCHEDULE
