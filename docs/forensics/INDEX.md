@@ -36,6 +36,7 @@ This index enumerates evidence packs stored under `docs/forensics/`.
 | B0540 | docs/forensics/evidence/b0540-drift-remediation-preflight-evidence.md | Drift remediation preflight evidence | unknown (legacy) | unknown |
 | B0540 | docs/forensics/evidence/b0540_ci_truthlayer_evidence.md | CI truth layer evidence | unknown (legacy) | unknown |
 | B0541 | docs/forensics/evidence/b0541_soundness_readiness_evidence.md | Soundness readiness evidence | unknown (legacy) | unknown |
+| B055 | docs/forensics/evidence/b055/b055_phase3_worker_stubs_evidence.md | Phase 3 worker stubs + ORM audit evidence | PR #17 / f03b8bc | pending |
 | B0 | docs/forensics/evidence/b0_foundation_chain_green_state.md | Foundation chain green state | unknown (legacy) | unknown |
 | B0 | docs/forensics/evidence/b0_system_phase_soundness_audit.md | System phase soundness audit | unknown (legacy) | unknown |
 | Contract | docs/forensics/evidence/schema_contract_guard_evidence.md | Schema contract guard evidence | unknown (legacy) | unknown |
