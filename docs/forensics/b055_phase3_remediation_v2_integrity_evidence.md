@@ -2,7 +2,7 @@
 
 ## Repo Pin
 - Branch: b055-phase3-worker-stubs
-- HEAD: 93b58beb442798c217ba1a03c80bb280ab806a0e
+- Remediation commit: 93b58beb442798c217ba1a03c80bb280ab806a0e
 - Status:
 ```
  M frontend/src/assets/brand/colors.css
