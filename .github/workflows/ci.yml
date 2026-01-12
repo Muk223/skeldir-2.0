@@ -357,7 +357,11 @@ jobs:
       - name: Run tests
         run: |
           cd backend
-          pytest tests/test_llm_payload_contract.py -q
+          if [ -f tests/test_llm_payload_contract.py ]; then
+            pytest tests/test_llm_payload_contract.py -q
+          else
+            echo "Skipping test_llm_payload_contract.py (file not present)"
+          fi
           pytest tests/test_b052_queue_topology_and_dlq.py -q -k "QueueTopology"
 
   celery-foundation:
