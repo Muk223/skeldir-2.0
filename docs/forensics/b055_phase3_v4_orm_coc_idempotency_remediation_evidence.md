@@ -3,7 +3,9 @@
 ## Repo Pin
 ```
 branch: b055-phase3-v4-orm-coc-idempotency
-candidate_sha: 1ab05359985ed9b743a39203972056186d87b850
+tested_logic_sha: 1ab05359985ed9b743a39203972056186d87b850
+current_pr_head_sha: b3acb035c7fb36aac245ab7d0d73a2c05b3187cd
+authoritative_ci_run: https://github.com/Muk223/skeldir-2.0/actions/runs/20970090939
 status:
 (clean)
 ```
