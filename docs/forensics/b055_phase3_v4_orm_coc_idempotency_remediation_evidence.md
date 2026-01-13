@@ -3,15 +3,15 @@
 ## Repo Pin
 ```
 branch: b055-phase3-v4-orm-coc-idempotency
-HEAD: f2ca8136c529e714f295e5ff851026710aeec89c
+candidate_sha: 855a23602f0466f1c81827f32c1e1ce5c4c09414
 status:
 (clean)
 ```
 
 ## 3.1 PR Head SHA + CI Run (baseline)
-- PR: <pending>
-- PR head SHA: <pending>
-- CI run: <pending>
+- PR: https://github.com/Muk223/skeldir-2.0/pull/19
+- PR head SHA: 855a23602f0466f1c81827f32c1e1ce5c4c09414
+- CI run: https://github.com/Muk223/skeldir-2.0/actions/runs/20969668255
 
 ## 3.2 ORM constraint mismatch (baseline)
 ### Migration unique constraint
@@ -86,8 +86,37 @@ async def test_llm_explanation_idempotency_prevents_duplicate_audit_rows(test_te
     ...
 ```
 
-## CI evidence (pending)
-- PR: <pending>
-- PR head SHA: <pending>
-- CI run: <pending>
-- CI log excerpts: <pending>
+## CI evidence (PR head SHA)
+- PR: https://github.com/Muk223/skeldir-2.0/pull/19
+- PR head SHA: 855a23602f0466f1c81827f32c1e1ce5c4c09414
+- CI run: https://github.com/Muk223/skeldir-2.0/actions/runs/20969668255
+
+### Topology invariants (Test Backend job)
+```
+Test Backend  Run tests  2026-01-13T19:25:28.8515733Z 
+tests/test_b052_queue_topology_and_dlq.py::TestQueueTopology::test_explicit_queues_defined PASSED [ 20%]
+Test Backend  Run tests  2026-01-13T19:25:28.8523908Z 
+tests/test_b052_queue_topology_and_dlq.py::TestQueueTopology::test_task_routing_rules_defined PASSED [ 40%]
+Test Backend  Run tests  2026-01-13T19:25:28.8553229Z 
+tests/test_b052_queue_topology_and_dlq.py::TestQueueTopology::test_llm_task_routes_via_router PASSED [ 60%]
+Test Backend  Run tests  2026-01-13T19:25:28.8600857Z 
+tests/test_b052_queue_topology_and_dlq.py::TestQueueTopology::test_task_names_stable PASSED [ 80%]
+Test Backend  Run tests  2026-01-13T19:25:29.0009666Z 
+tests/test_b052_queue_topology_and_dlq.py::TestQueueTopology::test_queue_routing_deterministic PASSED [100%]
+```
+
+### Idempotency + integrity + parity (Celery Foundation job)
+```
+Celery Foundation B0.5.1  Run Celery foundation tests  2026-01-13T19:26:30.9593831Z 
+tests/test_b055_llm_worker_stubs.py::test_llm_stub_atomic_writes_roll_back_on_failure PASSED [ 70%]
+Celery Foundation B0.5.1  Run Celery foundation tests  2026-01-13T19:26:31.5502131Z 
+tests/test_b055_llm_worker_stubs.py::test_llm_stub_rls_blocks_cross_tenant_reads PASSED [ 83%]
+Celery Foundation B0.5.1  Run Celery foundation tests  2026-01-13T19:26:31.8519791Z 
+tests/test_b055_llm_worker_stubs.py::test_llm_explanation_idempotency_prevents_duplicate_audit_rows PASSED [ 90%]
+Celery Foundation B0.5.1  Run Celery foundation tests  2026-01-13T19:26:32.1531314Z 
+tests/test_b055_llm_worker_stubs.py::test_llm_monthly_costs_concurrent_updates_are_atomic PASSED [ 93%]
+Celery Foundation B0.5.1  Run Celery foundation tests  2026-01-13T19:26:32.3172241Z 
+tests/test_b055_llm_worker_stubs.py::test_llm_route_idempotency_prevents_duplicate_audit_rows PASSED [ 96%]
+Celery Foundation B0.5.1  Run Celery foundation tests  2026-01-13T19:26:36.2946167Z 
+tests/test_b055_llm_model_parity.py::test_llm_models_reflection_parity PASSED [100%]
+```
