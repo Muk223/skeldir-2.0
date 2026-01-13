@@ -9,6 +9,7 @@ from sqlalchemy import select, text
 from app.db.session import engine, get_session
 from app.models.llm import BudgetOptimizationJob, Investigation, LLMApiCall, LLMMonthlyCost
 from app.schemas.llm_payloads import LLMTaskPayload
+from app.tasks.llm import llm_explanation_worker
 from app.workers.llm import (
     generate_explanation,
     optimize_budget,
@@ -29,6 +30,10 @@ def _build_payload(tenant_id: UUID) -> LLMTaskPayload:
 
 def _assert_postgres_engine() -> None:
     assert engine.dialect.name == "postgresql", "RLS tests must run on Postgres"
+
+
+class RetryCapture(RuntimeError):
+    pass
 
 
 @pytest.mark.asyncio
@@ -199,6 +204,53 @@ async def test_llm_explanation_idempotency_prevents_duplicate_audit_rows(test_te
             )
         ).scalars().one()
         assert monthly.total_calls == 1, "Idempotency failed: monthly costs double-counted"
+
+
+@pytest.mark.asyncio
+async def test_llm_explanation_retry_preserves_request_id_when_omitted(test_tenant, monkeypatch):
+    _assert_postgres_engine()
+    payload = {"stub": True}
+    captured = {}
+
+    def _fake_retry(*, kwargs=None, **_):
+        captured["kwargs"] = kwargs or {}
+        raise RetryCapture("retry")
+
+    monkeypatch.setattr(llm_explanation_worker, "retry", _fake_retry, raising=True)
+
+    with pytest.raises(RetryCapture, match="retry"):
+        llm_explanation_worker.run(
+            payload,
+            tenant_id=test_tenant,
+            max_cost_cents=0,
+            force_failure=True,
+        )
+
+    retry_kwargs = captured["kwargs"]
+    assert retry_kwargs.get("request_id"), "Retry kwargs missing request_id"
+    assert retry_kwargs.get("correlation_id"), "Retry kwargs missing correlation_id"
+
+    llm_explanation_worker.run(**retry_kwargs)
+    llm_explanation_worker.run(**retry_kwargs)
+
+    async with get_session(tenant_id=test_tenant) as session:
+        api_calls = (
+            await session.execute(
+                select(LLMApiCall).where(
+                    LLMApiCall.tenant_id == test_tenant,
+                    LLMApiCall.request_id == retry_kwargs["request_id"],
+                    LLMApiCall.endpoint == "app.tasks.llm.explanation",
+                )
+            )
+        ).scalars().all()
+        assert len(api_calls) == 1, "Retry idempotency failed: duplicate llm_api_calls rows"
+
+        monthly = (
+            await session.execute(
+                select(LLMMonthlyCost).where(LLMMonthlyCost.tenant_id == test_tenant)
+            )
+        ).scalars().one()
+        assert monthly.total_calls == 1, "Retry idempotency failed: monthly costs double-counted"
 
 
 @pytest.mark.asyncio
