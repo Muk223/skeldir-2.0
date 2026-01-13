@@ -3,7 +3,7 @@
 ## Repo Pin
 ```
 branch: b055-phase3-eg9-topology-idempotency-remediation
-HEAD: a6cbff9aa0c9f6fdc3595c421c93f2c1a09c7c41
+HEAD: f135a7e3a32810baa86cbfc7f9882ad572aba3c1
 status:
 (clean)
 ```
@@ -124,7 +124,7 @@ backend/tests/test_b055_llm_model_parity.py::test_llm_models_reflection_parity P
 Covered by the same Phase 3 test suite output above (atomicity, concurrency, RLS, parity).
 
 ## EG-F CI Adjudication (pending)
-- PR: <pending>
+- PR: https://github.com/Muk223/skeldir-2.0/pull/18
 - CI run: <pending>
 - CI logs: <pending>
 
