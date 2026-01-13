@@ -52,4 +52,4 @@ def downgrade():
         "llm_api_calls",
         type_="unique",
     )
-    op.drop_column("llm_api_calls", "request_id")
+    op.drop_column("llm_api_calls", "request_id")  # CI:DESTRUCTIVE_OK - Downgrade rollback
