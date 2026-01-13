@@ -3,7 +3,7 @@
 ## Repo Pin
 ```
 branch: b055-phase3-eg9-topology-idempotency-remediation
-HEAD: f135a7e3a32810baa86cbfc7f9882ad572aba3c1
+candidate_sha: ddf7e9990c95628e5f9d54cf305ea8b649b665ca
 status:
 (clean)
 ```
@@ -63,6 +63,21 @@ backend/tests/test_b052_queue_topology_and_dlq.py::TestQueueTopology::test_queue
 ================ 5 passed, 6 deselected, 129 warnings in 0.47s ================
 ```
 
+### CI topology proof (Test Backend job)
+Run: https://github.com/Muk223/skeldir-2.0/actions/runs/20966579788
+```
+Test Backend  Run tests  2026-01-13T17:40:01.8598814Z 
+tests/test_b052_queue_topology_and_dlq.py::TestQueueTopology::test_explicit_queues_defined PASSED [ 20%]
+Test Backend  Run tests  2026-01-13T17:40:01.8607742Z 
+tests/test_b052_queue_topology_and_dlq.py::TestQueueTopology::test_task_routing_rules_defined PASSED [ 40%]
+Test Backend  Run tests  2026-01-13T17:40:01.8638714Z 
+tests/test_b052_queue_topology_and_dlq.py::TestQueueTopology::test_llm_task_routes_via_router PASSED [ 60%]
+Test Backend  Run tests  2026-01-13T17:40:01.8688127Z 
+tests/test_b052_queue_topology_and_dlq.py::TestQueueTopology::test_task_names_stable PASSED [ 80%]
+Test Backend  Run tests  2026-01-13T17:40:02.0309400Z 
+tests/test_b052_queue_topology_and_dlq.py::TestQueueTopology::test_queue_routing_deterministic PASSED [100%]
+```
+
 ## EG-D Idempotency Gate
 ### Migration (unique constraint + request_id column)
 File: alembic/versions/004_llm_subsystem/202601131610_add_llm_api_call_idempotency.py
@@ -120,18 +135,34 @@ backend/tests/test_b055_llm_model_parity.py::test_llm_models_reflection_parity P
 ======================= 9 passed, 129 warnings in 2.24s =======================
 ```
 
+### CI idempotency + integrity proof (Celery Foundation job)
+Run: https://github.com/Muk223/skeldir-2.0/actions/runs/20966579788
+```
+Celery Foundation B0.5.1  Run Celery foundation tests  2026-01-13T17:41:11.3951606Z 
+tests/test_b055_llm_worker_stubs.py::test_llm_stub_atomic_writes_roll_back_on_failure PASSED [ 73%]
+Celery Foundation B0.5.1  Run Celery foundation tests  2026-01-13T17:41:12.0199563Z 
+tests/test_b055_llm_worker_stubs.py::test_llm_stub_rls_blocks_cross_tenant_reads PASSED [ 86%]
+Celery Foundation B0.5.1  Run Celery foundation tests  2026-01-13T17:41:12.4674295Z 
+tests/test_b055_llm_worker_stubs.py::test_llm_monthly_costs_concurrent_updates_are_atomic PASSED [ 93%]
+Celery Foundation B0.5.1  Run Celery foundation tests  2026-01-13T17:41:12.6419260Z 
+tests/test_b055_llm_worker_stubs.py::test_llm_route_idempotency_prevents_duplicate_audit_rows PASSED [ 96%]
+Celery Foundation B0.5.1  Run Celery foundation tests  2026-01-13T17:41:16.6712982Z 
+tests/test_b055_llm_model_parity.py::test_llm_models_reflection_parity PASSED [100%]
+```
+
 ## EG-E Integrity Regression (atomicity/concurrency/RLS/parity)
 Covered by the same Phase 3 test suite output above (atomicity, concurrency, RLS, parity).
 
-## EG-F CI Adjudication (pending)
+## EG-F CI Adjudication (pass)
 - PR: https://github.com/Muk223/skeldir-2.0/pull/18
-- CI run: <pending>
-- CI logs: <pending>
+- CI run: https://github.com/Muk223/skeldir-2.0/actions/runs/20966579788
+- CI jobs: CI + R5: Determinism + Scaling Proof (green)
 
 ## EG-G Scope/Hygiene
 ```
 git diff --name-status origin/main...HEAD
 A	alembic/versions/004_llm_subsystem/202601131610_add_llm_api_call_idempotency.py
+M	.github/workflows/r5-remediation.yml
 M	backend/app/models/llm.py
 M	backend/app/tasks/llm.py
 M	backend/app/workers/llm.py
