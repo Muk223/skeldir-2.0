@@ -1,4 +1,4 @@
-# B0.5.5 Phase 3 Evidence Pack — Worker Stub Layer + ORM Audit Writes
+ï»¿# B0.5.5 Phase 3 Evidence Pack â€” Worker Stub Layer + ORM Audit Writes
 
 ## Repo Pin
 ```text
@@ -6,7 +6,7 @@
 b055-phase3-worker-stubs
 ```
 
-## H1 — Contract/Execution Interface Drift Risk
+## H1 â€” Contract/Execution Interface Drift Risk
 Verdict: TRUE (canonical payload module is singular; tasks/workers import it)
 ```text
 rg -n "class LLMTaskPayload" backend/app/schemas/llm_payloads.py
@@ -28,7 +28,7 @@ backend/app/workers/llm.py:156:async def run_investigation(model: LLMTaskPayload
 backend/app/workers/llm.py:198:async def optimize_budget(model: LLMTaskPayload) -> Dict[str, Any]:
 ```
 
-## H2 — RLS Proof (Postgres-backed)
+## H2 â€” RLS Proof (Postgres-backed)
 Verdict: PENDING (local Postgres not available; CI required)
 ```text
 Get-Content -Path .github/workflows/ci.yml | Select-String -Pattern "celery-foundation" -Context 0,40
@@ -64,7 +64,7 @@ rg -n "get_session|set_tenant_guc_sync" backend/app/db/session.py
 144:def set_tenant_guc_sync(
 ```
 
-## H3 — ORM Drift From DB Schema
+## H3 â€” ORM Drift From DB Schema
 Verdict: PARTIAL (models + parity test added; local run blocked by DB)
 ```text
 rg -n "__tablename__" backend/app/models/llm.py
@@ -81,7 +81,7 @@ rg -n "CREATE TABLE (llm_api_calls|llm_monthly_costs|investigations|budget_optim
 202:        CREATE TABLE budget_optimization_jobs (
 ```
 
-## H4 — Domain Schema Pollution Trap (status='stubbed')
+## H4 â€” Domain Schema Pollution Trap (status='stubbed')
 Verdict: TRUE (status constrained; stub writes use 'completed')
 ```text
 rg -n "status TEXT NOT NULL CHECK" alembic/versions/004_llm_subsystem/202512081500_create_llm_tables.py
@@ -901,17 +901,16 @@ A	docs/forensics/evidence/b055/b055_phase3_worker_stubs_evidence.md
 ## Chain of Custody
 ```text
 git log --oneline --decorate -n 10
-7e54364 (HEAD -> b055-phase3-worker-stubs, origin/b055-phase3-worker-stubs) B055 Phase3: add evidence pack
+c88f99d (HEAD -> main, origin/main, origin/HEAD) Merge pull request #17 from Muk223/b055-phase3-worker-stubs
+b8e4928 (origin/b055-phase3-worker-stubs, b055-phase3-worker-stubs) docs: clarify Phase 3 evidence pin
+3882297 docs: align Phase 3 integrity evidence metadata
+86d5222 docs: finalize Phase 3 integrity evidence metadata
+4fb4d5e docs: add Phase 3 integrity evidence pack
+93b58be B055 Phase3: enforce atomic upserts + integrity tests
+40f4f7e B055 Phase3: refresh evidence pack metadata
+7e54364 B055 Phase3: add evidence pack
 f03b8bc B055 Phase3: add LLM worker stubs, ORM models, and tests
-7e313c8 (origin/main, origin/HEAD, main) Merge pull request #16 from Muk223/b055-phase2-queue-constantization
-aface84 (origin/b055-phase2-queue-constantization, b055-phase2-queue-constantization) B055 Phase2: record CI run + PR link
-9490dca CI: guard missing LLM payload contract test
-2a827c5 CI: set DATABASE_URL for test-backend
-567dcf8 B055 Phase2: refresh evidence pack metadata
-8343f58 B055 Phase2: add queue constantization evidence
-d464730 B055 Phase2: introduce QUEUE_LLM constant + routing proof
-0066937 Merge pull request #15 from Muk223/docs-evidence-hygiene
-756e141 (origin/docs-evidence-hygiene, docs-evidence-hygiene-fix) CI: bump upload-artifact to v4
+7e313c8 Merge pull request #16 from Muk223/b055-phase2-queue-constantization
 git remote -v
 origin	https://github.com/Muk223/skeldir-2.0.git (fetch)
 origin	https://github.com/Muk223/skeldir-2.0.git (push)
@@ -921,7 +920,9 @@ origin	https://github.com/Muk223/skeldir-2.0.git (push)
 ```text
 PR: https://github.com/Muk223/skeldir-2.0/pull/17
 Branch: b055-phase3-worker-stubs
-Commit (HEAD): 7e54364a4fc327085de91ad6b013b6ede5446628
+Merge commit (main): c88f99d1a7c870f902c269a35683a214077c275d
 Commit (code): f03b8bc2a881fe8d102e40e190793ca7c9b10af2
-CI: pending (not visible locally)
+CI run: https://github.com/Muk223/skeldir-2.0/actions/runs/20936127678
+CI job (Phase 3 tests): https://github.com/Muk223/skeldir-2.0/actions/runs/20936127678/job/60159174985
 ```
+
