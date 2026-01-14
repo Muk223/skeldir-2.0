@@ -2,10 +2,11 @@ B0.5.5 Phase 4 Remediation Evidence
 ===================================
 
 Branch: b055-phase4-ci-evidence
-Local HEAD: 36cac918c3f2bec82bdc12c0302c51e54100f359
+Tested Logic SHA: 36cac918c3f2bec82bdc12c0302c51e54100f359
+Evidence Doc Commit: doc-only update on PR head (see PR head SHA in GitHub)
 PR: https://github.com/Muk223/skeldir-2.0/pull/20
 CI Run: https://github.com/Muk223/skeldir-2.0/actions/runs/21002038563
-Timestamp: 2026-01-14T10:42:25.3783376-06:00
+Timestamp: 2026-01-14T10:44:48.3864523-06:00
 
 Phase 4 Remediation Preflight (H1–H4)
 -------------------------------------
@@ -150,5 +151,5 @@ Chain-of-custody
 ----------------
 
 PR: https://github.com/Muk223/skeldir-2.0/pull/20
-PR head SHA: 36cac918c3f2bec82bdc12c0302c51e54100f359
+PR head SHA: doc-only update after Tested Logic SHA
 CI run URL: https://github.com/Muk223/skeldir-2.0/actions/runs/21002038563
