@@ -84,8 +84,12 @@ def generate(bundle_dir: Path, db_url: str) -> None:
     env["DATABASE_URL"] = normalized_db_url
 
     repo = repo_root()
-    git_sha = run_cmd(["git", "rev-parse", "HEAD"], cwd=repo).strip()
-    write_text(bundle_dir / "ENV/git_sha.txt", f"{git_sha}\n")
+    workflow_sha = run_cmd(["git", "rev-parse", "HEAD"], cwd=repo).strip()
+    pr_head_sha = os.environ.get("B055_PR_HEAD_SHA") or workflow_sha
+    write_text(
+        bundle_dir / "ENV/git_sha.txt",
+        f"pr_head_sha={pr_head_sha}\nworkflow_sha={workflow_sha}\n",
+    )
     write_text(bundle_dir / "ENV/python_version.txt", f"{sys.version}\n")
 
     pip_freeze = run_cmd([sys.executable, "-m", "pip", "freeze"], cwd=repo)
@@ -94,6 +98,7 @@ def generate(bundle_dir: Path, db_url: str) -> None:
     ci_context = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "github_sha": os.environ.get("GITHUB_SHA"),
+        "pr_head_sha": pr_head_sha,
         "github_run_id": os.environ.get("GITHUB_RUN_ID"),
         "github_run_number": os.environ.get("GITHUB_RUN_NUMBER"),
         "github_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
@@ -182,7 +187,8 @@ def generate(bundle_dir: Path, db_url: str) -> None:
         "bundle_name": "b055_evidence_bundle",
         "bundle_dir": str(bundle_dir),
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "git_sha": git_sha,
+        "git_sha": pr_head_sha,
+        "workflow_sha": workflow_sha,
         "required_files": REQUIRED_FILES,
         "files": dict(sorted(manifest_files.items())),
     }
