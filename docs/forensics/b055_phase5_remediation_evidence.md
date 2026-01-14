@@ -1,46 +1,34 @@
 # B055 Phase 5 Remediation Evidence
 
-## Repo Pin
-- Branch: b055-phase5-fullpass
-- Head SHA: e6f381daa92310278e55b5f2ba81c9bcc3479637
+## Repo Pin (Adjudicated)
 - PR: https://github.com/Muk223/skeldir-2.0/pull/22
-- CI run: https://github.com/Muk223/skeldir-2.0/actions/runs/21009280293
+- ADJUDICATED_SHA: see bundle `MANIFEST.json` field `adjudicated_sha`
+- Artifact rule: `b055-evidence-bundle-${ADJUDICATED_SHA}`
+- CI run identity: authoritative in bundle `MANIFEST.json` (`workflow_run_id`, `run_attempt`)
 
 ## Enforcement (Fail-Closed)
-- Hermeticity scan log (CI artifact `LOGS/hermeticity_scan.log`):
-  ```
-  Hermetic runtime scan
-  Scanned root: /home/runner/work/skeldir-2.0/skeldir-2.0/backend/app
-  Reachable modules: 14
-  Violations: 0
-  Allowlist hits:
-  backend/app/db/session.py:15 allow:urllib.parse
-  backend/app/tasks/r6_resource_governance.py:12 allow:urllib.parse
-  ```
-- Determinism scan log (CI artifact `LOGS/determinism_scan.log`):
-  ```
-  Determinism scan
-  Scanned root: /home/runner/work/skeldir-2.0/skeldir-2.0/backend/app
-  Reachable modules: 14
-  Violations: 0
-  ```
+- Hermeticity scan log: bundle `LOGS/hermeticity_scan.log`
+- Determinism scan log: bundle `LOGS/determinism_scan.log`
 
 ## Cohesion Proofs (Tests)
-- Pytest proof log (CI artifact `LOGS/pytest_b055.log` excerpt):
-  ```
-  tests/test_b055_llm_payload_fidelity.py::test_llm_payload_json_roundtrip_fidelity PASSED
-  tests/test_b055_llm_payload_fidelity.py::test_llm_enqueue_payload_mapping PASSED
-  tests/test_b055_matview_boundary.py::test_matview_refresh_sql_invariant PASSED
-  tests/test_b055_tenant_propagation.py::test_maintenance_task_sets_tenant_guc PASSED
-  tests/test_b055_tenant_propagation.py::test_attribution_task_sets_tenant_guc PASSED
-  ====================== 41 passed, 129 warnings in 11.72s =======================
-  ```
+- Proof log: bundle `LOGS/pytest_b055.log`
+- Coverage includes:
+  - `backend/tests/test_b055_llm_payload_fidelity.py`
+  - `backend/tests/test_b055_matview_boundary.py`
+  - `backend/tests/test_b055_tenant_propagation.py`
+  - `backend/tests/test_b052_queue_topology_and_dlq.py`
+  - `backend/tests/test_b055_llm_worker_stubs.py`
 
 ## Evidence Bundle (Phase 4 Adjudication)
 - Generator: `scripts/ci/b055_evidence_bundle.py`
-- Artifact name: `b055-evidence-bundle-e6f381daa92310278e55b5f2ba81c9bcc3479637`
-- Artifact URL: https://github.com/Muk223/skeldir-2.0/actions/runs/21009280293/artifacts/5132253711
-- Required logs present:
+- Artifact name rule: `b055-evidence-bundle-${ADJUDICATED_SHA}`
+- Manifest fields required:
+  - `adjudicated_sha`
+  - `pr_head_sha`
+  - `github_sha`
+  - `workflow_run_id`
+  - `run_attempt`
+- Required logs present in bundle:
   - `LOGS/hermeticity_scan.log`
   - `LOGS/determinism_scan.log`
   - `LOGS/pytest_b055.log`

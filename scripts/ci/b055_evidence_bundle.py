@@ -87,10 +87,17 @@ def generate(bundle_dir: Path, db_url: str) -> None:
 
     repo = repo_root()
     workflow_sha = run_cmd(["git", "rev-parse", "HEAD"], cwd=repo).strip()
-    pr_head_sha = os.environ.get("B055_PR_HEAD_SHA") or workflow_sha
+    pr_head_sha = os.environ.get("PR_HEAD_SHA") or os.environ.get("B055_PR_HEAD_SHA") or workflow_sha
+    adjudicated_sha = os.environ.get("ADJUDICATED_SHA") or pr_head_sha
+    github_sha = os.environ.get("GITHUB_SHA")
     write_text(
         bundle_dir / "ENV/git_sha.txt",
-        f"pr_head_sha={pr_head_sha}\nworkflow_sha={workflow_sha}\n",
+        (
+            f"adjudicated_sha={adjudicated_sha}\n"
+            f"pr_head_sha={pr_head_sha}\n"
+            f"github_sha={github_sha}\n"
+            f"workflow_sha={workflow_sha}\n"
+        ),
     )
     write_text(bundle_dir / "ENV/python_version.txt", f"{sys.version}\n")
 
@@ -110,11 +117,12 @@ def generate(bundle_dir: Path, db_url: str) -> None:
 
     ci_context = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "github_sha": os.environ.get("GITHUB_SHA"),
+        "adjudicated_sha": adjudicated_sha,
+        "github_sha": github_sha,
         "pr_head_sha": pr_head_sha,
-        "github_run_id": os.environ.get("GITHUB_RUN_ID"),
+        "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
+        "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
         "github_run_number": os.environ.get("GITHUB_RUN_NUMBER"),
-        "github_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
         "github_workflow": os.environ.get("GITHUB_WORKFLOW"),
         "github_job": os.environ.get("GITHUB_JOB"),
         "github_ref": os.environ.get("GITHUB_REF"),
@@ -206,7 +214,12 @@ def generate(bundle_dir: Path, db_url: str) -> None:
         "bundle_name": "b055_evidence_bundle",
         "bundle_dir": str(bundle_dir),
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "git_sha": pr_head_sha,
+        "adjudicated_sha": adjudicated_sha,
+        "github_sha": github_sha,
+        "pr_head_sha": pr_head_sha,
+        "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
+        "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+        "git_sha": adjudicated_sha,
         "workflow_sha": workflow_sha,
         "required_files": REQUIRED_FILES,
         "files": dict(sorted(manifest_files.items())),

@@ -7,6 +7,9 @@ on:
     branches: [main, develop]
   workflow_dispatch:
 
+env:
+  ADJUDICATED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
 jobs:
   # Single git checkout - Schmidt's key requirement
   checkout:
@@ -16,7 +19,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ env.ADJUDICATED_SHA }}
           fetch-depth: 0  # Full history for versioning
+      - name: Adjudication SHA check
+        run: |
+          echo "PR_HEAD_SHA=${{ github.event.pull_request.head.sha }}"
+          echo "MERGE_SHA=${{ github.event.pull_request.merge_commit_sha }}"
+          echo "GITHUB_SHA=${{ github.sha }}"
+          echo "ADJUDICATED_SHA=${{ env.ADJUDICATED_SHA }}"
+          echo "HEAD_SHA=$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "${{ env.ADJUDICATED_SHA }}"
       - name: Evidence placement check
         run: |
           python3 scripts/check_evidence_placement.py
@@ -30,6 +42,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.ADJUDICATED_SHA }}
       
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -98,6 +112,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.ADJUDICATED_SHA }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -157,6 +173,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.ADJUDICATED_SHA }}
 
       - name: Set up toolchain
         uses: actions/setup-python@v5
@@ -252,6 +270,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.ADJUDICATED_SHA }}
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -312,6 +332,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.ADJUDICATED_SHA }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -343,6 +365,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.ADJUDICATED_SHA }}
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -389,10 +413,21 @@ jobs:
       CELERY_METRICS_PORT: 9546
       CELERY_METRICS_ADDR: 127.0.0.1
       B055_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/b055_evidence_bundle
-      B055_PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      ADJUDICATED_SHA: ${{ env.ADJUDICATED_SHA }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.ADJUDICATED_SHA }}
+      - name: Adjudication SHA check
+        run: |
+          echo "PR_HEAD_SHA=${{ github.event.pull_request.head.sha }}"
+          echo "MERGE_SHA=${{ github.event.pull_request.merge_commit_sha }}"
+          echo "GITHUB_SHA=${{ github.sha }}"
+          echo "ADJUDICATED_SHA=${{ env.ADJUDICATED_SHA }}"
+          echo "HEAD_SHA=$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD)" = "${{ env.ADJUDICATED_SHA }}"
 
       - name: Remove repo .env for CI isolation
         run: |
@@ -543,7 +578,7 @@ jobs:
       - name: Upload B055 evidence bundle
         uses: actions/upload-artifact@v4
         with:
-          name: b055-evidence-bundle-${{ env.B055_PR_HEAD_SHA }}
+          name: b055-evidence-bundle-${{ env.ADJUDICATED_SHA }}
           path: ${{ env.B055_EVIDENCE_DIR }}
           retention-days: 90
 
@@ -586,6 +621,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.ADJUDICATED_SHA }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -911,6 +948,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.ADJUDICATED_SHA }}
       
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -935,6 +974,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.ADJUDICATED_SHA }}
       
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -991,6 +1032,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: ${{ env.ADJUDICATED_SHA }}
           fetch-depth: 0
       - name: Detect migration changes
         id: detect-migrations
@@ -1040,6 +1082,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.ADJUDICATED_SHA }}
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -1091,6 +1135,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          ref: ${{ env.ADJUDICATED_SHA }}
           fetch-depth: 0
 
       - name: Set up Python
