@@ -15,6 +15,7 @@ This index enumerates evidence packs stored under `docs/forensics/`.
 | B055 Phase 3 EG9 remediation | docs/forensics/b055_phase3_eg9_topology_idempotency_remediation_evidence.md | EG9/Topology/Idempotency remediation evidence | PR #18 / 214a98d | https://github.com/Muk223/skeldir-2.0/actions/runs/20967066505 |
 | B055 Phase 3 v4 | docs/forensics/b055_phase3_v4_orm_coc_idempotency_remediation_evidence.md | ORM parity + chain-of-custody + explanation idempotency evidence | PR #19 / 671ea4b | https://github.com/Muk223/skeldir-2.0/actions/runs/20973767676 |
 | B055 Phase 3 v5 | docs/forensics/b055_phase3_v5_migrated_db_coc_stub_semantics_evidence.md | Migrated DB + CoC + stub semantics evidence (artifact promotion) | PR #19 / 3893c70 | https://github.com/Muk223/skeldir-2.0/actions/runs/20979320024 |
+| B055 Phase 4 | docs/forensics/b055_phase4_remediation_evidence.md | CI adjudication evidence bundle + manifest enforcement | PR #20 / d34e1a9 | https://github.com/Muk223/skeldir-2.0/actions/runs/21003920055 |
 
 ## Root evidence packs
 | Phase/Topic | Evidence pack | Purpose | PR/Commit | CI Run |
