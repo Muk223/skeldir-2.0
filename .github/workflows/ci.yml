@@ -414,7 +414,6 @@ jobs:
       CELERY_METRICS_ADDR: 127.0.0.1
       B055_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/b055_evidence_bundle
       PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      ADJUDICATED_SHA: ${{ env.ADJUDICATED_SHA }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
