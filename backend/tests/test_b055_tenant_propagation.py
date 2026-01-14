@@ -52,16 +52,3 @@ def test_attribution_task_sets_tenant_guc(monkeypatch):
 
     assert seen.get("value") == str(tenant_id)
 
-    async def _cleanup():
-        async with engine.begin() as conn:
-            await conn.execute(
-                text(
-                    """
-                    DELETE FROM attribution_recompute_jobs
-                    WHERE id = :job_id AND tenant_id = :tenant_id
-                    """
-                ),
-                {"job_id": result["job_id"], "tenant_id": tenant_id},
-            )
-
-    asyncio.run(_cleanup())
