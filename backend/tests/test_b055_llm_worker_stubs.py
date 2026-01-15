@@ -11,6 +11,7 @@ from app.models.llm import BudgetOptimizationJob, Investigation, LLMApiCall, LLM
 from app.schemas.llm_payloads import LLMTaskPayload
 from app.tasks.llm import llm_explanation_worker
 from app.workers.llm import (
+    _resolve_request_id,
     generate_explanation,
     optimize_budget,
     record_monthly_costs,
@@ -34,6 +35,28 @@ def _assert_postgres_engine() -> None:
 
 class RetryCapture(RuntimeError):
     pass
+
+
+def test_llm_fallback_id_ignores_prompt_variation():
+    tenant_id = uuid4()
+    payload_a = LLMTaskPayload(
+        tenant_id=tenant_id,
+        correlation_id=None,
+        request_id=None,
+        prompt={"question": "why deterministic?"},
+        max_cost_cents=0,
+    )
+    payload_b = LLMTaskPayload(
+        tenant_id=tenant_id,
+        correlation_id=None,
+        request_id=None,
+        prompt={"question": "why  deterministic?", "whitespace": True},
+        max_cost_cents=0,
+    )
+    fallback_a = _resolve_request_id(payload_a, "app.tasks.llm.route")
+    fallback_b = _resolve_request_id(payload_b, "app.tasks.llm.route")
+
+    assert fallback_a == fallback_b
 
 
 @pytest.mark.asyncio
@@ -132,6 +155,37 @@ async def test_llm_investigation_stub_writes_job(test_tenant):
         assert investigation is not None
         assert investigation.status == "completed"
         assert investigation.cost_cents == 0
+
+
+@pytest.mark.asyncio
+async def test_llm_investigation_repeat_is_idempotent(test_tenant):
+    _assert_postgres_engine()
+    request_id = str(uuid4())
+    payload = LLMTaskPayload(
+        tenant_id=test_tenant,
+        correlation_id=str(uuid4()),
+        request_id=request_id,
+        prompt={"stub": True},
+        max_cost_cents=0,
+    )
+
+    async with get_session(tenant_id=test_tenant) as session:
+        first = await run_investigation(payload, session=session)
+    async with get_session(tenant_id=test_tenant) as session:
+        second = await run_investigation(payload, session=session)
+
+    assert first["investigation_id"] == second["investigation_id"]
+
+    async with get_session(tenant_id=test_tenant) as session:
+        investigations = (
+            await session.execute(
+                select(Investigation).where(
+                    Investigation.tenant_id == test_tenant,
+                    Investigation.query == f"stubbed:{request_id}",
+                )
+            )
+        ).scalars().all()
+        assert len(investigations) == 1
 
 
 @pytest.mark.asyncio
