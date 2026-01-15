@@ -1,17 +1,16 @@
 # B055 Phase 5 Follow-Up Evidence Pack (EG5-F2 / EG5-E / EG5-G / COC)
 
-## PR / CI Adjudication
+## PR / CI Adjudication (Authority Model)
 - PR: https://github.com/Muk223/skeldir-2.0/pull/22
-- PR head SHA: `d70e64eeadc99d0fcca2960a12c6ea0f21a5f577`
-- CI run: https://github.com/Muk223/skeldir-2.0/actions/runs/21037165121
-- Evidence bundle: `b055-evidence-bundle-d70e64eeadc99d0fcca2960a12c6ea0f21a5f577`
+- PR head SHA: `21cce3b398a92bd7135818c29705359fafd01f8e`
+- Evidence bundle rule: `b055-evidence-bundle-${ADJUDICATED_SHA}`
+- Authority: `MANIFEST.json` in the CI artifact is the source of truth for
+  adjudicated binding (do not hardcode CI run IDs in source-controlled docs).
 
 ## MANIFEST Binding (bundle `MANIFEST.json`)
-- `adjudicated_sha`: `d70e64eeadc99d0fcca2960a12c6ea0f21a5f577`
-- `pr_head_sha`: `d70e64eeadc99d0fcca2960a12c6ea0f21a5f577`
-- `github_sha`: `8a02095671c58df50c752b33d727cd692b42436a`
-- `workflow_run_id`: `21037165121`
-- `run_attempt`: `1`
+- The manifest must satisfy: `adjudicated_sha == pr_head_sha`
+- The artifact suffix must match `adjudicated_sha`
+- Evidence documents defer to manifest fields for `workflow_run_id` and `run_attempt`
 
 ## H1 — Production Config Lock (Falsified & Fixed)
 **Finding:** Tests now import production Celery app and assert JSON-only serializer config.
