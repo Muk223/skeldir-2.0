@@ -4,12 +4,21 @@ from uuid import uuid4
 
 from kombu.serialization import registry
 
+from app.celery_app import _ensure_celery_configured, celery_app
 from app.schemas.llm_payloads import LLMTaskPayload
 from app.services.llm_dispatch import enqueue_llm_task
 from app.tasks.llm import llm_explanation_worker
 
 
 def test_llm_payload_json_roundtrip_fidelity():
+    _ensure_celery_configured()
+    serializer = celery_app.conf["task_serializer"]
+    assert serializer == "json"
+    assert celery_app.conf["result_serializer"] == "json"
+    accept_content = celery_app.conf.get("accept_content", [])
+    assert "json" in accept_content
+    assert "application/x-python-serialize" not in accept_content
+
     request_id = str(uuid4())
     payload = LLMTaskPayload(
         tenant_id=uuid4(),
@@ -21,7 +30,7 @@ def test_llm_payload_json_roundtrip_fidelity():
 
     content_type, content_encoding, body = registry.dumps(
         payload.model_dump(mode="json"),
-        serializer="json",
+        serializer=serializer,
     )
     decoded = registry.loads(body, content_type, content_encoding)
     rehydrated = LLMTaskPayload.model_validate(decoded)

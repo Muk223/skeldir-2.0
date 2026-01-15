@@ -11,6 +11,7 @@ from app.models.llm import BudgetOptimizationJob, Investigation, LLMApiCall, LLM
 from app.schemas.llm_payloads import LLMTaskPayload
 from app.tasks.llm import llm_explanation_worker
 from app.workers.llm import (
+    _resolve_request_id,
     generate_explanation,
     optimize_budget,
     record_monthly_costs,
@@ -34,6 +35,28 @@ def _assert_postgres_engine() -> None:
 
 class RetryCapture(RuntimeError):
     pass
+
+
+def test_llm_fallback_id_ignores_prompt_variation():
+    tenant_id = uuid4()
+    payload_a = LLMTaskPayload(
+        tenant_id=tenant_id,
+        correlation_id=None,
+        request_id=None,
+        prompt={"question": "why deterministic?"},
+        max_cost_cents=0,
+    )
+    payload_b = LLMTaskPayload(
+        tenant_id=tenant_id,
+        correlation_id=None,
+        request_id=None,
+        prompt={"question": "why  deterministic?", "whitespace": True},
+        max_cost_cents=0,
+    )
+    fallback_a = _resolve_request_id(payload_a, "app.tasks.llm.route")
+    fallback_b = _resolve_request_id(payload_b, "app.tasks.llm.route")
+
+    assert fallback_a == fallback_b
 
 
 @pytest.mark.asyncio

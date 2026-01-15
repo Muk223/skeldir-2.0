@@ -36,7 +36,6 @@ def _stable_fallback_id(model: LLMTaskPayload, endpoint: str, label: str) -> str
         "endpoint": endpoint,
         "correlation_id": model.correlation_id,
         "request_id": model.request_id,
-        "prompt": model.prompt,
     }
     seed = json.dumps(payload, sort_keys=True, default=str)
     digest = hashlib.sha256(f"{label}:{seed}".encode("utf-8")).hexdigest()
