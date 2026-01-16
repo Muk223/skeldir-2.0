@@ -57,8 +57,8 @@ class Settings(BaseSettings):
         None,
         description="Celery result backend URL (db+postgresql://...). Defaults to DATABASE_URL derived sync DSN when unset.",
     )
-    CELERY_METRICS_PORT: int = Field(9540, description="Port for Celery worker metrics/health HTTP server")
-    CELERY_METRICS_ADDR: str = Field("0.0.0.0", description="Bind address for Celery worker metrics/health server")
+    # B0.5.6.1: CELERY_METRICS_PORT and CELERY_METRICS_ADDR removed.
+    # Worker-side HTTP server eradicated; metrics exposed via API /metrics only.
     CELERY_TASK_ACKS_LATE: bool = Field(
         True,
         description="Acknowledge tasks only after execution completes (crash-safe, required for idempotent side effects).",

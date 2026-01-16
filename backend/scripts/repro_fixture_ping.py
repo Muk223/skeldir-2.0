@@ -17,8 +17,7 @@ sys.path.insert(0, str(backend_dir))
 os.environ["DATABASE_URL"] = "postgresql+asyncpg://app_user:app_user@127.0.0.1:5432/skeldir_validation"
 os.environ["CELERY_BROKER_URL"] = "sqla+postgresql://app_user:app_user@127.0.0.1:5432/skeldir_validation"
 os.environ["CELERY_RESULT_BACKEND"] = "db+postgresql://app_user:app_user@127.0.0.1:5432/skeldir_validation"
-os.environ["CELERY_METRICS_PORT"] = "9546"
-os.environ["CELERY_METRICS_ADDR"] = "127.0.0.1"
+# B0.5.6.1: CELERY_METRICS_PORT/ADDR removed - worker HTTP server eradicated
 
 from app.celery_app import celery_app
 

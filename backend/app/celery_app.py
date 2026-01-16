@@ -20,7 +20,6 @@ from sqlalchemy.engine.url import make_url
 from app.core.queues import QUEUE_LLM
 from app.observability import metrics
 from app.observability.logging_config import configure_logging
-from app.observability.worker_monitoring import start_worker_http_server
 
 logger = logging.getLogger(__name__)
 
@@ -219,18 +218,12 @@ def _ensure_celery_configured():
 def _configure_worker_logging(**kwargs):
     """
     Ensure structured logging is configured inside each worker process.
+
+    B0.5.6.1: Worker-side HTTP server removed. Metrics are exposed exclusively via API /metrics.
     """
     settings = _get_settings()  # B0.5.3.3 Gate C: Lazy settings access
     configure_logging(settings.LOG_LEVEL)
-    start_worker_http_server(
-        celery_app,
-        host=settings.CELERY_METRICS_ADDR,
-        port=settings.CELERY_METRICS_PORT,
-    )
-    logger.info(
-        "celery_worker_logging_configured",
-        extra={"metrics_addr": settings.CELERY_METRICS_ADDR, "metrics_port": settings.CELERY_METRICS_PORT},
-    )
+    logger.info("celery_worker_logging_configured")
 
 
 def _recover_invisible_kombu_messages(*, engine, visibility_timeout_s: int, task_name_filter: str | None) -> int:

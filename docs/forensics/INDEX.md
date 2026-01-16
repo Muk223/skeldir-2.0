@@ -19,6 +19,8 @@ This index enumerates evidence packs stored under `docs/forensics/`.
 | B055 Phase 5 remediation | docs/forensics/b055_phase5_remediation_evidence.md | Phase 5 hermeticity + determinism + cohesion remediation | PR #22 / adjudicated_sha (see MANIFEST.json) | Bundle manifest (workflow_run_id) |
 | B055 Phase 5 follow-up | docs/forensics/b055_phase5_followup_evidence_pack.md | Phase 5 config lock + determinism + COC follow-up evidence | PR #22 / adjudicated_sha (see MANIFEST.json) | MANIFEST.json (artifact) |
 | B055 Month bucket fix | docs/forensics/b055_month_bucket_remediation_evidence.md | Month bucket remediation (LLM monthly costs) | PR #23 / adjudicated_sha (see MANIFEST.json) | MANIFEST.json (artifact) |
+| B0.5.6 Phase 0 | docs/forensics/b056_phase0_worker_observability_drift_inventory_evidence.md | Worker observability drift inventory (context-gathering) | pending | pending |
+| B0.5.6 Phase 1 | docs/forensics/b056_phase1_drift_eradication_remediation_evidence.md | Worker HTTP sidecar eradication + guardrail | pending | pending |
 
 ## Root evidence packs
 | Phase/Topic | Evidence pack | Purpose | PR/Commit | CI Run |

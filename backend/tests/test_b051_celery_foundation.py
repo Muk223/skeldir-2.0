@@ -23,8 +23,7 @@ DEFAULT_ASYNC_DSN = os.environ.get("TEST_ASYNC_DSN", "postgresql+asyncpg://app_u
 os.environ.setdefault("DATABASE_URL", DEFAULT_ASYNC_DSN)
 os.environ.setdefault("CELERY_BROKER_URL", f"sqla+{DEFAULT_SYNC_DSN}")
 os.environ.setdefault("CELERY_RESULT_BACKEND", f"db+{DEFAULT_SYNC_DSN}")
-os.environ.setdefault("CELERY_METRICS_PORT", os.environ.get("CELERY_METRICS_PORT", "9546"))
-os.environ.setdefault("CELERY_METRICS_ADDR", "127.0.0.1")
+# B0.5.6.1: CELERY_METRICS_PORT/ADDR removed - worker HTTP server eradicated
 
 from app.celery_app import (
     celery_app,
@@ -175,8 +174,7 @@ def celery_worker_proc():
     backend_dir = Path(__file__).resolve().parents[1]
     env = os.environ.copy()
     env["PYTHONPATH"] = str(backend_dir.parent)
-    env.setdefault("CELERY_METRICS_PORT", os.environ["CELERY_METRICS_PORT"])
-    env.setdefault("CELERY_METRICS_ADDR", os.environ["CELERY_METRICS_ADDR"])
+    # B0.5.6.1: CELERY_METRICS_PORT/ADDR removed - worker HTTP server eradicated
     queue_list = ",".join(["housekeeping", "maintenance", QUEUE_LLM, "attribution"])
     cmd = [
         sys.executable,
@@ -239,24 +237,8 @@ async def test_ping_task_runs_and_persists_result(celery_worker_proc):
     assert data is not None
     assert data.status == "SUCCESS"
 
-    # Metrics served from worker HTTP server
-    metrics_port = os.environ["CELERY_METRICS_PORT"]
-    metrics_resp = httpx.get(f"http://127.0.0.1:{metrics_port}/metrics", timeout=10.0)
-    assert metrics_resp.status_code == 200
-    assert "celery_task_success_total" in metrics_resp.text
-
-    health_resp = None
-    for _ in range(5):
-        health_resp = httpx.get(f"http://127.0.0.1:{metrics_port}/health", timeout=10.0)
-        if health_resp.status_code == 200:
-            break
-        time.sleep(1)
-
-    assert health_resp is not None and health_resp.status_code == 200
-    health_body = health_resp.json()
-    assert health_body.get("broker") == "ok"
-    assert health_body.get("database") == "ok"
-
+    # B0.5.6.1: Worker HTTP server eradicated. Metrics are now exposed via API /metrics only.
+    # Worker-side /health and /metrics endpoints no longer exist.
 
 @pytest.mark.asyncio
 async def test_metrics_exposed_via_fastapi(monkeypatch):
