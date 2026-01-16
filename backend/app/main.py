@@ -52,11 +52,11 @@ app.include_router(attribution.router, prefix="/api/attribution", tags=["Attribu
 app.include_router(health.router, tags=["Health"])
 app.include_router(webhooks.router, prefix="/api", tags=["Webhooks"])
 
-# Health check endpoint (out-of-scope per contract_scope.yaml)
-@app.get("/health")
-async def health_check():
-    """Health check endpoint - explicitly out-of-scope for contract enforcement."""
-    return {"status": "healthy", "service": "skeldir-api"}
+# Health endpoints are now exclusively in app.api.health with explicit semantics:
+# - /health/live: Pure liveness (no deps)
+# - /health/ready: Readiness (DB + RLS + GUC)
+# - /health/worker: Worker capability (data-plane probe)
+# No /health endpoint exists to avoid semantic ambiguity (B0.5.6.2).
 
 
 @app.get("/")

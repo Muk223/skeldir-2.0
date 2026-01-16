@@ -50,12 +50,17 @@ def sign_shopify(body: bytes, secret: str) -> str:
 
 @pytest.mark.asyncio
 async def test_health_endpoints():
+    """
+    B0.5.6.2: Health endpoints now have explicit semantics.
+    - /health/live: Pure liveness (no deps)
+    - /health/ready: Readiness (DB + RLS + GUC)
+    """
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        liveness = await client.get("/health")
+        liveness = await client.get("/health/live")
         readiness = await client.get("/health/ready")
     assert liveness.status_code == 200
-    assert liveness.json()["status"] == "healthy"
+    assert liveness.json()["status"] == "ok"
     assert readiness.status_code in (200, 503)
     assert "status" in readiness.json()
 
