@@ -536,7 +536,7 @@ jobs:
           python -u scripts/ci/health_worker_probe.py \
             --url "http://127.0.0.1:8000/health/worker" \
             --log-path "$B055_EVIDENCE_DIR/LOGS/health_worker_probe.log" \
-            | tee /tmp/health_worker_probe_stdout.log
+            2>&1 | tee /tmp/health_worker_probe_stdout.log
           probe_exit=${PIPESTATUS[0]}
           set -e
           echo "health_worker_probe_stdout_begin"
