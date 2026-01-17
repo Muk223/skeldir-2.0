@@ -548,7 +548,7 @@ jobs:
           fi
           : > /tmp/health_worker_probe.log
           set +e
-          python -u scripts/ci/health_worker_probe.py \
+          python -u ../scripts/ci/health_worker_probe.py \
             --url "http://127.0.0.1:8000/health/worker" \
             --log-path /tmp/health_worker_probe.log \
             2>&1 | tee /tmp/health_worker_probe_stdout.log

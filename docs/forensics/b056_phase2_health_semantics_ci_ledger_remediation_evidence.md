@@ -28,6 +28,14 @@ Evidence (CI log excerpt):
 The `celery-foundation` job did not include `tests/test_b0562_health_semantics.py`
 in the pytest list.
 
+### CI probe script path regression (new)
+CI run `21099327198` failed in the `B0.5.6.2 Worker capability data-plane probe`
+step because the probe script path resolved relative to `backend/`:
+`python -u scripts/ci/health_worker_probe.py` (missing file).
+
+Evidence (CI log excerpt):
+- `python: can't open file '/home/runner/work/skeldir-2.0/skeldir-2.0/backend/scripts/ci/health_worker_probe.py'`
+
 ### `/health` decision stability (H-CTX4 confirmed)
 Current API exposes `/health` as a strict liveness alias in `backend/app/api/health.py`.
 This preserves legacy behavior while keeping explicit `/health/live` semantics.
@@ -44,6 +52,10 @@ File: `.github/workflows/ci.yml`
 File: `.github/workflows/ci.yml`
 - Added `tests/test_b0562_health_semantics.py` to the Celery foundation pytest list.
 
+### Fix probe script path
+File: `.github/workflows/ci.yml`
+- Updated to `python -u ../scripts/ci/health_worker_probe.py` after `cd backend`.
+
 ## Guardrail Evidence (B0.5.6.1)
 Command:
 `python scripts/ci/enforce_no_worker_http_server.py --scan-path backend/app --output docs/forensics/evidence/b056_phase2_worker_http_guardrail.log`
@@ -55,7 +67,7 @@ Result:
 Log: `docs/forensics/evidence/b056_phase2_worker_http_guardrail.log`
 
 ## Status
-- CI remediation applied locally; CI rerun required to close ledger.
+- CI remediation applied; CI rerun required to close ledger.
 - B0.5.6.2 tests are now explicitly included in CI.
 - `/health` alias remains explicitly documented and implemented as liveness-only.
 
