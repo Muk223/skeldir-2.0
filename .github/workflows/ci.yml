@@ -544,7 +544,10 @@ jobs:
             fi
             sleep 2
           done
-          python - <<'PY'
+          echo "health_worker_probe_log_begin"
+          cat "$B055_EVIDENCE_DIR/LOGS/health_worker_probe.log" || true
+          echo "health_worker_probe_log_end"
+          if ! python - <<'PY'
           import json
           import os
           import sys
@@ -559,6 +562,15 @@ jobs:
           if code != 200 or body.get("worker") != "ok" or body.get("broker") != "ok":
             raise SystemExit(f"health/worker probe failed: code={code} body={body}")
           PY
+          then
+            echo "health_probe_api_log_begin"
+            tail -n 200 /tmp/health_probe_api.log || true
+            echo "health_probe_api_log_end"
+            echo "health_probe_worker_log_begin"
+            tail -n 200 /tmp/celery.log || true
+            echo "health_probe_worker_log_end"
+            exit 1
+          fi
           echo "health_probe_log_begin"
           grep -n "health_probe_task_complete" /tmp/celery.log || true
           echo "health_probe_log_end"
