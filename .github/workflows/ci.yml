@@ -539,6 +539,11 @@ jobs:
             2>&1 | tee /tmp/health_worker_probe_stdout.log
           probe_exit=${PIPESTATUS[0]}
           set -e
+          if [ ! -f "$B055_EVIDENCE_DIR/LOGS/health_worker_probe.log" ]; then
+            echo "probe_log_missing" > "$B055_EVIDENCE_DIR/LOGS/health_worker_probe.log"
+          fi
+          echo "probe_exit=${probe_exit}" >> "$B055_EVIDENCE_DIR/LOGS/health_worker_probe.log"
+          cat /tmp/health_worker_probe_stdout.log >> "$B055_EVIDENCE_DIR/LOGS/health_worker_probe.log" || true
           echo "health_worker_probe_stdout_begin"
           cat /tmp/health_worker_probe_stdout.log || true
           echo "health_worker_probe_stdout_end"
