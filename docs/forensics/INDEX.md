@@ -1,4 +1,4 @@
-﻿# Forensics Evidence Index
+# Forensics Evidence Index
 
 This index enumerates evidence packs stored under `docs/forensics/`.
 
@@ -21,7 +21,7 @@ This index enumerates evidence packs stored under `docs/forensics/`.
 | B055 Month bucket fix | docs/forensics/b055_month_bucket_remediation_evidence.md | Month bucket remediation (LLM monthly costs) | PR #23 / adjudicated_sha (see MANIFEST.json) | MANIFEST.json (artifact) |
 | B0.5.6 Phase 0 | docs/forensics/b056_phase0_worker_observability_drift_inventory_evidence.md | Worker observability drift inventory (context-gathering) | pending | pending |
 | B0.5.6 Phase 1 | docs/forensics/b056_phase1_drift_eradication_remediation_evidence.md | Worker HTTP sidecar eradication + guardrail | c2fefa4 / deee625 | CI #524 ✅ |
-| B0.5.6 Phase 2 | docs/forensics/b056_phase2_health_semantics_remediation_evidence.md | Health semantics remediation evidence (live/ready/worker) | 78c689e | local (CI not run) |
+| B0.5.6 Phase 2 | docs/forensics/b056_phase2_health_semantics_remediation_evidence.md | Health semantics remediation evidence (live/ready/worker) | pending | pending |
 
 ## Root evidence packs
 | Phase/Topic | Evidence pack | Purpose | PR/Commit | CI Run |

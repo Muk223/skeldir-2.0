@@ -93,7 +93,7 @@ def _execute_worker_probe() -> _ProbeResult:
             elapsed = time.monotonic() - start
             latency_ms = int(elapsed * 1000)
             
-            # The probe task returns {"status": "ok", "db_user": ..., ...} on success
+            # The health probe task returns {"status": "ok", "db_user": ..., ...} on success
             if isinstance(result, dict) and result.get("status") == "ok":
                 worker_ok = True
                 # db_user presence proves DB connectivity from worker side
@@ -189,14 +189,6 @@ async def liveness() -> dict:
     Constant-time response.
     
     Use for: Kubernetes liveness probe, load balancer health.
-    """
-    return {"status": "ok"}
-
-
-@router.get("/health")
-async def health_alias() -> dict:
-    """
-    Legacy health alias: strict liveness only (no dependency checks).
     """
     return {"status": "ok"}
 

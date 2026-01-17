@@ -18,21 +18,20 @@ rg -n "(/health|health/ready|include_router\(health|APIRouter\(|def health|def r
 ```
 backend/app\main.py
 52:app.include_router(health.router, tags=["Health"])
-56:# - /health: Legacy alias for liveness only
-57:# - /health/live: Pure liveness (no deps)
-58:# - /health/ready: Readiness (DB + RLS + GUC)
-59:# - /health/worker: Worker capability (data-plane probe)
+56:# - /health/live: Pure liveness (no deps)
+57:# - /health/ready: Readiness (DB + RLS + GUC)
+58:# - /health/worker: Worker capability (data-plane probe)
+59:# No /health endpoint exists to avoid semantic ambiguity (B0.5.6.2).
 
 backend/app\api\health.py
-5:- /health: Legacy alias for liveness only (process responds, no dependency checks)
-6:- /health/live: Pure liveness (process responds, no dependency checks)
-7:- /health/ready: Readiness (DB + RLS + tenant GUC validation)
-8:- /health/worker: Worker capability (data-plane probe via Celery)
+5:- /health/live: Pure liveness (process responds, no dependency checks)
+6:- /health/ready: Readiness (DB + RLS + tenant GUC validation)
+7:- /health/worker: Worker capability (data-plane probe via Celery)
+9:No /health endpoint exists to avoid semantic ambiguity.
 24:router = APIRouter()
 182:@router.get("/health/live")
-197:@router.get("/health")
-204:@router.get("/health/ready")
-275:@router.get("/health/worker")
+196:@router.get("/health/ready")
+267:@router.get("/health/worker")
 ```
 
 ### 1.2 Runtime route truth (OpenAPI)
@@ -44,13 +43,12 @@ python -c "import json; data=json.load(open('.tmp/b056_openapi.json', encoding='
 
 **Output**
 ```
-/health
 /health/live
 /health/ready
 /health/worker
 ```
 
-### 1.3 `/health` response (alias)
+### 1.3 `/health` response (route exists?)
 **Command**
 ```
 curl.exe -s -i http://127.0.0.1:8001/health
@@ -58,23 +56,24 @@ curl.exe -s -i http://127.0.0.1:8001/health
 
 **Output**
 ```
-HTTP/1.1 200 OK
+HTTP/1.1 404 Not Found
 content-type: application/json
 
-{"status":"ok"}
+{"detail":"Not Found"}
 ```
 
-**Finding**: Hypothesis H-C0.2 (duplicate `/health`) is **falsified** on current `main`. `/health` is a strict alias of `/health/live`.
+**Finding**: Hypothesis H-C0.2 (duplicate `/health`) is **falsified** on current `main`. No `/health` route exists.
 
 ---
 
 ## 2) Remediation Summary
 
-No code changes required in this phase. The required health surface and tests already exist:
+Changes applied to restore provenance and align with B0.5.6.2:
 
-- `backend/app/api/health.py` implements `/health` (alias), `/health/live`, `/health/ready`, `/health/worker` with explicit semantics.
-- `backend/app/tasks/health.py` implements `app.tasks.health.probe` for the data-plane probe.
-- `backend/tests/test_b0562_health_semantics.py` covers EG1–EG6 gates.
+- **New worker probe task**: `backend/app/tasks/health.py` defines `app.tasks.health.probe` (data-plane probe).
+- **API worker probe wiring**: `backend/app/api/health.py` sends `app.tasks.health.probe` via the broker.
+- **Celery registration**: `backend/app/celery_app.py` includes `app.tasks.health` with routing to `housekeeping`.
+- **Tests**: `backend/tests/test_b0562_health_semantics.py` updated to expect `app.tasks.health.probe`.
 
 ---
 
@@ -89,7 +88,6 @@ python -c "import json; data=json.load(open('.tmp/b056_openapi.json', encoding='
 
 **Output**
 ```
-/health
 /health/live
 /health/ready
 /health/worker
@@ -221,8 +219,8 @@ PASS: No worker HTTP server primitives detected.
 
 ## 4) Adjudication Metadata
 
-- **Commit SHA**: `78c689ecbfa6ebbe887cea059646cb8faeb6fb29`
-- **CI Run URL**: pending (local-only execution)
+- **Commit SHA**: pending (post-commit update)
+- **CI Run URL**: pending (CI not run yet)
 
 ---
 
