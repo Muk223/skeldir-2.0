@@ -521,11 +521,13 @@ jobs:
           cd backend
           export PYTHONPATH=$(pwd):$PYTHONPATH
           export DATABASE_URL="${DATABASE_URL/postgresql:\/\//postgresql+asyncpg://}"
+          : > /tmp/health_probe_api.log
           nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/health_probe_api.log 2>&1 &
           API_PID=$!
           sleep 1
           if ! kill -0 "${API_PID}" 2>/dev/null; then
             echo "API process exited early"
+            ls -l /tmp/health_probe_api.log || true
             tail -n 200 /tmp/health_probe_api.log || true
             exit 1
           fi
