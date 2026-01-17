@@ -303,6 +303,7 @@ async def worker_capability(response: Response) -> dict:
         "worker": "ok" if probe.worker_ok else "error",
         "probe_latency_ms": probe.latency_ms,
         "cached": was_cached,
+        "cache_scope": "process",
     }
     
     if not probe.worker_ok:
