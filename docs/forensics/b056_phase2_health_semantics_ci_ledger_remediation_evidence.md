@@ -36,6 +36,14 @@ step because the probe script path resolved relative to `backend/`:
 Evidence (CI log excerpt):
 - `python: can't open file '/home/runner/work/skeldir-2.0/skeldir-2.0/backend/scripts/ci/health_worker_probe.py'`
 
+### B0.5.6.2 tests failing in CI (new)
+CI run `21099391086` executed `tests/test_b0562_health_semantics.py` but failed
+mocked worker probe tests because `app.api.health` did not expose a
+`celery_app` attribute for patching.
+
+Evidence (CI log excerpt):
+- `AttributeError: <module 'app.api.health' ...> does not have the attribute 'celery_app'`
+
 ### `/health` decision stability (H-CTX4 confirmed)
 Current API exposes `/health` as a strict liveness alias in `backend/app/api/health.py`.
 This preserves legacy behavior while keeping explicit `/health/live` semantics.
@@ -55,6 +63,10 @@ File: `.github/workflows/ci.yml`
 ### Fix probe script path
 File: `.github/workflows/ci.yml`
 - Updated to `python -u ../scripts/ci/health_worker_probe.py` after `cd backend`.
+
+### Align test patch target
+File: `backend/app/api/health.py`
+- Added module-level import of `celery_app` so tests can patch `app.api.health.celery_app`.
 
 ## Guardrail Evidence (B0.5.6.1)
 Command:

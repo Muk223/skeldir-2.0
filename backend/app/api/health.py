@@ -21,6 +21,7 @@ from sqlalchemy import text
 from uuid import uuid4
 
 from app.db.session import engine
+from app.celery_app import celery_app
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -68,8 +69,6 @@ def _execute_worker_probe() -> _ProbeResult:
     
     Returns a _ProbeResult with status of each component.
     """
-    from app.celery_app import celery_app
-    
     start = time.monotonic()
     broker_ok = False
     database_ok = False
