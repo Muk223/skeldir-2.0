@@ -517,17 +517,33 @@ jobs:
           export PYTHONPATH=$(pwd):$PYTHONPATH
           nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/health_probe_api.log 2>&1 &
           API_PID=$!
+          ready_ok=false
           for i in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:8000/health/ready >/dev/null; then
+              ready_ok=true
               break
             fi
             sleep 1
           done
-          response="$(curl -s -w "\n%{http_code}" http://127.0.0.1:8000/health/worker)"
-          body="$(echo "$response" | sed '$d')"
-          code="$(echo "$response" | tail -n1)"
-          echo "HTTP_CODE=${code}" > "$B055_EVIDENCE_DIR/LOGS/health_worker_probe.log"
-          echo "$body" >> "$B055_EVIDENCE_DIR/LOGS/health_worker_probe.log"
+          if [ "${ready_ok}" != "true" ]; then
+            echo "health/ready never returned 200; dumping API log"
+            tail -n 200 /tmp/health_probe_api.log || true
+            kill "${API_PID}" || true
+            exit 1
+          fi
+          : > "$B055_EVIDENCE_DIR/LOGS/health_worker_probe.log"
+          for attempt in $(seq 1 5); do
+            response="$(curl -s -w "\n%{http_code}" http://127.0.0.1:8000/health/worker)"
+            body="$(echo "$response" | sed '$d')"
+            code="$(echo "$response" | tail -n1)"
+            echo "ATTEMPT=${attempt}" >> "$B055_EVIDENCE_DIR/LOGS/health_worker_probe.log"
+            echo "HTTP_CODE=${code}" >> "$B055_EVIDENCE_DIR/LOGS/health_worker_probe.log"
+            echo "$body" >> "$B055_EVIDENCE_DIR/LOGS/health_worker_probe.log"
+            if [ "$code" = "200" ]; then
+              break
+            fi
+            sleep 2
+          done
           python - <<'PY'
           import json
           import os
@@ -536,9 +552,10 @@ jobs:
           path = os.environ.get("B055_EVIDENCE_DIR", "") + "/LOGS/health_worker_probe.log"
           with open(path, "r", encoding="utf-8") as handle:
             lines = [line.strip() for line in handle if line.strip()]
-          code_line = next((line for line in lines if line.startswith("HTTP_CODE=")), "HTTP_CODE=0")
-          code = int(code_line.split("=", 1)[1])
-          body = json.loads(lines[-1]) if lines else {}
+          code_lines = [line for line in lines if line.startswith("HTTP_CODE=")]
+          code = int(code_lines[-1].split("=", 1)[1]) if code_lines else 0
+          body_line = next((line for line in reversed(lines) if line.startswith("{")), "{}")
+          body = json.loads(body_line)
           if code != 200 or body.get("worker") != "ok" or body.get("broker") != "ok":
             raise SystemExit(f"health/worker probe failed: code={code} body={body}")
           PY
