@@ -551,10 +551,10 @@ jobs:
               last_body = resp.json()
             except Exception:
               last_body = {"raw": resp.text}
-            print(f"health_worker_probe_attempt_{attempt}_response_begin")
-            print(resp.status_code)
-            print(resp.text)
-            print(f"health_worker_probe_attempt_{attempt}_response_end")
+            print(f"health_worker_probe_attempt_{attempt}_response_begin", flush=True)
+            print(resp.status_code, flush=True)
+            print(resp.text, flush=True)
+            print(f"health_worker_probe_attempt_{attempt}_response_end", flush=True)
             with open(log_path, "a", encoding="utf-8") as handle:
               handle.write(f"ATTEMPT={attempt}\n")
               handle.write(f"HTTP_CODE={resp.status_code}\n")
@@ -563,6 +563,7 @@ jobs:
               break
             time.sleep(2)
           if last_code != 200 or last_body.get("worker") != "ok" or last_body.get("broker") != "ok":
+            print(f"health_worker_probe_failed code={last_code} body={last_body}", file=sys.stderr, flush=True)
             raise SystemExit(f"health/worker probe failed: code={last_code} body={last_body}")
           PY
           then
