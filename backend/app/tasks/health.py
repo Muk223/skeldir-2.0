@@ -44,7 +44,7 @@ async def _fetch_db_user() -> str:
         return res.scalar() or ""
 
 
-@celery_app.task(bind=True, name="app.tasks.health.probe", routing_key="housekeeping.health")
+@celery_app.task(bind=True, name="app.tasks.health.probe", routing_key="housekeeping.task")
 def probe(self) -> dict:
     """
     Health probe task used by /health/worker.

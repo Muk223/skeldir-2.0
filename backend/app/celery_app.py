@@ -180,7 +180,7 @@ def _ensure_celery_configured():
         ],
         task_routes={
             'app.tasks.housekeeping.*': {'queue': 'housekeeping', 'routing_key': 'housekeeping.task'},
-            'app.tasks.health.*': {'queue': 'housekeeping', 'routing_key': 'housekeeping.health'},
+            'app.tasks.health.*': {'queue': 'housekeeping', 'routing_key': 'housekeeping.task'},
             'app.tasks.maintenance.*': {'queue': 'maintenance', 'routing_key': 'maintenance.task'},
             'app.tasks.matviews.*': {'queue': 'maintenance', 'routing_key': 'maintenance.task'},
             'app.tasks.llm.*': {'queue': QUEUE_LLM, 'routing_key': 'llm.task'},
