@@ -492,7 +492,7 @@ jobs:
       - name: Start Celery worker
         run: |
           cd backend
-          export PYTHONPATH=$(pwd):$PYTHONPATH
+          export PYTHONPATH="$(pwd):${PYTHONPATH:-}"
           echo "Starting Celery worker..."
           celery -A app.celery_app.celery_app worker -P solo -c 1 --loglevel=INFO --logfile /tmp/celery.log &
           echo $! > /tmp/celery.pid
@@ -519,7 +519,7 @@ jobs:
         run: |
           set -euo pipefail
           cd backend
-          export PYTHONPATH=$(pwd):$PYTHONPATH
+          export PYTHONPATH="$(pwd):${PYTHONPATH:-}"
           export DATABASE_URL="${DATABASE_URL/postgresql:\/\//postgresql+asyncpg://}"
           : > /tmp/health_probe_api.log
           nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/health_probe_api.log 2>&1 &
@@ -596,7 +596,8 @@ jobs:
             tests/test_b055_llm_model_parity.py \
             tests/test_b055_llm_payload_fidelity.py \
             tests/test_b055_matview_boundary.py \
-            tests/test_b055_tenant_propagation.py -q | tee "$B055_EVIDENCE_DIR/LOGS/pytest_b055.log"
+            tests/test_b055_tenant_propagation.py \
+            tests/test_b0562_health_semantics.py -q | tee "$B055_EVIDENCE_DIR/LOGS/pytest_b055.log"
 
       - name: Upload health probe logs
         if: always()
