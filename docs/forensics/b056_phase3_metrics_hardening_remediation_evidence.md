@@ -4,6 +4,8 @@
 **Investigator**: Claude (automated remediation execution)  
 **Phase**: B0.5.6.3 Metrics Hardening: Cardinality/Privacy Enforcement as Tests  
 **Status**: COMPLETE
+**Acceptance Commit**: 3afd141  
+**Acceptance CI Run**: https://github.com/Muk223/skeldir-2.0/actions/runs/21116761325
 
 ---
 
