@@ -190,7 +190,7 @@ async def liveness() -> dict:
     
     Use for: Kubernetes liveness probe, load balancer health.
     """
-    return {"status": "ok"}
+    return {"status": "ok", "healthy": True}
 
 
 @router.get("/health")
@@ -198,7 +198,7 @@ async def health_alias() -> dict:
     """
     Legacy health alias: strict liveness only (no dependency checks).
     """
-    return {"status": "ok"}
+    return {"status": "ok", "healthy": True}
 
 
 @router.get("/health/ready")

@@ -176,20 +176,33 @@ async def _http_fire(
     status_counts: dict[str, int] = {}
     timeouts = 0
     connection_errors = 0
+    recovered_request_errors = 0
 
     async def _one(url: str, headers: dict[str, str], body: bytes) -> None:
-        nonlocal timeouts, connection_errors
+        nonlocal timeouts, connection_errors, recovered_request_errors
         async with sem:
-            try:
-                resp = await client.post(url, content=body, headers=headers, timeout=timeout_s)
-                key = str(resp.status_code)
-                status_counts[key] = status_counts.get(key, 0) + 1
-            except (httpx.TimeoutException, asyncio.TimeoutError):
-                timeouts += 1
-                status_counts["timeout"] = status_counts.get("timeout", 0) + 1
-            except httpx.RequestError:
-                connection_errors += 1
-                status_counts["request_error"] = status_counts.get("request_error", 0) + 1
+            transient_request_error = False
+            for attempt in range(3):
+                try:
+                    resp = await client.post(url, content=body, headers=headers, timeout=timeout_s)
+                    key = str(resp.status_code)
+                    status_counts[key] = status_counts.get(key, 0) + 1
+                    if transient_request_error:
+                        recovered_request_errors += 1
+                        status_counts["request_error_recovered"] = status_counts.get("request_error_recovered", 0) + 1
+                    return
+                except (httpx.TimeoutException, asyncio.TimeoutError):
+                    timeouts += 1
+                    status_counts["timeout"] = status_counts.get("timeout", 0) + 1
+                    return
+                except httpx.RequestError:
+                    transient_request_error = True
+                    if attempt < 2:
+                        await asyncio.sleep(0.05 * (attempt + 1))
+                        continue
+                    connection_errors += 1
+                    status_counts["request_error"] = status_counts.get("request_error", 0) + 1
+                    return
 
     await asyncio.gather(*[_one(url, headers, body) for (url, headers, body) in requests])
     return status_counts, timeouts, connection_errors
