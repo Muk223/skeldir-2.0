@@ -318,11 +318,46 @@ async def worker_capability(response: Response) -> dict:
 
 
 # ============================================================================
-# Metrics Endpoint (unchanged from original)
+# Metrics Endpoint (B0.5.6.3: Multiprocess-aware)
 # ============================================================================
+
+def _get_metrics_data() -> bytes:
+    """
+    Generate Prometheus metrics with multiprocess support (B0.5.6.3).
+    
+    When PROMETHEUS_MULTIPROC_DIR is set, uses MultiProcessCollector to
+    aggregate metrics from all worker processes (Uvicorn/Gunicorn/Celery).
+    Otherwise falls back to standard generate_latest().
+    """
+    import os
+    multiproc_dir = os.environ.get("PROMETHEUS_MULTIPROC_DIR")
+    
+    if multiproc_dir:
+        # Multiprocess mode: aggregate from all workers
+        from prometheus_client import CollectorRegistry, CONTENT_TYPE_LATEST
+        from prometheus_client.multiprocess import MultiProcessCollector
+        
+        registry = CollectorRegistry()
+        MultiProcessCollector(registry)
+        return generate_latest(registry)
+    else:
+        # Single-process mode: use default registry
+        return generate_latest()
+
 
 @router.get("/metrics")
 async def metrics():
-    """Prometheus metrics endpoint."""
-    data = generate_latest()
+    """
+    Prometheus metrics endpoint.
+    
+    B0.5.6.3: Supports multiprocess mode when PROMETHEUS_MULTIPROC_DIR is set.
+    In pre-forked environments (Uvicorn workers, Gunicorn), each worker process
+    writes metrics to files in the multiproc directory. This endpoint aggregates
+    them for scraping.
+    
+    Environment:
+        PROMETHEUS_MULTIPROC_DIR: Directory for multiprocess metric files.
+                                  Must be set before any prometheus_client imports.
+    """
+    data = _get_metrics_data()
     return Response(content=data, media_type=CONTENT_TYPE_LATEST)

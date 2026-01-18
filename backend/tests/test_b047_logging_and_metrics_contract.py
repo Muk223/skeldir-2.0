@@ -175,11 +175,12 @@ async def test_metrics_labels_and_parseability(tenant_with_secret):
     assert "events_duplicate_total" in text
     assert "events_dlq_total" in text
     assert "ingestion_duration_seconds_bucket" in text
-    # Check labels present
-    assert f'tenant_id="{tenant_id}' in text
-    assert 'vendor="shopify"' in text or 'vendor="unknown"' in text
-    assert 'event_type="purchase"' in text or 'event_type="unknown"' in text
-    assert 'error_type=' in text
+    # B0.5.6.3: Labels removed from event metrics for privacy/cardinality
+    # These metrics are now label-free aggregate counters
+    assert "tenant_id=" not in text
+    assert 'vendor=' not in text
+    assert 'event_type=' not in text
+    assert 'error_type=' not in text
 
 
 @pytest.mark.asyncio

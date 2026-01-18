@@ -103,12 +103,8 @@ class EventIngestionService:
                     **log_context(),
                 }
             )
-            events_duplicate_total.labels(
-                tenant_id=str(tenant_id),
-                vendor=event_data.get("vendor", source),
-                event_type=event_data.get("event_type", "unknown"),
-                error_type="duplicate",
-            ).inc()
+            # B0.5.6.3: No labels on event metrics (bounded cardinality)
+            events_duplicate_total.inc()
             return existing
 
         start_time = time.perf_counter()
@@ -167,18 +163,9 @@ class EventIngestionService:
                 }
             )
             duration = time.perf_counter() - start_time
-            events_ingested_total.labels(
-                tenant_id=str(tenant_id),
-                vendor=event_data.get("vendor", source),
-                event_type=validated["event_type"],
-                error_type="none",
-            ).inc()
-            ingestion_duration_seconds.labels(
-                tenant_id=str(tenant_id),
-                vendor=event_data.get("vendor", source),
-                event_type=validated["event_type"],
-                error_type="none",
-            ).observe(duration)
+            # B0.5.6.3: No labels on event metrics (bounded cardinality)
+            events_ingested_total.inc()
+            ingestion_duration_seconds.observe(duration)
 
             return event
 
@@ -207,18 +194,9 @@ class EventIngestionService:
                 source=source,
             )
             duration = time.perf_counter() - start_time
-            events_dlq_total.labels(
-                tenant_id=str(tenant_id),
-                vendor=event_data.get("vendor", source),
-                event_type=event_data.get("event_type", "unknown"),
-                error_type="validation_error",
-            ).inc()
-            ingestion_duration_seconds.labels(
-                tenant_id=str(tenant_id),
-                vendor=event_data.get("vendor", source),
-                event_type=event_data.get("event_type", "unknown"),
-                error_type="validation_error",
-            ).observe(duration)
+            # B0.5.6.3: No labels on event metrics (bounded cardinality)
+            events_dlq_total.inc()
+            ingestion_duration_seconds.observe(duration)
             raise  # Re-raise to signal failure to caller
 
         except IntegrityError as e:
@@ -246,12 +224,8 @@ class EventIngestionService:
                         **log_context(),
                     },
                 )
-                events_duplicate_total.labels(
-                    tenant_id=str(tenant_id),
-                    vendor=event_data.get("vendor", source),
-                    event_type=event_data.get("event_type", "unknown"),
-                    error_type="duplicate_race",
-                ).inc()
+                # B0.5.6.3: No labels on event metrics (bounded cardinality)
+                events_duplicate_total.inc()
                 return existing_after_race
 
             raise

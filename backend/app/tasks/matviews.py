@@ -17,6 +17,7 @@ from app.celery_app import celery_app
 from app.matviews.executor import RefreshOutcome, RefreshResult, refresh_all_for_tenant, refresh_single
 from app.observability import metrics
 from app.observability.context import set_request_correlation_id, set_tenant_id
+from app.observability.metrics_policy import normalize_view_name
 
 logger = logging.getLogger(__name__)
 
@@ -50,22 +51,35 @@ def strategy_for_refresh_result(result: RefreshResult) -> TaskOutcomeStrategy:
         raise UnmappedOutcomeError(f"Unmapped RefreshOutcome: {result.outcome}") from exc
 
 
+def _map_refresh_outcome_to_policy(outcome: RefreshOutcome) -> str:
+    """Map RefreshOutcome enum to bounded policy outcome (B0.5.6.3)."""
+    mapping = {
+        RefreshOutcome.SUCCESS: "success",
+        RefreshOutcome.SKIPPED_LOCK_HELD: "skipped",
+        RefreshOutcome.FAILED: "failure",
+    }
+    return mapping.get(outcome, "failure")
+
+
 def _record_metrics(result: RefreshResult, strategy: TaskOutcomeStrategy) -> None:
+    """Record matview refresh metrics with bounded labels (B0.5.6.3)."""
     duration_s = max(result.duration_ms, 0) / 1000.0
-    outcome = result.outcome.value
+    # B0.5.6.3: Normalize labels to bounded sets
+    view_name = normalize_view_name(result.view_name)
+    outcome = _map_refresh_outcome_to_policy(result.outcome)
+    
     metrics.matview_refresh_total.labels(
-        view_name=result.view_name,
+        view_name=view_name,
         outcome=outcome,
-        strategy=strategy.value,
     ).inc()
     metrics.matview_refresh_duration_seconds.labels(
-        view_name=result.view_name,
+        view_name=view_name,
         outcome=outcome,
     ).observe(duration_s)
     if result.outcome == RefreshOutcome.FAILED:
         metrics.matview_refresh_failures_total.labels(
-            view_name=result.view_name,
-            error_type=result.error_type or "unknown",
+            view_name=view_name,
+            outcome=outcome,
         ).inc()
 
 

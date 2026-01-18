@@ -17,9 +17,15 @@ from sqlalchemy.engine.url import make_url
 # Import settings ONLY when Celery config is actually built, not at module load time
 # from app.core.config import settings  # REMOVED - now imported in _get_settings()
 
-from app.core.queues import QUEUE_LLM
+from app.core.queues import (
+    QUEUE_ATTRIBUTION,
+    QUEUE_HOUSEKEEPING,
+    QUEUE_LLM,
+    QUEUE_MAINTENANCE,
+)
 from app.observability import metrics
 from app.observability.logging_config import configure_logging
+from app.observability.metrics_policy import normalize_task_name
 
 logger = logging.getLogger(__name__)
 
@@ -172,25 +178,26 @@ def _ensure_celery_configured():
         ],
         # B0.5.2: Fixed queue topology
         # B0.5.3.1: Added attribution queue for deterministic routing
+        # B0.5.6.3: Use centralized queue constants for bounded cardinality
         task_queues=[
-            Queue('housekeeping', routing_key='housekeeping.#'),
-            Queue('maintenance', routing_key='maintenance.#'),
-            Queue(QUEUE_LLM, routing_key='llm.#'),
-            Queue('attribution', routing_key='attribution.#'),
+            Queue(QUEUE_HOUSEKEEPING, routing_key=f'{QUEUE_HOUSEKEEPING}.#'),
+            Queue(QUEUE_MAINTENANCE, routing_key=f'{QUEUE_MAINTENANCE}.#'),
+            Queue(QUEUE_LLM, routing_key=f'{QUEUE_LLM}.#'),
+            Queue(QUEUE_ATTRIBUTION, routing_key=f'{QUEUE_ATTRIBUTION}.#'),
         ],
         task_routes={
-            'app.tasks.housekeeping.*': {'queue': 'housekeeping', 'routing_key': 'housekeeping.task'},
-            'app.tasks.health.*': {'queue': 'housekeeping', 'routing_key': 'housekeeping.task'},
-            'app.tasks.maintenance.*': {'queue': 'maintenance', 'routing_key': 'maintenance.task'},
-            'app.tasks.matviews.*': {'queue': 'maintenance', 'routing_key': 'maintenance.task'},
-            'app.tasks.llm.*': {'queue': QUEUE_LLM, 'routing_key': 'llm.task'},
-            'app.tasks.attribution.*': {'queue': 'attribution', 'routing_key': 'attribution.task'},
-            'app.tasks.r4_failure_semantics.*': {'queue': 'housekeeping', 'routing_key': 'housekeeping.task'},
-            'app.tasks.r6_resource_governance.*': {'queue': 'housekeeping', 'routing_key': 'housekeeping.task'},
+            'app.tasks.housekeeping.*': {'queue': QUEUE_HOUSEKEEPING, 'routing_key': f'{QUEUE_HOUSEKEEPING}.task'},
+            'app.tasks.health.*': {'queue': QUEUE_HOUSEKEEPING, 'routing_key': f'{QUEUE_HOUSEKEEPING}.task'},
+            'app.tasks.maintenance.*': {'queue': QUEUE_MAINTENANCE, 'routing_key': f'{QUEUE_MAINTENANCE}.task'},
+            'app.tasks.matviews.*': {'queue': QUEUE_MAINTENANCE, 'routing_key': f'{QUEUE_MAINTENANCE}.task'},
+            'app.tasks.llm.*': {'queue': QUEUE_LLM, 'routing_key': f'{QUEUE_LLM}.task'},
+            'app.tasks.attribution.*': {'queue': QUEUE_ATTRIBUTION, 'routing_key': f'{QUEUE_ATTRIBUTION}.task'},
+            'app.tasks.r4_failure_semantics.*': {'queue': QUEUE_HOUSEKEEPING, 'routing_key': f'{QUEUE_HOUSEKEEPING}.task'},
+            'app.tasks.r6_resource_governance.*': {'queue': QUEUE_HOUSEKEEPING, 'routing_key': f'{QUEUE_HOUSEKEEPING}.task'},
         },
-        task_default_queue='housekeeping',
+        task_default_queue=QUEUE_HOUSEKEEPING,
         task_default_exchange='tasks',
-        task_default_routing_key='housekeeping.task',
+        task_default_routing_key=f'{QUEUE_HOUSEKEEPING}.task',
         control_exchange="celery.control",
         control_exchange_type="direct",
     )
@@ -348,26 +355,32 @@ def _on_worker_ready(**kwargs):
 @signals.task_prerun.connect
 def _on_task_prerun(task_id, task, **kwargs):
     task.request._started_at = time.perf_counter()
-    metrics.celery_task_started_total.labels(task_name=task.name).inc()
+    # B0.5.6.3: Normalize task_name to bounded set
+    normalized_name = normalize_task_name(task.name)
+    metrics.celery_task_started_total.labels(task_name=normalized_name).inc()
 
 
 @signals.task_postrun.connect
 def _on_task_postrun(task_id, task, retval, state, **kwargs):
     started = getattr(task.request, "_started_at", None)
+    # B0.5.6.3: Normalize task_name to bounded set
+    normalized_name = normalize_task_name(task.name)
     if started is not None:
         duration = time.perf_counter() - started
-        metrics.celery_task_duration_seconds.labels(task_name=task.name).observe(duration)
+        metrics.celery_task_duration_seconds.labels(task_name=normalized_name).observe(duration)
     if state == "SUCCESS":
-        metrics.celery_task_success_total.labels(task_name=task.name).inc()
+        metrics.celery_task_success_total.labels(task_name=normalized_name).inc()
 
 
 @signals.task_failure.connect
 def _on_task_failure(task_id=None, exception=None, args=None, kwargs=None, einfo=None, **extra):
     # Extract task from extra if available (signal signature variations)
     task = extra.get('sender')
-    task_name = task.name if task else "unknown"
+    raw_task_name = task.name if task else "unknown"
+    # B0.5.6.3: Normalize task_name to bounded set
+    normalized_name = normalize_task_name(raw_task_name)
 
-    metrics.celery_task_failure_total.labels(task_name=task_name).inc()
+    metrics.celery_task_failure_total.labels(task_name=normalized_name).inc()
     logger.error(
         "celery_task_failed",
         extra={

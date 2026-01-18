@@ -229,12 +229,8 @@ class DLQHandler:
         session.add(dead_event)
         await session.flush()
 
-        events_dlq_total.labels(
-            tenant_id=str(tenant_id),
-            vendor=source or "unknown",
-            event_type=(original_payload or {}).get("event_type", "unknown"),
-            error_type=error_type.value,
-        ).inc()
+        # B0.5.6.3: No labels on event metrics (bounded cardinality)
+        events_dlq_total.inc()
 
         ctx = log_context()
         ctx.update(

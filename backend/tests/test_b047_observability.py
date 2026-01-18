@@ -97,7 +97,8 @@ async def test_metrics_exposed_and_counters_increment(tenant_with_secret):
     metrics_text = metrics_resp.text
     assert "events_ingested_total" in metrics_text
     assert "ingestion_duration_seconds_bucket" in metrics_text
-    assert str(tenant_id) in metrics_text
+    # B0.5.6.3: tenant_id removed from metrics for privacy/cardinality
+    assert "tenant_id=" not in metrics_text
 
 
 @pytest.mark.asyncio
