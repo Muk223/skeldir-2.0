@@ -5,6 +5,8 @@ This module centralizes Celery initialization so workers and tests share
 the same configuration, logging, and metrics wiring as the FastAPI app.
 """
 import logging
+import multiprocessing
+import os
 import threading
 import time
 from typing import Optional
@@ -23,8 +25,9 @@ from app.core.queues import (
     QUEUE_LLM,
     QUEUE_MAINTENANCE,
 )
-from app.observability import metrics
 from app.observability.logging_config import configure_logging
+from app.observability.metrics_runtime_config import get_multiproc_dir, get_multiproc_prune_policy
+from app.observability.multiprocess_shard_pruner import prune_stale_multiproc_shards
 from app.observability.metrics_policy import normalize_task_name
 
 logger = logging.getLogger(__name__)
@@ -107,6 +110,12 @@ def _build_result_backend() -> str:
 celery_app = Celery("skeldir_backend")
 _celery_configured = False
 _kombu_visibility_recovery_started = False
+_multiproc_sweeper_started = False
+
+# Best-effort child lifecycle tracking (parent-owned state).
+_live_child_pids: set[int] = set()
+_live_child_pids_lock = threading.Lock()
+_child_pid_events = multiprocessing.Queue()
 
 
 def _ensure_celery_configured():
@@ -223,6 +232,25 @@ def _ensure_celery_configured():
     _celery_configured = True
 
 
+@signals.worker_init.connect
+def _on_worker_parent_init(**kwargs):
+    """
+    B0.5.6.5: Validate multiprocess directory in the worker parent.
+
+    Provisioning authority is external. We validate and fail fast; we do NOT
+    create/permission the directory here.
+    """
+    multiproc_dir = get_multiproc_dir()
+    os.environ["PROMETHEUS_MULTIPROC_DIR"] = str(multiproc_dir)
+
+    policy = get_multiproc_prune_policy()
+    shard_count = len(list(multiproc_dir.glob("*.db")))
+    if shard_count > policy.max_shard_files:
+        raise RuntimeError(
+            f"B0.5.6.5: PROMETHEUS_MULTIPROC_DIR overflow (shard_db_files={shard_count} > max={policy.max_shard_files})"
+        )
+
+
 @signals.worker_process_init.connect
 def _configure_worker_logging(**kwargs):
     """
@@ -230,9 +258,35 @@ def _configure_worker_logging(**kwargs):
 
     B0.5.6.1: Worker-side HTTP server removed. Metrics are exposed exclusively via API /metrics.
     """
+    try:
+        _child_pid_events.put(("alive", os.getpid()))
+    except Exception:
+        pass
     settings = _get_settings()  # B0.5.3.3 Gate C: Lazy settings access
     configure_logging(settings.LOG_LEVEL)
     logger.info("celery_worker_logging_configured")
+
+
+@signals.worker_process_shutdown.connect
+def _on_worker_process_shutdown(pid=None, **kwargs):
+    """
+    B0.5.6.5: Best-effort cleanup when a Celery child exits gracefully.
+
+    Hard crashes (SIGKILL/OOM) will skip this hook; those are handled by the
+    parent-owned periodic multiprocess shard sweeper.
+    """
+    resolved_pid = int(pid) if pid is not None else os.getpid()
+    try:
+        from prometheus_client import multiprocess
+
+        multiprocess.mark_process_dead(resolved_pid)
+    except Exception:
+        logger.exception("multiproc_mark_process_dead_failed", extra={"pid": resolved_pid})
+
+    try:
+        _child_pid_events.put(("dead", resolved_pid))
+    except Exception:
+        pass
 
 
 def _recover_invisible_kombu_messages(*, engine, visibility_timeout_s: int, task_name_filter: str | None) -> int:
@@ -329,6 +383,90 @@ def _start_kombu_visibility_recovery_thread() -> None:
     _kombu_visibility_recovery_started = True
 
 
+def _drain_child_pid_events() -> None:
+    while True:
+        try:
+            event, pid = _child_pid_events.get_nowait()
+        except Exception:
+            return
+        with _live_child_pids_lock:
+            if event == "alive":
+                _live_child_pids.add(int(pid))
+            elif event == "dead":
+                _live_child_pids.discard(int(pid))
+
+
+def _get_worker_pool_pids(worker) -> set[int]:
+    """
+    Best-effort: extract current child PIDs from the worker pool (parent process only).
+
+    This is used as a fallback to heal the known-live PID set after hard crashes,
+    where Celery shutdown hooks may not execute.
+    """
+    pool = getattr(worker, "pool", None)
+    if pool is None:
+        return set()
+    processes = getattr(pool, "_pool", None)
+    if not processes:
+        return set()
+    pids: set[int] = set()
+    for proc in processes:
+        pid = getattr(proc, "pid", None)
+        if isinstance(pid, int) and pid > 0:
+            pids.add(pid)
+    return pids
+
+
+def _start_multiproc_sweeper_thread(*, worker) -> None:
+    global _multiproc_sweeper_started
+    if _multiproc_sweeper_started:
+        return
+
+    multiproc_dir = get_multiproc_dir()
+    policy = get_multiproc_prune_policy()
+
+    def _loop() -> None:
+        while True:
+            try:
+                _drain_child_pid_events()
+                pool_pids = _get_worker_pool_pids(worker)
+                with _live_child_pids_lock:
+                    if pool_pids:
+                        _live_child_pids.clear()
+                        _live_child_pids.update(pool_pids)
+                    live_snapshot = set(_live_child_pids)
+
+                result = prune_stale_multiproc_shards(
+                    multiproc_dir=multiproc_dir,
+                    live_pids=live_snapshot,
+                    grace_seconds=policy.grace_seconds,
+                    max_shard_files=policy.max_shard_files,
+                )
+
+                from app.observability import metrics as metrics_module
+
+                if result.orphan_db_files_detected:
+                    metrics_module.multiproc_orphan_files_detected.inc(result.orphan_db_files_detected)
+                if result.pruned_db_files:
+                    metrics_module.multiproc_pruned_files_total.inc(result.pruned_db_files)
+                if result.overflow:
+                    metrics_module.multiproc_dir_overflow_total.inc()
+                    logger.error(
+                        "multiproc_dir_overflow",
+                        extra={
+                            "shard_db_file_count": result.shard_db_file_count,
+                            "max_shard_files": policy.max_shard_files,
+                        },
+                    )
+            except Exception:
+                logger.exception("multiproc_sweeper_failed")
+
+            time.sleep(policy.interval_seconds)
+
+    threading.Thread(target=_loop, name="prom-multiproc-sweeper", daemon=True).start()
+    _multiproc_sweeper_started = True
+
+
 
 
 def _log_registered_tasks() -> None:
@@ -346,10 +484,12 @@ def _log_registered_tasks() -> None:
 
 
 @signals.worker_ready.connect
-def _on_worker_ready(**kwargs):
+def _on_worker_ready(sender=None, **kwargs):
     _ensure_celery_configured()
     _log_registered_tasks()
     _start_kombu_visibility_recovery_thread()
+    if sender is not None:
+        _start_multiproc_sweeper_thread(worker=sender)
 
 
 @signals.task_prerun.connect
@@ -357,7 +497,9 @@ def _on_task_prerun(task_id, task, **kwargs):
     task.request._started_at = time.perf_counter()
     # B0.5.6.3: Normalize task_name to bounded set
     normalized_name = normalize_task_name(task.name)
-    metrics.celery_task_started_total.labels(task_name=normalized_name).inc()
+    from app.observability import metrics as metrics_module
+
+    metrics_module.celery_task_started_total.labels(task_name=normalized_name).inc()
 
 
 @signals.task_postrun.connect
@@ -367,9 +509,13 @@ def _on_task_postrun(task_id, task, retval, state, **kwargs):
     normalized_name = normalize_task_name(task.name)
     if started is not None:
         duration = time.perf_counter() - started
-        metrics.celery_task_duration_seconds.labels(task_name=normalized_name).observe(duration)
+        from app.observability import metrics as metrics_module
+
+        metrics_module.celery_task_duration_seconds.labels(task_name=normalized_name).observe(duration)
     if state == "SUCCESS":
-        metrics.celery_task_success_total.labels(task_name=normalized_name).inc()
+        from app.observability import metrics as metrics_module
+
+        metrics_module.celery_task_success_total.labels(task_name=normalized_name).inc()
 
 
 @signals.task_failure.connect
@@ -380,7 +526,9 @@ def _on_task_failure(task_id=None, exception=None, args=None, kwargs=None, einfo
     # B0.5.6.3: Normalize task_name to bounded set
     normalized_name = normalize_task_name(raw_task_name)
 
-    metrics.celery_task_failure_total.labels(task_name=normalized_name).inc()
+    from app.observability import metrics as metrics_module
+
+    metrics_module.celery_task_failure_total.labels(task_name=normalized_name).inc()
     logger.error(
         "celery_task_failed",
         extra={

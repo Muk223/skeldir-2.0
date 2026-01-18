@@ -212,6 +212,7 @@ def compute_series_budget() -> dict[str, int | dict[str, int]]:
     # - celery_task_* metrics: task_name only
     # - matview_refresh_* metrics: view_name, outcome
     # - celery_queue_* metrics: queue,state and queue
+    # - multiproc_* metrics: no labels (operational counters only)
     
     events_series = 1  # No labels after B0.5.6.3
     celery_task_series = dim_task_names  # task_name only
@@ -224,10 +225,12 @@ def compute_series_budget() -> dict[str, int | dict[str, int]]:
     # Events: 4 families (ingested, duplicate, dlq, duration)
     # Celery: 4 families (started, success, failure, duration)
     # Matview: 3 families (total, duration, failures)
+    # Multiproc: 3 families (orphan_detected, pruned, overflow)
     
     events_total = 4 * events_series
     celery_total = 4 * celery_task_series
     matview_total = 3 * matview_series
+    multiproc_total = 3 * 1
     celery_queue_total = (
         1 * celery_queue_messages_series
         + 1 * celery_queue_max_age_series
@@ -246,9 +249,10 @@ def compute_series_budget() -> dict[str, int | dict[str, int]]:
             "events": events_total,
             "celery_task": celery_total,
             "matview_refresh": matview_total,
+            "multiproc": multiproc_total,
             "celery_queue": celery_queue_total,
         },
-        "total_upper_bound": events_total + celery_total + matview_total + celery_queue_total,
+        "total_upper_bound": events_total + celery_total + matview_total + multiproc_total + celery_queue_total,
     }
 
 

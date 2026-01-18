@@ -17,7 +17,7 @@ Multiprocess Mode (B0.5.6.3):
     
     Example:
         export PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
-        mkdir -p $PROMETHEUS_MULTIPROC_DIR
+        # Directory must already exist and be writable (provisioned externally).
         uvicorn app.main:app --workers 4
     
     Without PROMETHEUS_MULTIPROC_DIR, metrics are process-local and only the
@@ -109,4 +109,25 @@ matview_refresh_failures_total = Counter(
     "matview_refresh_failures_total",
     "Materialized view refresh failures",
     ["view_name", "outcome"],
+)
+
+
+# =============================================================================
+# Multiprocess Shard Hygiene (B0.5.6.5: parent-owned pruning)
+# =============================================================================
+# No labels (operational counters only).
+
+multiproc_orphan_files_detected = Counter(
+    "multiproc_orphan_files_detected",
+    "Total multiprocess shard *.db files detected for non-live PIDs (before pruning grace window)",
+)
+
+multiproc_pruned_files_total = Counter(
+    "multiproc_pruned_files_total",
+    "Total multiprocess shard *.db files pruned for stale, non-live PIDs",
+)
+
+multiproc_dir_overflow_total = Counter(
+    "multiproc_dir_overflow_total",
+    "Total times multiprocess shard file count exceeded configured threshold",
 )

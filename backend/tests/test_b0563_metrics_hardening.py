@@ -71,6 +71,7 @@ APPLICATION_METRIC_PREFIXES = (
     "celery_queue_",
     "matview_refresh_",
     "ingestion_",
+    "multiproc_",
 )
 
 

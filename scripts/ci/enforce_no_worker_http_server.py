@@ -50,6 +50,7 @@ FORBIDDEN_CALL_PATTERNS = [
 # Allowlist: paths that are permitted to contain these patterns (e.g., this script itself, tests)
 ALLOWLIST_PATH_PATTERNS = [
     r"scripts/ci/enforce_no_worker_http_server\.py$",  # This script
+    r"backend/app/observability/worker_metrics_exporter\.py$",  # Dedicated exporter (not in worker runtime)
     r"backend/tests/",  # Test files may mock or test detection
     r"tests/",  # Test files
     r"__pycache__/",  # Bytecode
