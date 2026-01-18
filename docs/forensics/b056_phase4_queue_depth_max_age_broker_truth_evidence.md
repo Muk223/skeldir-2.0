@@ -2,9 +2,9 @@
 
 **Date**: 2026-01-18  
 **Phase**: B0.5.6.4 — Queue Depth + Max Age Gauges from Broker Truth (Read-Only, Cached)  
-**Status**: DRAFT (awaiting acceptance commit + CI run)  
-**Acceptance Commit**: pending  
-**Acceptance CI Run**: pending  
+**Status**: COMPLETE  
+**Acceptance Commit**: 1533ef2  
+**Acceptance CI Run**: https://github.com/Muk223/skeldir-2.0/actions/runs/21117888714  
 
 ---
 
@@ -240,9 +240,16 @@ pytest -q tests/test_b0563_metrics_hardening.py tests/test_b0564_queue_depth_max
 ====================== 20 passed, 129 warnings in 1.17s =======================
 ```
 
+**CI run proof (excerpt):** https://github.com/Muk223/skeldir-2.0/actions/runs/21117888714
+```
+tests/test_b0564_queue_depth_max_age_broker_truth.py -q | tee "$B055_EVIDENCE_DIR/LOGS/pytest_b055.log"
+tests/test_b0564_queue_depth_max_age_broker_truth.py::test_b0564_metrics_cache_singleflight_sequential PASSED [ 97%]
+tests/test_b0564_queue_depth_max_age_broker_truth.py::test_b0564_metrics_cache_singleflight_concurrent PASSED [ 98%]
+tests/test_b0564_queue_depth_max_age_broker_truth.py::test_b0564_refresh_failure_keeps_last_good PASSED [100%]
+```
+
 ---
 
 ## 5. Ledger Closure (EG4.6)
 
-Pending: update `docs/forensics/INDEX.md` with the authoritative Phase 4 row (acceptance commit + CI run) once CI adjudicates.
-
+`docs/forensics/INDEX.md` updated with authoritative B0.5.6 Phase 4 row (acceptance commit + CI run).
