@@ -1,5 +1,6 @@
 # Development dependencies for contract tooling
 # Pinned versions for deterministic builds
+-r requirements.txt
 datamodel-code-generator==0.25.0
 pydantic>=2.0.0,<3.0.0
 
@@ -11,4 +12,3 @@ httpx>=0.24.0  # For async client testing
 pyyaml>=6.0  # For config parsing
 fastapi>=0.100.0
 uvicorn>=0.23.0
-prometheus-client>=0.19.0
