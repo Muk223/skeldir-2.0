@@ -180,7 +180,7 @@ def _get_or_execute_probe() -> tuple[_ProbeResult, bool]:
 # ============================================================================
 
 @router.get("/health/live")
-async def liveness() -> dict:
+async def liveness(response: Response) -> dict:
     """
     Liveness probe: process-only, no dependency checks.
     
@@ -190,15 +190,17 @@ async def liveness() -> dict:
     
     Use for: Kubernetes liveness probe, load balancer health.
     """
-    return {"status": "ok", "healthy": True}
+    response.headers["X-Health-Status"] = "healthy"
+    return {"status": "ok"}
 
 
 @router.get("/health")
-async def health_alias() -> dict:
+async def health_alias(response: Response) -> dict:
     """
     Legacy health alias: strict liveness only (no dependency checks).
     """
-    return {"status": "ok", "healthy": True}
+    response.headers["X-Health-Status"] = "healthy"
+    return {"status": "ok"}
 
 
 @router.get("/health/ready")
