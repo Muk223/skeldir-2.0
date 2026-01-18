@@ -240,13 +240,16 @@ def _on_worker_parent_init(**kwargs):
     Provisioning authority is external. We validate and fail fast; we do NOT
     create/permission the directory here.
     """
-    multiproc_dir = get_multiproc_dir()
+    try:
+        multiproc_dir = get_multiproc_dir()
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
     os.environ["PROMETHEUS_MULTIPROC_DIR"] = str(multiproc_dir)
 
     policy = get_multiproc_prune_policy()
     shard_count = len(list(multiproc_dir.glob("*.db")))
     if shard_count > policy.max_shard_files:
-        raise RuntimeError(
+        raise SystemExit(
             f"B0.5.6.5: PROMETHEUS_MULTIPROC_DIR overflow (shard_db_files={shard_count} > max={policy.max_shard_files})"
         )
 
