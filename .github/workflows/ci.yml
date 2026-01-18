@@ -450,7 +450,6 @@ jobs:
       - name: Initialize B055 evidence bundle directory
         run: |
           mkdir -p "$B055_EVIDENCE_DIR/LOGS"
-          mkdir -p "$PROMETHEUS_MULTIPROC_DIR"
 
       - name: Enforce hermetic runtime imports (Phase 5)
         run: |
