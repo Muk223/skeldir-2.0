@@ -410,7 +410,6 @@ jobs:
       DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/skeldir_validation
       CELERY_BROKER_URL: sqla+postgresql://app_user:app_user@127.0.0.1:5432/skeldir_validation
       CELERY_RESULT_BACKEND: db+postgresql://app_user:app_user@127.0.0.1:5432/skeldir_validation
-      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus_multiproc
       # B0.5.6.1: CELERY_METRICS_PORT/ADDR removed - worker HTTP server eradicated
       B055_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/b055_evidence_bundle
       PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -492,9 +491,12 @@ jobs:
           } | tee "$B055_EVIDENCE_DIR/LOGS/migrations.log"
 
       - name: Start Celery worker
+        env:
+          PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus_multiproc
         run: |
           cd backend
           export PYTHONPATH="$(pwd):${PYTHONPATH:-}"
+          mkdir -p "$PROMETHEUS_MULTIPROC_DIR"
           echo "Starting Celery worker..."
           celery -A app.celery_app.celery_app worker -P solo -c 1 --loglevel=INFO --logfile /tmp/celery.log &
           echo $! > /tmp/celery.pid
