@@ -179,7 +179,7 @@ def test_eg56_active_pruning_prunes_dead_pid_shards_but_keeps_live(tmp_path: Pat
         live_pids={live_pid},
         grace_seconds=600,
         max_shard_files=10_000,
-        now=time.time(),
+        now_epoch_seconds=time.time(),
     )
     assert result.orphan_db_files_detected >= 1
     assert result.pruned_db_files == 1
@@ -213,4 +213,3 @@ def test_eg58_task_metrics_labels_are_privacy_safe_and_bounded():
     text = generate_latest().decode("utf-8", errors="replace")
     assert "tenant_id" not in text
     assert UUID_PATTERN.search(text) is None
-

@@ -424,6 +424,7 @@ def _start_multiproc_sweeper_thread(*, worker) -> None:
 
     multiproc_dir = get_multiproc_dir()
     policy = get_multiproc_prune_policy()
+    clock_path = multiproc_dir / ".multiproc_sweeper_clock"
 
     def _loop() -> None:
         while True:
@@ -436,11 +437,25 @@ def _start_multiproc_sweeper_thread(*, worker) -> None:
                         _live_child_pids.update(pool_pids)
                     live_snapshot = set(_live_child_pids)
 
+                try:
+                    clock_path.touch(exist_ok=True)
+                except OSError:
+                    pass
+                try:
+                    os.utime(clock_path, None)
+                except OSError:
+                    pass
+                try:
+                    now_epoch_seconds = float(clock_path.stat().st_mtime)
+                except OSError:
+                    now_epoch_seconds = 0.0
+
                 result = prune_stale_multiproc_shards(
                     multiproc_dir=multiproc_dir,
                     live_pids=live_snapshot,
                     grace_seconds=policy.grace_seconds,
                     max_shard_files=policy.max_shard_files,
+                    now_epoch_seconds=now_epoch_seconds,
                 )
 
                 from app.observability import metrics as metrics_module

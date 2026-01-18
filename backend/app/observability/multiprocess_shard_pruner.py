@@ -10,7 +10,6 @@ for PIDs that are not in the worker parent's known-live PID set.
 from __future__ import annotations
 
 import re
-import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -47,7 +46,7 @@ def prune_stale_multiproc_shards(
     live_pids: set[int],
     grace_seconds: int,
     max_shard_files: int,
-    now: float | None = None,
+    now_epoch_seconds: float,
 ) -> MultiprocPruneResult:
     """
     Prune stale multiprocess metric shards.
@@ -59,9 +58,6 @@ def prune_stale_multiproc_shards(
     - Only if mtime is older than grace_seconds are files deleted.
     - Non-matching files (including sentinels) are never touched.
     """
-    if now is None:
-        now = time.time()
-
     db_files = iter_multiproc_db_files(multiproc_dir)
     shard_db_file_count = len(db_files)
     overflow = shard_db_file_count > max_shard_files
@@ -84,7 +80,7 @@ def prune_stale_multiproc_shards(
         except OSError:
             continue
 
-        if (now - mtime) < grace_seconds:
+        if (now_epoch_seconds - mtime) < grace_seconds:
             continue
 
         try:
@@ -100,4 +96,3 @@ def prune_stale_multiproc_shards(
         shard_db_file_count=shard_db_file_count,
         overflow=overflow,
     )
-
