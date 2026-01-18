@@ -604,7 +604,8 @@ jobs:
             tests/test_b055_llm_payload_fidelity.py \
             tests/test_b055_matview_boundary.py \
             tests/test_b055_tenant_propagation.py \
-            tests/test_b0562_health_semantics.py -q | tee "$B055_EVIDENCE_DIR/LOGS/pytest_b055.log"
+            tests/test_b0562_health_semantics.py \
+            tests/test_b0563_metrics_hardening.py -q | tee "$B055_EVIDENCE_DIR/LOGS/pytest_b055.log"
 
       - name: Upload health probe logs
         if: always()

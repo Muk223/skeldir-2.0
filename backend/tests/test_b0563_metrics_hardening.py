@@ -29,6 +29,21 @@ from app.observability.metrics_policy import (
     compute_series_budget,
 )
 
+def _iter_application_metric_definitions():
+    """
+    Yield prometheus_client metric wrapper objects defined in app.observability.metrics.
+
+    This is a definition-time enforcement boundary: it catches drift even if a metric
+    family has no samples yet (i.e., labels were defined but never observed).
+    """
+    from prometheus_client.metrics import MetricWrapperBase
+    from app.observability import metrics as metrics_module
+
+    for value in vars(metrics_module).values():
+        if isinstance(value, MetricWrapperBase):
+            yield value
+
+
 # UUID regex pattern (standard 8-4-4-4-12 format)
 UUID_PATTERN = re.compile(
     r'[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}',
@@ -100,6 +115,20 @@ async def metrics_text() -> str:
 # EG3.1: No tenant_id in exposition
 # =============================================================================
 
+def test_eg31_no_tenant_id_in_metric_definitions():
+    """
+    EG3.1 (definition-time): No metric definition includes tenant_id as a label key.
+
+    This is stronger than scraping /metrics alone because Prometheus exposition
+    may omit labelnames until a labelled child is observed.
+    """
+    for metric in _iter_application_metric_definitions():
+        labelnames = set(getattr(metric, "_labelnames", ()) or ())
+        assert "tenant_id" not in labelnames, (
+            f"EG3.1 FAILED: tenant_id label defined on metric {metric._name}: {sorted(labelnames)}"
+        )
+
+
 @pytest.mark.asyncio
 async def test_eg31_no_tenant_id_in_metrics(metrics_text: str):
     """
@@ -145,6 +174,20 @@ async def test_eg34_no_uuid_values_in_metrics(metrics_text: str):
 # =============================================================================
 # EG3.2: Closed-set label enforcement
 # =============================================================================
+
+def test_eg32_metric_label_keys_are_allowlisted():
+    """
+    EG3.2 (definition-time): All metric label keys are within ALLOWED_LABEL_KEYS.
+
+    This prevents drift such as reintroducing vendor/event_type/error_type/strategy labels.
+    """
+    for metric in _iter_application_metric_definitions():
+        labelnames = set(getattr(metric, "_labelnames", ()) or ())
+        assert labelnames <= set(ALLOWED_LABEL_KEYS), (
+            f"EG3.2 FAILED: disallowed label keys on {metric._name}: "
+            f"{sorted(labelnames - set(ALLOWED_LABEL_KEYS))} (all={sorted(labelnames)})"
+        )
+
 
 @pytest.mark.asyncio
 async def test_eg32_closed_set_label_keys(metrics_text: str):
