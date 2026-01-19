@@ -98,17 +98,17 @@ Local Windows environment constraints:
 
 ### 5.1 EVAL-A — Acceptance SHA + contents (verbatim)
 
-Current checkout:
+Acceptance SHA (Phase 7):
 
 ```text
-git rev-parse HEAD
+git rev-parse 7fe6219f0ac4cba53179eec5b6e16d124e568304
 7fe6219f0ac4cba53179eec5b6e16d124e568304
 
-git log -1 --oneline
+git show -s --oneline 7fe6219f0ac4cba53179eec5b6e16d124e568304
 7fe6219 CI: add Backend Integration (B0567) job; rename Playwright job
 ```
 
-INDEX Phase 7 row at `7fe6219` (post-REM-1 acceptance pointer):
+Acceptance SHA (code + workflow) is pinned by INDEX Phase 7 row:
 
 ```text
 | B0.5.6 Phase 7 | docs/forensics/b056_phase7_integration_tests_truthful_scrape_targets_evidence.md | Integration tests: truthful scrape targets (exporter vs API) + anti split-brain + privacy labels | 7fe6219 | https://github.com/Muk223/skeldir-2.0/actions/runs/21150928803 |
@@ -163,7 +163,7 @@ Broker-truth SQL (read-only) is implemented in `_fetch_broker_truth_normalized()
 
 ## 6) Remediation to eliminate “green illusion” ambiguity (REM-1)
 
-`ci.yml` now contains an explicit backend job and disambiguated Playwright naming (commit `7fe6219`, CI run `21150928803`):
+`ci.yml` now contains an explicit backend job and disambiguated Playwright naming (acceptance commit `7fe6219`, CI run `21150928803`):
 
 - Backend job: `Backend Integration (B0567)` (explicit `pytest -vv tests/test_b0567_integration_truthful_scrape_targets.py`)
 - Playwright job renamed: `Frontend E2E (Playwright)`
