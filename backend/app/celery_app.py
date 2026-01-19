@@ -29,6 +29,11 @@ from app.observability.logging_config import configure_logging
 from app.observability.metrics_runtime_config import get_multiproc_dir, get_multiproc_prune_policy
 from app.observability.multiprocess_shard_pruner import prune_stale_multiproc_shards
 from app.observability.metrics_policy import normalize_task_name
+from app.observability.celery_task_lifecycle import (
+    configure_task_lifecycle_loggers,
+    emit_lifecycle_event,
+    set_task_lifecycle_started_at,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +147,20 @@ def _ensure_celery_configured():
         "max_overflow": settings.CELERY_BROKER_ENGINE_MAX_OVERFLOW,
     }
 
+    include_modules = [
+        "app.tasks.housekeeping",
+        "app.tasks.health",
+        "app.tasks.maintenance",
+        "app.tasks.matviews",
+        "app.tasks.llm",
+        "app.tasks.attribution",
+        "app.tasks.r4_failure_semantics",
+        "app.tasks.r6_resource_governance",
+    ]
+    # B0.5.6.6: Test-only tasks for runtime log proof (never enabled in production).
+    if os.getenv("SKELDIR_TEST_TASKS") == "1":
+        include_modules.append("app.tasks.observability_test")
+
     celery_app.conf.update(
         broker_url=broker_url,
         result_backend=_build_result_backend(),
@@ -175,16 +194,7 @@ def _ensure_celery_configured():
                 "retry_jitter": True,
             }
         },
-        include=[
-            "app.tasks.housekeeping",
-            "app.tasks.health",
-            "app.tasks.maintenance",
-            "app.tasks.matviews",
-            "app.tasks.llm",
-            "app.tasks.attribution",
-            "app.tasks.r4_failure_semantics",
-            "app.tasks.r6_resource_governance",
-        ],
+        include=include_modules,
         # B0.5.2: Fixed queue topology
         # B0.5.3.1: Added attribution queue for deterministic routing
         # B0.5.6.3: Use centralized queue constants for bounded cardinality
@@ -267,6 +277,7 @@ def _configure_worker_logging(**kwargs):
         pass
     settings = _get_settings()  # B0.5.3.3 Gate C: Lazy settings access
     configure_logging(settings.LOG_LEVEL)
+    configure_task_lifecycle_loggers(settings.LOG_LEVEL)
     logger.info("celery_worker_logging_configured")
 
 
@@ -510,14 +521,36 @@ def _on_worker_ready(sender=None, **kwargs):
         _start_multiproc_sweeper_thread(worker=sender)
 
 
+def _queue_name_for_task(task) -> str:
+    request = getattr(task, "request", None)
+    delivery = getattr(request, "delivery_info", None) if request is not None else None
+    if isinstance(delivery, dict):
+        routing_key = delivery.get("routing_key")
+        if isinstance(routing_key, str) and routing_key:
+            # Our routing keys are "{queue}.task" (see task_routes in _ensure_celery_configured()).
+            return routing_key.split(".", 1)[0]
+    return "unknown"
+
+
 @signals.task_prerun.connect
-def _on_task_prerun(task_id, task, **kwargs):
-    task.request._started_at = time.perf_counter()
+def _on_task_prerun(task_id=None, task=None, sender=None, args=None, kwargs=None, **extra):
+    task_obj = task or sender
+    if task_obj is None:
+        return
+    task_obj.request._started_at = time.perf_counter()
+    set_task_lifecycle_started_at(task_obj)
     # B0.5.6.3: Normalize task_name to bounded set
-    normalized_name = normalize_task_name(task.name)
+    normalized_name = normalize_task_name(task_obj.name)
     from app.observability import metrics as metrics_module
 
     metrics_module.celery_task_started_total.labels(task_name=normalized_name).inc()
+    emit_lifecycle_event(
+        status="started",
+        task=task_obj,
+        task_id=str(task_id) if task_id else getattr(getattr(task_obj, "request", None), "id", None),
+        queue_name=_queue_name_for_task(task_obj),
+        call_kwargs=kwargs,
+    )
 
 
 @signals.task_postrun.connect
@@ -536,6 +569,44 @@ def _on_task_postrun(task_id, task, retval, state, **kwargs):
         metrics_module.celery_task_success_total.labels(task_name=normalized_name).inc()
 
 
+@signals.task_success.connect
+def _on_task_success(sender=None, result=None, **kwargs):
+    task_obj = sender
+    if task_obj is None:
+        return
+    emit_lifecycle_event(
+        status="success",
+        task=task_obj,
+        task_id=getattr(getattr(task_obj, "request", None), "id", None),
+        queue_name=_queue_name_for_task(task_obj),
+        call_kwargs=None,
+    )
+
+
+@signals.task_retry.connect
+def _on_task_retry(sender=None, request=None, reason=None, einfo=None, **kwargs):
+    task_obj = sender
+    if task_obj is None:
+        return
+    retry_count = None
+    req = getattr(task_obj, "request", None)
+    if req is not None:
+        try:
+            retry_count = int(getattr(req, "retries", 0) or 0)
+        except (TypeError, ValueError):
+            retry_count = None
+    emit_lifecycle_event(
+        status="failure",
+        task=task_obj,
+        task_id=getattr(getattr(task_obj, "request", None), "id", None),
+        queue_name=_queue_name_for_task(task_obj),
+        call_kwargs=getattr(request, "kwargs", None) if request is not None else None,
+        exception=reason,
+        retry=True,
+        retries=retry_count,
+    )
+
+
 @signals.task_failure.connect
 def _on_task_failure(task_id=None, exception=None, args=None, kwargs=None, einfo=None, **extra):
     # Extract task from extra if available (signal signature variations)
@@ -547,15 +618,22 @@ def _on_task_failure(task_id=None, exception=None, args=None, kwargs=None, einfo
     from app.observability import metrics as metrics_module
 
     metrics_module.celery_task_failure_total.labels(task_name=normalized_name).inc()
-    logger.error(
-        "celery_task_failed",
-        extra={
-            "task_name": normalized_name,
-            "raw_task_name": raw_task_name,
-            "task_id": task_id,
-            "error": str(exception),
-        },
-    )
+    if task is not None:
+        retry_count = None
+        try:
+            retry_count = int(getattr(getattr(task, "request", None), "retries", 0) or 0)
+        except (TypeError, ValueError):
+            retry_count = None
+        emit_lifecycle_event(
+            status="failure",
+            task=task,
+            task_id=str(task_id) if task_id else getattr(getattr(task, "request", None), "id", None),
+            queue_name=_queue_name_for_task(task),
+            call_kwargs=kwargs,
+            exception=exception,
+            retry=False,
+            retries=retry_count,
+        )
 
     # B0.5.2: Persist task failure to worker DLQ (G4 remediation: sync psycopg2 path)
     try:
