@@ -29,7 +29,7 @@ This index enumerates evidence packs stored under `docs/forensics/`.
 | B0.5.6 Phase 3 CI enforcement | docs/forensics/b056_phase3_ci_enforcement_remediation_evidence.md | Proof that Phase 3 gates execute in CI (selection + logs) | 3afd141 | https://github.com/Muk223/skeldir-2.0/actions/runs/21116761325 |
 | B0.5.6 Phase 4 | docs/forensics/b056_phase4_queue_depth_max_age_broker_truth_evidence.md | Queue depth + max age gauges from broker truth (cached) | 1533ef2 | https://github.com/Muk223/skeldir-2.0/actions/runs/21117888714 |
 | B0.5.6 Phase 5 | docs/forensics/b056_phase5_task_metrics_topology_no_db_sink_evidence.md | Task metrics topology: exporter-only scrape, no DB sink, parent-owned pruning | 7ffb4e7 | https://github.com/Muk223/skeldir-2.0/actions/runs/21120122342 |
-| B0.5.6 Phase 6 | docs/forensics/b056_phase6_structured_worker_logging_remediation_evidence.md | Structured worker lifecycle JSON logs (tenant_id in logs; metrics bounded; runtime proof via subprocess) | 11fb434 | pending |
+| B0.5.6 Phase 6 | docs/forensics/b056_phase6_structured_worker_logging_remediation_evidence.md | Structured worker lifecycle JSON logs (tenant_id in logs; metrics bounded; runtime proof via subprocess) | 1ce2016 | https://github.com/Muk223/skeldir-2.0/actions/runs/21146810238 |
 
 ## Root evidence packs
 | Phase/Topic | Evidence pack | Purpose | PR/Commit | CI Run |

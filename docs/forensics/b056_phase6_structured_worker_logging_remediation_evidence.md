@@ -3,7 +3,7 @@
 **Date**: 2026-01-19
 **Investigator**: Codex (automated remediation execution)
 **Phase**: B0.5.6.6 ? Context-Robust Hypothesis-Driven Remediation
-**Status**: COMPLETE (local runtime proof + test; CI URL pending)
+**Status**: COMPLETE (local runtime proof + test; CI verified)
 
 ---
 
@@ -1446,11 +1446,11 @@ What it asserts:
 - **EG6.2 (Failure schema proof)**: met by ?3.2 stdout lifecycle record with `status="failure"` and non-empty `error_type`, and test assertions.
 - **EG6.3 (Runtime-based; anti-eager)**: met by worker subprocess test + `runtime_config_proof.txt` showing eager disabled.
 - **EG6.4 (Payload/PII non-leak guard)**: met by allowlist enforcement in code + negative assertions in the subprocess test.
-- **EG6.5 (Ledger/provenance closure)**: met by this evidence pack + `docs/forensics/INDEX.md` row update; CI run URL pending.
+- **EG6.5 (Ledger/provenance closure)**: met by this evidence pack + `docs/forensics/INDEX.md` row update; CI run URL: https://github.com/Muk223/skeldir-2.0/actions/runs/21146810238
 
 ---
 
 ## 7. Provenance
 
-- Commit: 11fb434c5b485e63d91dcb312cb6baa401494b86
-- CI run: pending
+- Commit: 1ce20161e461fa6a517683a4e9d8fb77077ddbed
+- CI run: https://github.com/Muk223/skeldir-2.0/actions/runs/21146810238
