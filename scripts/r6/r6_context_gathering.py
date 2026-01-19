@@ -638,10 +638,12 @@ def main() -> int:
     gap_report = _build_gap_report(snapshot, matrix_rows, active_list)
     _write_text(output_dir / "R6_GAP_REPORT.md", gap_report, sha=sha, timestamp=timestamp)
 
-    _probe_timeout(ctx)
+    # Order matters: the timeout probe intentionally kills a worker process via hard time limits.
+    # Run non-destructive probes first to avoid flakiness from post-timeout pool churn.
     _probe_retry(ctx)
     _probe_prefetch(ctx)
     _probe_recycle(ctx)
+    _probe_timeout(ctx)
 
     return 0
 
