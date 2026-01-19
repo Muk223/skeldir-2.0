@@ -5,6 +5,7 @@ This evidence pack locks the runtime topology truth into CI-enforced integration
 - Worker emits task metrics via Prometheus multiprocess shards in `PROMETHEUS_MULTIPROC_DIR` (no worker HTTP listener).
 - Exporter is the only HTTP scrape surface for worker task metrics (`/metrics`).
 - API `/metrics` exposes API metrics + broker-truth queue gauges only; it must not expose worker task metric families.
+- EG7.4: Health semantics are integration-locked: `/health/live` != `/health/ready` != `/health/worker` under worker termination.
 
 ## 1) Investigation (source-of-truth mapping)
 
@@ -55,6 +56,9 @@ This evidence pack locks the runtime topology truth into CI-enforced integration
   - T7.2: API queue gauges match broker truth (computed by SQL query; compared to scraped gauges).
   - T7.3: Anti split-brain: API `/metrics` does not include worker task metric families.
   - T7.4: Privacy/cardinality: forbidden label keys (at least `tenant_id`) absent on both scrape surfaces.
+  - T7.5 (EG7.4): Health semantics verified under worker termination:
+    - Worker up => `/health/live` 200, `/health/ready` 200, `/health/worker` 200
+    - Worker down => `/health/live` 200, `/health/ready` 200, `/health/worker` 503
 
 ## 3) Local run commands
 
@@ -98,20 +102,20 @@ Local Windows environment constraints:
 
 ### 5.1 EVAL-A — Acceptance SHA + contents (verbatim)
 
-Acceptance SHA (Phase 7):
+Acceptance SHA (Phase 7 + EG7.4):
 
 ```text
-git rev-parse 7fe6219f0ac4cba53179eec5b6e16d124e568304
-7fe6219f0ac4cba53179eec5b6e16d124e568304
+git rev-parse 829a300fc375e5525e3cbbe6deff8273fdb1362b
+829a300fc375e5525e3cbbe6deff8273fdb1362b
 
-git show -s --oneline 7fe6219f0ac4cba53179eec5b6e16d124e568304
-7fe6219 CI: add Backend Integration (B0567) job; rename Playwright job
+git show -s --oneline 829a300fc375e5525e3cbbe6deff8273fdb1362b
+829a300 CI: allow manual dispatch of Contract Artifacts CI
 ```
 
-Acceptance SHA (code + workflow) is pinned by INDEX Phase 7 row:
+Acceptance SHA is pinned by INDEX Phase 7 row:
 
 ```text
-| B0.5.6 Phase 7 | docs/forensics/b056_phase7_integration_tests_truthful_scrape_targets_evidence.md | Integration tests: truthful scrape targets (exporter vs API) + anti split-brain + privacy labels | 7fe6219 | https://github.com/Muk223/skeldir-2.0/actions/runs/21150928803 |
+| B0.5.6 Phase 7 | docs/forensics/b056_phase7_integration_tests_truthful_scrape_targets_evidence.md | Integration tests: truthful scrape targets (exporter vs API) + anti split-brain + privacy labels + health semantics | 829a300 | https://github.com/Muk223/skeldir-2.0/actions/runs/21153690592 |
 ```
 
 Pre-REM-1 provenance incoherence (validated): the Phase 7 test module existed at `0d6aac0`, but `docs/forensics/INDEX.md` still showed Phase 7 as `pending` at that SHA:
@@ -172,15 +176,17 @@ Verbatim excerpt from `Backend Integration (B0567)` job log:
 
 ```text
 pytest -vv tests/test_b0567_integration_truthful_scrape_targets.py
-collecting ... collected 4 items
+collecting ... collected 5 items
 tests/test_b0567_integration_truthful_scrape_targets.py::test_t71_task_metrics_delta_on_exporter PASSED [ 25%]
 tests/test_b0567_integration_truthful_scrape_targets.py::test_t72_api_queue_gauges_match_broker_truth PASSED [ 50%]
 tests/test_b0567_integration_truthful_scrape_targets.py::test_t73_api_metrics_do_not_include_worker_task_metrics PASSED [ 75%]
-tests/test_b0567_integration_truthful_scrape_targets.py::test_t74_forbidden_labels_absent_on_both_scrape_surfaces PASSED [100%]
-============================== 4 passed in 11.18s ==============================
+tests/test_b0567_integration_truthful_scrape_targets.py::test_t74_forbidden_labels_absent_on_both_scrape_surfaces PASSED [ 80%]
+tests/test_b0567_integration_truthful_scrape_targets.py::test_t75_health_semantics_live_ready_worker_capability PASSED [100%]
+============================== 5 passed in 22.52s ==============================
 ```
 
 ## 7) CI run link and provenance
 
 - Phase 7 execution proof (pre-REM-1 disambiguation): commit `c3707c8`, run https://github.com/Muk223/skeldir-2.0/actions/runs/21149356100
 - Phase 7 unskippable explicit job proof (REM-1): commit `7fe6219`, run https://github.com/Muk223/skeldir-2.0/actions/runs/21150928803
+- Phase 7 + EG7.4 proof: commit `829a300`, run https://github.com/Muk223/skeldir-2.0/actions/runs/21153690592
