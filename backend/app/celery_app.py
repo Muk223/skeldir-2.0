@@ -275,7 +275,8 @@ def _configure_worker_logging(**kwargs):
     """
     Ensure structured logging is configured inside each worker process.
 
-    B0.5.6.1: Worker-side HTTP server removed. Metrics are exposed exclusively via API /metrics.
+    B0.5.6.1: Worker-side HTTP server removed.
+    B0.5.6.5: Worker task metrics are exposed via the dedicated exporter.
     """
     try:
         _child_pid_events.put(("alive", os.getpid()))

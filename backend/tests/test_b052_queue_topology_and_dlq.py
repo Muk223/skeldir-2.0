@@ -405,12 +405,14 @@ class TestWorkerDLQ:
 class TestObservabilityOperability:
     """Test observability endpoints operational (B0.5.2 Criterion #3).
 
-    B0.5.6.1: Worker-side HTTP server eradicated. Metrics now exposed via API /metrics only.
+    B0.5.6.1: Worker-side HTTP server eradicated.
+    B0.5.6.5/B0.5.6.7: Worker task metrics are exposed via the dedicated exporter.
+    API `/metrics` remains the scrape surface for API metrics + broker-truth queue gauges.
     """
 
     def test_api_metrics_endpoint_exists(self):
-        """Validate API exposes /metrics endpoint (worker-side removed in B0.5.6.1)."""
+        """Validate API exposes /metrics endpoint."""
         # This test validates that metrics are accessible via the API, not worker sidecar.
         # The actual endpoint test is done via API client in integration tests.
         # Here we just confirm the architectural decision is documented.
-        pass  # B0.5.6.1: Worker HTTP server removed; API /metrics is the single metrics surface
+        pass  # B0.5.6.7: API /metrics is NOT a unified registry; exporter is the worker surface.

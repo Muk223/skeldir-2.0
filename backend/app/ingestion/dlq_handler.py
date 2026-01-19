@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 from app.observability.context import log_context
-from app.observability.metrics import events_dlq_total
+from app.observability.api_metrics import events_dlq_total
 
 try:
     import structlog

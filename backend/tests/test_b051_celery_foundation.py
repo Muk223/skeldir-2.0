@@ -237,29 +237,20 @@ async def test_ping_task_runs_and_persists_result(celery_worker_proc):
     assert data is not None
     assert data.status == "SUCCESS"
 
-    # B0.5.6.1: Worker HTTP server eradicated. Metrics are now exposed via API /metrics only.
-    # Worker-side /health and /metrics endpoints no longer exist.
+    # B0.5.6.1: Worker HTTP server eradicated.
+    # B0.5.6.5/B0.5.6.7: Worker task metrics are exposed via the dedicated exporter,
+    # not via API /metrics.
 
 @pytest.mark.asyncio
-async def test_metrics_exposed_via_fastapi(monkeypatch):
-    original = celery_app.conf.task_always_eager
-    celery_app.conf.task_always_eager = True
-    try:
-        ping.delay()
-        with pytest.raises(ValueError):
-            ping.delay(fail=True).get(propagate=True)
-    finally:
-        celery_app.conf.task_always_eager = original
-
+async def test_api_metrics_exposed_via_fastapi_and_no_split_brain():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         resp = await client.get("/metrics")
 
     text_body = resp.text
-    assert "celery_task_started_total" in text_body
-    assert "celery_task_success_total" in text_body
-    assert "celery_task_failure_total" in text_body
-    assert "celery_task_duration_seconds_bucket" in text_body
+    assert "events_ingested_total" in text_body
+    assert "celery_queue_messages" in text_body
+    assert "celery_task_success_total" not in text_body
 
 
 def test_worker_logs_are_structured(caplog):

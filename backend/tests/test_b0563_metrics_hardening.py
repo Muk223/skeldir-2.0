@@ -32,17 +32,19 @@ from app.observability.metrics_policy import (
 
 def _iter_application_metric_definitions():
     """
-    Yield prometheus_client metric wrapper objects defined in app.observability.metrics.
+    Yield prometheus_client metric wrapper objects defined in application metric modules.
 
     This is a definition-time enforcement boundary: it catches drift even if a metric
     family has no samples yet (i.e., labels were defined but never observed).
     """
     from prometheus_client.metrics import MetricWrapperBase
-    from app.observability import metrics as metrics_module
+    from app.observability import api_metrics as api_metrics_module
+    from app.observability import metrics as worker_metrics_module
 
-    for value in vars(metrics_module).values():
-        if isinstance(value, MetricWrapperBase):
-            yield value
+    for module in (api_metrics_module, worker_metrics_module):
+        for value in vars(module).values():
+            if isinstance(value, MetricWrapperBase):
+                yield value
 
 
 # UUID regex pattern (standard 8-4-4-4-12 format)
@@ -418,17 +420,10 @@ async def test_metrics_contains_expected_families(metrics_text: str):
         "events_duplicate_total",
         "events_dlq_total",
         "ingestion_duration_seconds",
-        "celery_task_started_total",
-        "celery_task_success_total",
-        "celery_task_failure_total",
-        "celery_task_duration_seconds",
         "celery_queue_messages",
         "celery_queue_max_age_seconds",
         "celery_queue_stats_last_refresh_timestamp_seconds",
         "celery_queue_stats_refresh_errors_total",
-        "matview_refresh_total",
-        "matview_refresh_duration_seconds",
-        "matview_refresh_failures_total",
     ]
     
     for family in expected_families:
@@ -439,27 +434,16 @@ async def test_metrics_contains_expected_families(metrics_text: str):
 # Multiprocess Mode Verification (B0.5.6.3)
 # =============================================================================
 
-def test_multiprocess_mode_detection():
+def test_api_metrics_ignores_prometheus_multiproc_dir(monkeypatch):
     """
-    Verify _get_metrics_data() correctly detects multiprocess mode.
-    
-    When PROMETHEUS_MULTIPROC_DIR is not set, should use standard generate_latest().
+    B0.5.6.7: API `/metrics` must not depend on PROMETHEUS_MULTIPROC_DIR.
     """
-    import os
     from app.api.health import _get_metrics_data
-    
-    # Ensure we're in single-process mode for this test
-    original = os.environ.get("PROMETHEUS_MULTIPROC_DIR")
-    if original:
-        del os.environ["PROMETHEUS_MULTIPROC_DIR"]
-    
-    try:
-        data = _get_metrics_data()
-        assert isinstance(data, bytes)
-        assert b"events_ingested_total" in data or b"python_gc" in data
-    finally:
-        if original:
-            os.environ["PROMETHEUS_MULTIPROC_DIR"] = original
+
+    monkeypatch.setenv("PROMETHEUS_MULTIPROC_DIR", "/tmp/should_not_be_used_by_api")
+    data = _get_metrics_data()
+    assert isinstance(data, bytes)
+    assert b"celery_queue_messages" in data
 
 
 def test_multiprocess_mode_env_documented():

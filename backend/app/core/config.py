@@ -58,7 +58,8 @@ class Settings(BaseSettings):
         description="Celery result backend URL (db+postgresql://...). Defaults to DATABASE_URL derived sync DSN when unset.",
     )
     # B0.5.6.1: CELERY_METRICS_PORT and CELERY_METRICS_ADDR removed.
-    # Worker-side HTTP server eradicated; metrics exposed via API /metrics only.
+    # B0.5.6.5/B0.5.6.7: Worker task metrics are exposed via the dedicated exporter
+    # (app.observability.worker_metrics_exporter), not via API /metrics.
     CELERY_TASK_ACKS_LATE: bool = Field(
         True,
         description="Acknowledge tasks only after execution completes (crash-safe, required for idempotent side effects).",

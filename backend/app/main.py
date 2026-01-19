@@ -10,6 +10,12 @@ Contract-First Enforcement:
 - Static and dynamic conformance checks prevent divergence
 """
 
+import os
+
+# B0.5.6.7: No split-brain. PROMETHEUS_MULTIPROC_DIR is reserved for Celery worker
+# task metrics shards and must not influence API process metrics.
+os.environ.pop("PROMETHEUS_MULTIPROC_DIR", None)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 

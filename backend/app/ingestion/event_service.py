@@ -22,7 +22,7 @@ from app.ingestion.channel_normalization import normalize_channel
 from app.ingestion.dlq_handler import DLQHandler
 from app.models import AttributionEvent, DeadEvent
 from app.observability.context import log_context
-from app.observability.metrics import (
+from app.observability.api_metrics import (
     events_dlq_total,
     events_duplicate_total,
     events_ingested_total,

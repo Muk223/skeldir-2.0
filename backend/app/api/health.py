@@ -320,50 +320,50 @@ async def worker_capability(response: Response) -> dict:
 
 
 # ============================================================================
-# Metrics Endpoint (B0.5.6.3: Multiprocess-aware)
+# Metrics Endpoint (B0.5.6.7: No split-brain)
 # ============================================================================
 
 def _get_metrics_data() -> bytes:
     """
-    Generate Prometheus metrics with multiprocess support (B0.5.6.3).
-    
-    When PROMETHEUS_MULTIPROC_DIR is set, uses MultiProcessCollector to
-    aggregate metrics from all worker processes (Uvicorn/Gunicorn/Celery).
-    Otherwise falls back to standard generate_latest().
-    """
-    import os
-    multiproc_dir = os.environ.get("PROMETHEUS_MULTIPROC_DIR")
-    
-    if multiproc_dir:
-        # Multiprocess mode: aggregate from all workers
-        from prometheus_client import CollectorRegistry, CONTENT_TYPE_LATEST
-        from prometheus_client.multiprocess import MultiProcessCollector
-        from app.observability import broker_queue_stats
+    Generate Prometheus metrics for the API process.
 
-        registry = CollectorRegistry()
-        MultiProcessCollector(registry)
-        broker_queue_stats.register_collector(registry)
-        return generate_latest(registry)
-    else:
-        # Single-process mode: use default registry
-        from app.observability import broker_queue_stats
-        broker_queue_stats.ensure_default_registry_registered()
-        return generate_latest()
+    B0.5.6.7: No split-brain. API `/metrics` must not aggregate from
+    `PROMETHEUS_MULTIPROC_DIR` because that directory belongs to Celery worker
+    task metrics and is exposed via the dedicated exporter.
+    """
+    from app.observability import broker_queue_stats
+
+    broker_queue_stats.ensure_default_registry_registered()
+
+    # B0.5.6.7: Even if worker modules are imported in-process (e.g., test suite
+    # configuring Celery), API `/metrics` must not expose worker task metrics.
+    from prometheus_client import CollectorRegistry, REGISTRY
+
+    excluded_prefixes = (
+        "celery_task_",
+        "matview_refresh_",
+        "multiproc_",
+    )
+
+    class _FilteredDefaultRegistryCollector:
+        def collect(self):
+            for metric in REGISTRY.collect():
+                if metric.name.startswith(excluded_prefixes):
+                    continue
+                yield metric
+
+    registry = CollectorRegistry(auto_describe=True)
+    registry.register(_FilteredDefaultRegistryCollector())
+    return generate_latest(registry)
 
 
 @router.get("/metrics")
 async def metrics():
     """
     Prometheus metrics endpoint.
-    
-    B0.5.6.3: Supports multiprocess mode when PROMETHEUS_MULTIPROC_DIR is set.
-    In pre-forked environments (Uvicorn workers, Gunicorn), each worker process
-    writes metrics to files in the multiproc directory. This endpoint aggregates
-    them for scraping.
-    
-    Environment:
-        PROMETHEUS_MULTIPROC_DIR: Directory for multiprocess metric files.
-                                  Must be set before any prometheus_client imports.
+
+    B0.5.6.7: API `/metrics` exposes API metrics + broker-truth queue gauges only.
+    Worker task metrics are exposed via `app.observability.worker_metrics_exporter`.
     """
     from app.observability import broker_queue_stats
     broker_queue_stats.ensure_default_registry_registered()

@@ -611,6 +611,7 @@ jobs:
             tests/test_b0563_metrics_hardening.py \
             tests/test_b0565_task_metrics_topology.py \
             tests/test_b0566_structured_worker_logging_runtime.py \
+            tests/test_b0567_integration_truthful_scrape_targets.py \
             tests/test_b0564_queue_depth_max_age_broker_truth.py -q | tee "$B055_EVIDENCE_DIR/LOGS/pytest_b055.log"
 
       - name: Upload health probe logs
