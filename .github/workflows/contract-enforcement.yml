@@ -152,6 +152,12 @@ jobs:
     name: Dynamic Contract Conformance
     runs-on: ubuntu-latest
     needs: contract-static
+    env:
+      # Contract tests import `app.main` (Settings validation requires DATABASE_URL).
+      # Use an ephemeral CI DSN to keep import deterministic; dynamic conformance
+      # tests exercise stubbed endpoints that do not require a live DB.
+      CI: "true"
+      DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:5432/skeldir_contract_conformance
     
     steps:
       - name: Checkout code
@@ -227,6 +233,5 @@ jobs:
           echo ""
           echo "✅ Contract-First Enforcement PASSED"
           echo "Implementation perfectly aligned with specification."
-
 
 
