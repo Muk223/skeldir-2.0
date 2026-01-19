@@ -134,8 +134,7 @@ Observed result:
 
 ## 5) CI run link and provenance
 
-- Commit SHA: pending
-- CI run URL: pending
+- Commit SHA: `0d6aac0`
+- CI run URL: https://github.com/Muk223/skeldir-2.0/actions/runs/21149266087
 
 Once merged, this section must be updated with the adjudicated commit SHA and the GitHub Actions run URL showing `tests/test_b0567_integration_truthful_scrape_targets.py` passing.
-
