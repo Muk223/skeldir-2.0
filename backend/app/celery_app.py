@@ -263,6 +263,12 @@ def _on_worker_parent_init(**kwargs):
             f"B0.5.6.5: PROMETHEUS_MULTIPROC_DIR overflow (shard_db_files={shard_count} > max={policy.max_shard_files})"
         )
 
+    # B0.5.6.6: Configure lifecycle loggers in the parent as well.
+    # Some Celery signals (task_* hooks) execute in the worker main process (prefork),
+    # and must emit pure JSON lines for subprocess parsing and forensics.
+    settings = _get_settings()
+    configure_task_lifecycle_loggers(settings.LOG_LEVEL)
+
 
 @signals.worker_process_init.connect
 def _configure_worker_logging(**kwargs):

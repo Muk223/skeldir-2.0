@@ -97,10 +97,18 @@ def _parse_lifecycle_records(lines: list[str]) -> list[dict]:
     records: list[dict] = []
     for line in lines:
         line = line.strip()
-        if not line or not line.startswith("{"):
+        if not line:
             continue
+        start = line.find("{")
+        if start == -1:
+            continue
+        candidate = line[start:]
+        end = candidate.rfind("}")
+        if end == -1:
+            continue
+        candidate = candidate[: end + 1]
         try:
-            obj = json.loads(line)
+            obj = json.loads(candidate)
         except Exception:
             continue
         if not isinstance(obj, dict):
