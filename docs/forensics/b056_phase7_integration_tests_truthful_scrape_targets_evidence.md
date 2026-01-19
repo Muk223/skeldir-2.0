@@ -89,52 +89,98 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 ## 4) Evidence captured in this environment
 
-This environment does not include a local Postgres service (`psql` not present), so the full 3-process topology could not be executed here.
+Local Windows environment constraints:
 
-What was executed locally as correctness/compile gates:
+- No local Postgres service available (`psql` not present), so the full 3-process topology cannot be proven locally here.
+- CI evidence below is therefore the acceptance authority for end-to-end topology proof.
 
-### 4.1 Python bytecode compile
+## 5) Evaluation protocol evidence (EVAL-A/B/C)
 
-```powershell
-python -m compileall backend\\app backend\\tests -q
+### 5.1 EVAL-A — Acceptance SHA + contents (verbatim)
+
+Current checkout:
+
+```text
+git rev-parse HEAD
+7fe6219f0ac4cba53179eec5b6e16d124e568304
+
+git log -1 --oneline
+7fe6219 CI: add Backend Integration (B0567) job; rename Playwright job
 ```
 
-### 4.2 Phase 5 topology unit/integration-ish tests (exporter subprocess)
+INDEX Phase 7 row at `7fe6219` (post-REM-1 acceptance pointer):
 
-```powershell
-cd backend
-python -m pytest tests/test_b0565_task_metrics_topology.py -q
+```text
+| B0.5.6 Phase 7 | docs/forensics/b056_phase7_integration_tests_truthful_scrape_targets_evidence.md | Integration tests: truthful scrape targets (exporter vs API) + anti split-brain + privacy labels | 7fe6219 | https://github.com/Muk223/skeldir-2.0/actions/runs/21150928803 |
 ```
 
-Observed result (truncated):
+Pre-REM-1 provenance incoherence (validated): the Phase 7 test module existed at `0d6aac0`, but `docs/forensics/INDEX.md` still showed Phase 7 as `pending` at that SHA:
 
-- `7 passed, 1 skipped`
+```text
+git ls-tree -r 0d6aac0 --name-only | findstr b0567
+backend/tests/test_b0567_integration_truthful_scrape_targets.py
 
-### 4.3 Phase 3 metrics hardening tests (API `/metrics` filtering)
+git show 0d6aac0:docs/forensics/INDEX.md | findstr /c:"| B0.5.6 Phase 7 |"
+| B0.5.6 Phase 7 | docs/forensics/b056_phase7_integration_tests_truthful_scrape_targets_evidence.md | Integration tests: truthful scrape targets (exporter vs API) + anti split-brain + privacy labels | pending | pending |
 
-```powershell
-cd backend
-python -m pytest tests/test_b0563_metrics_hardening.py -q
+git show 0d6aac0:docs/forensics/b056_phase7_integration_tests_truthful_scrape_targets_evidence.md | findstr /c:"Commit SHA"
+- Commit SHA: pending
 ```
 
-Observed result (truncated):
+### 5.2 EVAL-B — CI execution proof (log excerpts)
 
-- `17 passed`
+CI run (commit `c3707c8`) proving Phase 7 executed and passed:
 
-### 4.4 Legacy foundation test updated for split-brain (single test)
+- https://github.com/Muk223/skeldir-2.0/actions/runs/21149356100
 
-```powershell
-cd backend
-python -m pytest tests/test_b051_celery_foundation.py -k "api_metrics_exposed" -q
+Verbatim excerpt from job `Celery Foundation B0.5.1`:
+
+```text
+pytest \
+  tests/test_b051_celery_foundation.py \
+  ...
+  tests/test_b0566_structured_worker_logging_runtime.py \
+  tests/test_b0567_integration_truthful_scrape_targets.py \
+  tests/test_b0564_queue_depth_max_age_broker_truth.py -q | tee "$B055_EVIDENCE_DIR/LOGS/pytest_b055.log"
+
+tests/test_b0567_integration_truthful_scrape_targets.py::test_t71_task_metrics_delta_on_exporter PASSED [ 93%]
+tests/test_b0567_integration_truthful_scrape_targets.py::test_t72_api_queue_gauges_match_broker_truth PASSED [ 94%]
+tests/test_b0567_integration_truthful_scrape_targets.py::test_t73_api_metrics_do_not_include_worker_task_metrics PASSED [ 95%]
+tests/test_b0567_integration_truthful_scrape_targets.py::test_t74_forbidden_labels_absent_on_both_scrape_surfaces PASSED [ 96%]
+====================== 93 passed, 129 warnings in 29.89s =======================
 ```
 
-Observed result:
+### 5.3 EVAL-C — Topology semantics asserted by test code (pointers)
 
-- `1 passed, 5 deselected`
+Phase 7 test module: `backend/tests/test_b0567_integration_truthful_scrape_targets.py`
 
-## 5) CI run link and provenance
+- Exporter scrape for worker task deltas: `test_t71_task_metrics_delta_on_exporter`
+- API scrape for broker-truth gauges: `test_t72_api_queue_gauges_match_broker_truth`
+- Anti split-brain negative assertion: `test_t73_api_metrics_do_not_include_worker_task_metrics`
+- Privacy label ban via scrape: `test_t74_forbidden_labels_absent_on_both_scrape_surfaces`
 
-- Commit SHA: `0d6aac0`
-- CI run URL: https://github.com/Muk223/skeldir-2.0/actions/runs/21149266087
+Broker-truth SQL (read-only) is implemented in `_fetch_broker_truth_normalized()` and compared to API gauges in `test_t72_api_queue_gauges_match_broker_truth`.
 
-Once merged, this section must be updated with the adjudicated commit SHA and the GitHub Actions run URL showing `tests/test_b0567_integration_truthful_scrape_targets.py` passing.
+## 6) Remediation to eliminate “green illusion” ambiguity (REM-1)
+
+`ci.yml` now contains an explicit backend job and disambiguated Playwright naming (commit `7fe6219`, CI run `21150928803`):
+
+- Backend job: `Backend Integration (B0567)` (explicit `pytest -vv tests/test_b0567_integration_truthful_scrape_targets.py`)
+- Playwright job renamed: `Frontend E2E (Playwright)`
+
+Verbatim excerpt from `Backend Integration (B0567)` job log:
+
+```text
+pytest -vv tests/test_b0567_integration_truthful_scrape_targets.py
+collecting ... collected 4 items
+tests/test_b0567_integration_truthful_scrape_targets.py::test_t71_task_metrics_delta_on_exporter PASSED [ 25%]
+tests/test_b0567_integration_truthful_scrape_targets.py::test_t72_api_queue_gauges_match_broker_truth PASSED [ 50%]
+tests/test_b0567_integration_truthful_scrape_targets.py::test_t73_api_metrics_do_not_include_worker_task_metrics PASSED [ 75%]
+tests/test_b0567_integration_truthful_scrape_targets.py::test_t74_forbidden_labels_absent_on_both_scrape_surfaces PASSED [100%]
+============================== 4 passed in 11.18s ==============================
+```
+
+## 7) CI run link and provenance
+
+- Phase 7 execution proof (pre-REM-1 disambiguation): commit `c3707c8`, run https://github.com/Muk223/skeldir-2.0/actions/runs/21149356100
+- Phase 7 unskippable explicit job proof (REM-1): commit `7fe6219`, run https://github.com/Muk223/skeldir-2.0/actions/runs/21150928803
