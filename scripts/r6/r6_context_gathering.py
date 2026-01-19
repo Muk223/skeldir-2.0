@@ -30,6 +30,7 @@ from app.celery_app import celery_app  # noqa: E402
 
 WORKER_LOG_ENV = "R6_WORKER_LOG_PATH"
 PROBE_LOG_ENV = "R6_PROBE_LOG_PATH"
+RESULT_GET_TIMEOUT_ENV = "R6_RESULT_GET_TIMEOUT_S"
 
 
 @dataclass(frozen=True)
@@ -411,8 +412,9 @@ def _probe_prefetch(ctx: R6Context) -> dict[str, Any]:
         for i in range(4)
     ]
 
-    long_results = [AsyncResult(tid).get(timeout=30) for tid in long_ids]
-    short_results = [AsyncResult(tid).get(timeout=30) for tid in short_ids]
+    result_timeout_s = int(os.getenv(RESULT_GET_TIMEOUT_ENV, "90"))
+    long_results = [AsyncResult(tid).get(timeout=result_timeout_s) for tid in long_ids]
+    short_results = [AsyncResult(tid).get(timeout=result_timeout_s) for tid in short_ids]
 
     events = _read_probe_events(ctx.probe_log_path)
     short_start_events = [
