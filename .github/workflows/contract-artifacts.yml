@@ -5,6 +5,7 @@ name: Contract Artifacts CI
 # Sequence: Bundling -> Integrity -> Provider -> Docs
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -241,6 +242,5 @@ jobs:
             echo "  - Implementation conforms to contracts"
             echo "  - Documentation built and validated"
           fi
-
 
 
