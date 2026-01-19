@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 import time
 from typing import Any, Mapping, Optional, Sequence
@@ -47,6 +48,24 @@ class _RawMessageFormatter(logging.Formatter):
         return record.getMessage()
 
 
+class _StdoutFDHandler(logging.Handler):
+    """
+    Write log records directly to FD 1 (stdout) to avoid Celery stdout redirection.
+
+    Celery may wrap/redirect `sys.stdout` (e.g., LoggingProxy). Using `os.write(1, ...)`
+    preserves a pure JSON line on stdout for forensic parsing.
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            msg = self.format(record)
+            if not msg.endswith("\n"):
+                msg += "\n"
+            os.write(1, msg.encode("utf-8", errors="replace"))
+        except Exception:
+            self.handleError(record)
+
+
 def configure_task_lifecycle_loggers(level: str = "INFO") -> None:
     """
     Configure dedicated raw-JSON loggers for lifecycle events.
@@ -69,7 +88,7 @@ def _configure_raw_json_logger(name: str, *, level: str) -> logging.Logger:
             handler.setLevel(resolved_level)
             return logger
 
-    handler = logging.StreamHandler(stream=sys.stdout)
+    handler = _StdoutFDHandler()
     handler.setLevel(resolved_level)
     handler.setFormatter(_RawMessageFormatter())
     setattr(handler, "_skeldir_raw_json_handler", True)
