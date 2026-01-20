@@ -1,4 +1,4 @@
-# B0.5.7-P1 — CI Topology Validation Closure Evidence
+# B0.5.7-P1 - CI Topology Validation Closure Evidence
 
 Objective: prove (in CI) that the canonical topology in `docker-compose.e2e.yml` is instantiated and validated with falsifiable assertions (health truth + anti split-brain metrics), and that PR required checks are green.
 
@@ -18,7 +18,8 @@ git status --porcelain=v1
 Output:
 
 ```text
-b4d3f788e12ac732f72b9d61bdbfa4d73223f2d8
+e0cc39d70280e4278c53919ca4f166082fce254d
+# git status --porcelain=v1: (no output; working tree clean)
 ```
 
 ---
@@ -52,20 +53,22 @@ FATAL:  role "root" does not exist
 
 ### After (CI proves compose topology and assertions executed)
 
-Compose topology validation run (green): https://github.com/Muk223/skeldir-2.0/actions/runs/21188871350
+Compose topology validation run (green): https://github.com/Muk223/skeldir-2.0/actions/runs/21189296243
 
-Main CI run (green): https://github.com/Muk223/skeldir-2.0/actions/runs/21188871380
+Main CI run (green): https://github.com/Muk223/skeldir-2.0/actions/runs/21189295977
 
-`b0545-convergence` run (green): https://github.com/Muk223/skeldir-2.0/actions/runs/21188871405
+Empirical Validation run (green): https://github.com/Muk223/skeldir-2.0/actions/runs/21189296053
+
+`b0545-convergence` run (green): https://github.com/Muk223/skeldir-2.0/actions/runs/21189296275
 
 PR checks (all pass at head SHA):
 
 ```text
-B0.5.7-P1 Compose E2E Topology  pass  https://github.com/Muk223/skeldir-2.0/actions/runs/21188871350/job/60950434959
-Checkout Code                  pass  https://github.com/Muk223/skeldir-2.0/actions/runs/21188871380/job/60950434781
-Proof Pack (EG-5)              pass  https://github.com/Muk223/skeldir-2.0/actions/runs/21188871380/job/60950785359
-b0545-convergence              pass  https://github.com/Muk223/skeldir-2.0/actions/runs/21188871405/job/60950434844
-Backend Integration (B0567)    pass  https://github.com/Muk223/skeldir-2.0/actions/runs/21188871380/job/60950445953
+B0.5.7-P1 Compose E2E Topology  pass  https://github.com/Muk223/skeldir-2.0/actions/runs/21189296243/job/60951906377
+Checkout Code                  pass  https://github.com/Muk223/skeldir-2.0/actions/runs/21189295977/job/60951881178
+Proof Pack (EG-5)              pass  https://github.com/Muk223/skeldir-2.0/actions/runs/21189295977/job/60952393264
+b0545-convergence              pass  https://github.com/Muk223/skeldir-2.0/actions/runs/21189296275/job/60951883024
+Backend Integration (B0567)    pass  https://github.com/Muk223/skeldir-2.0/actions/runs/21189295977/job/60951935071
 ```
 
 Full check listing is reproducible via:
@@ -78,7 +81,7 @@ gh pr checks 24
 
 ## Workflow audit (RC hypotheses)
 
-### RC-1 (no workflow boots `docker-compose.e2e.yml`) — was TRUE, now FALSE
+### RC-1 (no workflow boots `docker-compose.e2e.yml`) - was TRUE, now FALSE
 
 Remediation: added workflow `/.github/workflows/b057-p1-compose-e2e.yml` that runs on PRs and executes:
 
@@ -98,9 +101,9 @@ Remediation: added workflow `/.github/workflows/b057-p1-compose-e2e.yml` that ru
 
 Evidence: compose topology job log (step: `Assert scrape target separation (anti split-brain)`):
 
-Run: https://github.com/Muk223/skeldir-2.0/actions/runs/21188871350
+Run: https://github.com/Muk223/skeldir-2.0/actions/runs/21189296243
 
-Job: https://github.com/Muk223/skeldir-2.0/actions/runs/21188871350/job/60950434959
+Job: https://github.com/Muk223/skeldir-2.0/actions/runs/21189296243/job/60951906377
 
 Log excerpt (command-level assertions):
 
@@ -115,7 +118,7 @@ if ! grep -q "celery_task_" /tmp/b057_exporter_metrics.txt; then exit 1; fi
 Repro command (local workstation) to view logs:
 
 ```powershell
-gh run view 21188871350 --job 60950434959 --log
+gh run view 21189296243 --job 60951906377 --log
 ```
 
 ---

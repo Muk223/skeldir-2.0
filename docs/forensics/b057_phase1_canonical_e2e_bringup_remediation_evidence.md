@@ -1,4 +1,4 @@
-# B0.5.7-P1 — Canonical E2E Bring-Up Remediation Evidence (Docker Compose)
+# B0.5.7-P1 - Canonical E2E Bring-Up Remediation Evidence (Docker Compose)
 
 ## Scope / non-negotiables
 
@@ -15,7 +15,7 @@ Timestamp (local): `2026-01-20T14:06:41-06:00`
 - Branch (work): `b057-p1-canonical-e2e-bringup`
 - Pre-remediation anchor (this branch, before P1 changes): `0a31d08e18acc97c630b0a97d65b3664837d2ce4`
 - Remediation implementation commit (compose + scripts + runbook): `9dd08fa461301b6daa192fc48d664ffe303c7dfc`
-- PR head SHA (CI-validated): `b4d3f788e12ac732f72b9d61bdbfa4d73223f2d8`
+- PR head SHA (CI-validated): `e0cc39d70280e4278c53919ca4f166082fce254d`
 - `main` at time of work (per branch history): `f083d23` (`b056: phase8 ledger closure`)
 
 Commands:
@@ -66,7 +66,7 @@ Docker Compose version v2.40.0-desktop.1
 
 ## Mandatory investigation (validate/refute before remediation)
 
-### H-P1-R1 (compose drift: legacy microservice paths) — TRUE
+### H-P1-R1 (compose drift: legacy microservice paths) - TRUE
 
 Command:
 
@@ -83,7 +83,7 @@ Output:
 98:      dockerfile: backend/app/webhooks/Dockerfile
 ```
 
-### H-P1-R2 (no active Dockerfile outside archive at pre-remediation anchor) — TRUE
+### H-P1-R2 (no active Dockerfile outside archive at pre-remediation anchor) - TRUE
 
 Command (tree listing at the pre-remediation anchor):
 
@@ -100,7 +100,7 @@ docs/forensics/archive/docker_tools/legacy_microservices/Dockerfile.ingestion
 docs/forensics/archive/docker_tools/legacy_microservices/Dockerfile.webhooks
 ```
 
-### H-P1-D1 (component-dev compose is nonfunctional on main) — TRUE
+### H-P1-D1 (component-dev compose is nonfunctional on main) - TRUE
 
 Command:
 
@@ -164,9 +164,9 @@ PostgreSQL 16.11 (Debian 16.11-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by g
 
 ---
 
-## Gates (EG-P1.*) — evidence
+## Gates (EG-P1.*) - evidence
 
-### EG-P1.1 — Compose integrity (config + build)
+### EG-P1.1 - Compose integrity (config + build)
 
 Commands:
 
@@ -180,7 +180,7 @@ Observed:
 - `docker compose -f docker-compose.e2e.yml config` exits `0`
 - `docker compose -f docker-compose.e2e.yml build` exits `0`
 
-### EG-P1.2 — Topology bring-up
+### EG-P1.2 - Topology bring-up
 
 Commands:
 
@@ -201,7 +201,7 @@ skeldir-e2e-migrate-1     migrate    Exited (0) 18 seconds ago
 skeldir-e2e-worker-1      worker     Up 2 hours
 ```
 
-### EG-P1.3 — Health truth gate
+### EG-P1.3 - Health truth gate
 
 Commands:
 
@@ -224,7 +224,7 @@ HTTP/1.1 200 OK
 {"status":"ok","broker":"ok","database":"ok","worker":"ok","probe_latency_ms":707,"cached":false,"cache_scope":"process"}
 ```
 
-### EG-P1.4 — Scrape target truth gate (anti split-brain)
+### EG-P1.4 - Scrape target truth gate (anti split-brain)
 
 API `/metrics` shows broker-truth queue gauges and excludes worker task metrics:
 
@@ -280,7 +280,7 @@ docker compose -f docker-compose.e2e.yml exec -T db psql -U postgres -d skeldir_
 docker compose -f docker-compose.e2e.yml exec -T api python -c "import uuid; from app.celery_app import celery_app; cid=str(uuid.uuid4()); r=celery_app.send_task('app.tasks.matviews.refresh_single', queue='maintenance', kwargs={'tenant_id': 'e6ea7765-0622-4670-a69c-4b2956f0b3b9', 'view_name': 'mv_realtime_revenue', 'correlation_id': cid, 'force': True}); print(r.get(timeout=120))"
 ```
 
-### EG-P1.5 — Regression guard gate (B0.5.6.7)
+### EG-P1.5 - Regression guard gate (B0.5.6.7)
 
 Test run used the compose Postgres (`127.0.0.1:15432`) as broker+results+persistence (Postgres-only).
 
@@ -326,5 +326,5 @@ Branch push + PR:
 
 - Branch push: `origin/b057-p1-canonical-e2e-bringup`
 - PR URL: https://github.com/Muk223/skeldir-2.0/pull/24
-- CI run (compose topology validation): https://github.com/Muk223/skeldir-2.0/actions/runs/21188871350
-- CI run (main CI): https://github.com/Muk223/skeldir-2.0/actions/runs/21188871380
+- CI run (compose topology validation): https://github.com/Muk223/skeldir-2.0/actions/runs/21189296243
+- CI run (main CI): https://github.com/Muk223/skeldir-2.0/actions/runs/21189295977
