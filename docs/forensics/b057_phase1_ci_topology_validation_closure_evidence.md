@@ -61,7 +61,7 @@ Empirical Validation run (green): https://github.com/Muk223/skeldir-2.0/actions/
 
 `b0545-convergence` run (green): https://github.com/Muk223/skeldir-2.0/actions/runs/21189960727
 
-Note: a prior compose run for this PR head failed due to a metrics scrape race in `test_t71_task_metrics_delta_on_exporter` (regression guard). Remediation: make `test_t71` poll exporter metrics until deltas are visible (commit `3354d141d3b05a43b1495000ff28c9a734ab2344`). CI proof below is at that commit.
+Note: a prior compose run for this PR failed (run: https://github.com/Muk223/skeldir-2.0/actions/runs/21189747690) due to a metrics scrape race in `test_t71_task_metrics_delta_on_exporter` (regression guard). Remediation: make `test_t71` poll exporter metrics until deltas are visible (commit `3354d141d3b05a43b1495000ff28c9a734ab2344`). CI proof below is at that commit.
 
 PR checks (all pass at head SHA):
 
