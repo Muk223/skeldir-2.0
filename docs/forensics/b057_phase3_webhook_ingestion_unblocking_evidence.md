@@ -8,6 +8,7 @@ This evidence pack treats prior docs/specs/plans as hypotheses and substantiates
 
 - Implementation commit: `4a00100`
 - Workflow: `.github/workflows/b057-p3-webhook-ingestion-least-privilege.yml` (runs on PRs + pushes to `main`)
+- Evidence pack: `docs/forensics/b057_phase3_webhook_ingestion_unblocking_evidence.md`
 
 ## Objective (P3)
 
