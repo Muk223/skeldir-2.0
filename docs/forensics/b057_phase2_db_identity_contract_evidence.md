@@ -9,6 +9,11 @@
 
 **Collected (local)**: `2026-01-21` (Windows, PowerShell, Docker Desktop)
 
+**Git/CI anchors**
+- Branch: `b057-p2-db-identity-contract`
+- Commit (head): `108a9209034a0de401c70068a2bb3a5599e45106`
+- CI run: https://github.com/Muk223/skeldir-2.0/actions/runs/21219344381
+
 ---
 
 ## G0 — Ground Truth Anchors
@@ -134,4 +139,3 @@ It uploads:
 
 Index updated:
 - `docs/forensics/INDEX.md` (new row for B0.5.7 Phase 2)
-
