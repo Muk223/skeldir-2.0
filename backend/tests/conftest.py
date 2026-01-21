@@ -57,6 +57,7 @@ else:
         print("[B0.5.3.3 Gate C] Local dev: Using Neon DSN fallback (override with DATABASE_URL env var)")
 
 from app.db.session import engine
+from tests.support.db_admin import insert_tenant_admin
 
 # B0.5.3.3 Gate C: Trigger Celery configuration AFTER DATABASE_URL validation
 # This ensures settings is imported with validated credentials
@@ -68,8 +69,26 @@ async def _insert_tenant(conn, tenant_id: uuid4, api_key_hash: str) -> None:
     """
     Insert a tenant row while tolerating schema drift (api_key_hash/notification_email optional).
     """
+    can_insert = (
+        await conn.execute(
+            text("SELECT has_table_privilege(current_user, 'public.tenants', 'INSERT')")
+        )
+    ).scalar()
+    if not can_insert:
+        insert_tenant_admin(
+            tenant_id=tenant_id,
+            name=f"Test Tenant {str(tenant_id)[:8]}",
+            api_key_hash=api_key_hash,
+            notification_email=f"test_{str(tenant_id)[:8]}@test.local",
+            columns=None,
+        )
+        return
+
     result = await conn.execute(
-        text("SELECT column_name FROM information_schema.columns WHERE table_name = 'tenants'")
+        text(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema='public' AND table_name='tenants'"
+        )
     )
     columns = set(result.scalars().all())
 
@@ -88,12 +107,24 @@ async def _insert_tenant(conn, tenant_id: uuid4, api_key_hash: str) -> None:
 
     values_clause = ", ".join(f":{col}" for col in insert_cols)
     # RAW_SQL_ALLOWLIST: bootstrap tenant fixture during migration/rls setup
-    await conn.execute(
-        text(
-            f"INSERT INTO tenants ({', '.join(insert_cols)}) VALUES ({values_clause})"
-        ),
-        params,
-    )
+    try:
+        await conn.execute(
+            text(
+                f"INSERT INTO tenants ({', '.join(insert_cols)}) VALUES ({values_clause})"
+            ),
+            params,
+        )
+    except ProgrammingError as exc:
+        message = str(exc).lower()
+        if "permission denied for table tenants" not in message:
+            raise
+        insert_tenant_admin(
+            tenant_id=tenant_id,
+            name=params["name"],
+            api_key_hash=params["api_key_hash"],
+            notification_email=params.get("notification_email"),
+            columns=None,
+        )
 
 
 @pytest.fixture(scope="function")

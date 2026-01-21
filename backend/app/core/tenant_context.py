@@ -54,14 +54,12 @@ async def get_tenant_with_webhook_secrets(api_key: str) -> dict:
             text(
                 """
                 SELECT
-                  id AS tenant_id,
+                  tenant_id,
                   shopify_webhook_secret,
                   stripe_webhook_secret,
                   paypal_webhook_secret,
                   woocommerce_webhook_secret
-                FROM tenants
-                WHERE api_key_hash = :api_key_hash
-                LIMIT 1
+                FROM security.resolve_tenant_webhook_secrets(:api_key_hash)
                 """
             ),
             {"api_key_hash": api_key_hash},
@@ -239,6 +237,5 @@ async def tenant_context_middleware(request: Request, call_next):
         # SET LOCAL is automatically cleared on transaction end
         # Explicit rollback not needed unless we want to ensure cleanup
         pass
-
 
 

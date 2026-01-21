@@ -1,0 +1,99 @@
+name: B0.5.7-P2 — DB Identity Contract (Canonical Compose)
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: b057-p2-db-identity-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  db-identity-contract:
+    name: B0.5.7-P2 DB Identity Contract
+    runs-on: ubuntu-latest
+    env:
+      SKELDIR_DB_PORT: "15432"
+      SKELDIR_DB_NAME: "skeldir_e2e"
+      SKELDIR_DB_SUPERUSER: "postgres"
+      SKELDIR_DB_SUPERPASS: "postgres"
+      DATABASE_URL: postgresql://app_user:app_user@127.0.0.1:15432/skeldir_e2e
+      MIGRATION_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:15432/skeldir_e2e
+      CI: "true"
+      PYTHONPATH: ${{ github.workspace }}/backend
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Docker versions
+        run: |
+          set -euo pipefail
+          docker version
+          docker compose version
+
+      - name: Build canonical topology (docker-compose.e2e.yml)
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.e2e.yml build
+
+      - name: Bring up canonical topology
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.e2e.yml up -d
+          docker compose -f docker-compose.e2e.yml ps -a
+
+      - name: Stop compose app services before identity tests
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.e2e.yml stop api worker exporter || true
+          docker compose -f docker-compose.e2e.yml ps -a
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python deps (backend)
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+
+      - name: Run P2 integration tests (canonical DB)
+        run: |
+          set -euo pipefail
+          cd backend
+          python -m pytest -vv tests/integration/test_b057_p2_db_identity_contract.py | tee /tmp/b057_p2_pytest.txt
+
+      - name: Capture DB privilege proof (psql)
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/b057_p2_db_identity_contract
+
+          docker compose -f docker-compose.e2e.yml ps -a > artifacts/b057_p2_db_identity_contract/compose_ps.txt || true
+          docker compose -f docker-compose.e2e.yml logs --no-color > artifacts/b057_p2_db_identity_contract/compose_logs.txt || true
+          cp -f /tmp/b057_p2_pytest.txt artifacts/b057_p2_db_identity_contract/pytest_p2.txt || true
+
+          docker compose -f docker-compose.e2e.yml exec -T db psql -U postgres -d skeldir_e2e -v ON_ERROR_STOP=1 -c \
+            "SELECT rolname, rolcanlogin, rolinherit, rolsuper, rolbypassrls FROM pg_roles WHERE rolname IN ('app_user','app_rw','app_security') ORDER BY rolname;" \
+            > artifacts/b057_p2_db_identity_contract/roles.txt || true
+
+          docker compose -f docker-compose.e2e.yml exec -T db psql -U postgres -d skeldir_e2e -v ON_ERROR_STOP=1 -c \
+            "SELECT has_table_privilege('app_user','public.tenants','SELECT') AS app_user_select_tenants, has_table_privilege('app_user','public.llm_api_calls','INSERT') AS app_user_insert_llm_api_calls, has_function_privilege('app_user','security.list_tenant_ids()','EXECUTE') AS app_user_exec_list_tenant_ids, has_function_privilege('app_user','security.resolve_tenant_webhook_secrets(text)','EXECUTE') AS app_user_exec_resolve_secrets;" \
+            > artifacts/b057_p2_db_identity_contract/privileges_truth.txt || true
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b057-p2-db-identity-contract-${{ github.sha }}
+          path: artifacts/b057_p2_db_identity_contract/
+          retention-days: 14
+
+      - name: Teardown compose (always)
+        if: always()
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.e2e.yml down -v --remove-orphans
+

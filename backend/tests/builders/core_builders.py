@@ -14,9 +14,10 @@ from typing import Dict, Set
 from uuid import UUID, uuid4
 
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, ProgrammingError
 
 from app.db.session import engine
+from tests.support.db_admin import insert_tenant_admin
 
 
 async def _required_columns(table_name: str) -> Set[str]:
@@ -89,7 +90,6 @@ async def _ensure_channel_code(code: str = "direct") -> None:
 async def build_tenant(name: str | None = None) -> Dict[str, UUID]:
     """Create a tenant row satisfying required columns."""
     tenant_id = uuid4()
-    required = await _required_columns("tenants")
     insert_cols = ["id", "name"]
     params = {
         "id": str(tenant_id),
@@ -98,13 +98,7 @@ async def build_tenant(name: str | None = None) -> Dict[str, UUID]:
         "notification_email": f"{tenant_id.hex[:8]}@test.invalid",
         "shopify_webhook_secret": "test_secret",
     }
-    if "api_key_hash" in required:
-        insert_cols.append("api_key_hash")
-    if "notification_email" in required:
-        insert_cols.append("notification_email")
-    # Optional but tolerated required additions
-    if "shopify_webhook_secret" in required:
-        insert_cols.append("shopify_webhook_secret")
+    insert_cols.extend(["api_key_hash", "notification_email", "shopify_webhook_secret"])
 
     values_clause = ", ".join(f":{col}" for col in insert_cols)
     sql = text(
@@ -113,14 +107,22 @@ async def build_tenant(name: str | None = None) -> Dict[str, UUID]:
     )
     try:
         async with engine.begin() as conn:
-            await conn.execute(
-                text("SELECT set_config('app.current_tenant_id', :tenant_id, false)"),
-                {"tenant_id": str(tenant_id)},
-            )
             await conn.execute(sql, params)
+    except ProgrammingError as exc:
+        message = str(exc).lower()
+        if "permission denied for table tenants" not in message:
+            raise
+        insert_tenant_admin(
+            tenant_id=tenant_id,
+            name=params["name"],
+            api_key_hash=params["api_key_hash"],
+            notification_email=params.get("notification_email"),
+            columns=None,
+            secrets={"shopify_webhook_secret": params.get("shopify_webhook_secret", "test_secret")},
+        )
     except IntegrityError as exc:
         raise RuntimeError(
-            f"Tenant builder failed. Required columns: {sorted(required)}"
+            "Tenant builder failed (integrity error)"
         ) from exc
 
     return {"id": tenant_id, "tenant_id": tenant_id}

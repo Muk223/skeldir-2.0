@@ -35,6 +35,7 @@ This index enumerates evidence packs stored under `docs/forensics/`.
 | B0.5.7 Context Gathering | docs/forensics/b057_context_gathering_inventory_evidence.md | Forensic inventory baseline: static repo truth + runtime audit (health/metrics/failure semantics) + hypothesis truth table | f083d23 | local (Windows) |
 | B0.5.7 Phase 1 | docs/forensics/b057_phase1_canonical_e2e_bringup_remediation_evidence.md | Canonical E2E bring-up: repo-native one-command topology (db+api+worker+exporter) + truthful scrape targets + local regression proof | PR #24 / 4634611 | compose: https://github.com/Muk223/skeldir-2.0/actions/runs/21190374590 ; main: https://github.com/Muk223/skeldir-2.0/actions/runs/21190374599 |
 | B0.5.7 Phase 1 CI closure | docs/forensics/b057_phase1_ci_topology_validation_closure_evidence.md | CI proof that `docker-compose.e2e.yml` boots and anti split-brain assertions executed; plus governance gate closures | PR #24 / 4634611 | compose: https://github.com/Muk223/skeldir-2.0/actions/runs/21190374590 ; empirical: https://github.com/Muk223/skeldir-2.0/actions/runs/21190374609 |
+| B0.5.7 Phase 2 | docs/forensics/b057_phase2_db_identity_contract_evidence.md | Production-truth DB identity contract: least privilege testable (no direct tenants reads; mediated interfaces; LLM audit writes under RLS) | pending | pending |
 
 ## Root evidence packs
 | Phase/Topic | Evidence pack | Purpose | PR/Commit | CI Run |

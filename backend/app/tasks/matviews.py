@@ -119,7 +119,7 @@ def _fetch_tenant_ids_sync() -> list[UUID]:
     conn = psycopg2.connect(dsn)
     try:
         cur = conn.cursor()
-        cur.execute("SELECT id FROM tenants ORDER BY id")
+        cur.execute("SELECT tenant_id FROM security.list_tenant_ids() ORDER BY tenant_id")
         rows = cur.fetchall()
         return [UUID(str(row[0])) for row in rows]
     finally:
