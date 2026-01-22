@@ -61,6 +61,7 @@ def _retry_kwargs(
     correlation_id: str,
     request_id: str,
     max_cost_cents: int,
+    retry_on_failure: bool,
 ) -> dict:
     return {
         "payload": payload,
@@ -68,6 +69,7 @@ def _retry_kwargs(
         "correlation_id": correlation_id,
         "request_id": request_id,
         "max_cost_cents": max_cost_cents,
+        "retry_on_failure": retry_on_failure,
     }
 
 
@@ -87,6 +89,7 @@ def llm_routing_worker(
     request_id: Optional[str] = None,
     max_cost_cents: int = 0,
     force_failure: bool = False,
+    retry_on_failure: bool = True,
 ):
     correlation, request_id = _resolve_request_context(
         tenant_id=tenant_id,
@@ -116,6 +119,8 @@ def llm_routing_worker(
     try:
         return _run_async(_execute)
     except Exception as exc:
+        if not retry_on_failure:
+            raise
         raise self.retry(
             exc=exc,
             kwargs=_retry_kwargs(
@@ -124,6 +129,7 @@ def llm_routing_worker(
                 correlation_id=correlation,
                 request_id=request_id,
                 max_cost_cents=max_cost_cents,
+                retry_on_failure=retry_on_failure,
             ),
         )
 
@@ -138,6 +144,7 @@ def llm_explanation_worker(
     request_id: Optional[str] = None,
     max_cost_cents: int = 0,
     force_failure: bool = False,
+    retry_on_failure: bool = True,
 ):
     correlation, request_id = _resolve_request_context(
         tenant_id=tenant_id,
@@ -171,6 +178,8 @@ def llm_explanation_worker(
     try:
         return _run_async(_execute)
     except Exception as exc:
+        if not retry_on_failure:
+            raise
         raise self.retry(
             exc=exc,
             kwargs=_retry_kwargs(
@@ -179,6 +188,7 @@ def llm_explanation_worker(
                 correlation_id=correlation,
                 request_id=request_id,
                 max_cost_cents=max_cost_cents,
+                retry_on_failure=retry_on_failure,
             ),
         )
 
@@ -193,6 +203,7 @@ def llm_investigation_worker(
     request_id: Optional[str] = None,
     max_cost_cents: int = 0,
     force_failure: bool = False,
+    retry_on_failure: bool = True,
 ):
     correlation, request_id = _resolve_request_context(
         tenant_id=tenant_id,
@@ -226,6 +237,8 @@ def llm_investigation_worker(
     try:
         return _run_async(_execute)
     except Exception as exc:
+        if not retry_on_failure:
+            raise
         raise self.retry(
             exc=exc,
             kwargs=_retry_kwargs(
@@ -234,6 +247,7 @@ def llm_investigation_worker(
                 correlation_id=correlation,
                 request_id=request_id,
                 max_cost_cents=max_cost_cents,
+                retry_on_failure=retry_on_failure,
             ),
         )
 
@@ -248,6 +262,7 @@ def llm_budget_optimization_worker(
     request_id: Optional[str] = None,
     max_cost_cents: int = 0,
     force_failure: bool = False,
+    retry_on_failure: bool = True,
 ):
     correlation, request_id = _resolve_request_context(
         tenant_id=tenant_id,
@@ -281,6 +296,8 @@ def llm_budget_optimization_worker(
     try:
         return _run_async(_execute)
     except Exception as exc:
+        if not retry_on_failure:
+            raise
         raise self.retry(
             exc=exc,
             kwargs=_retry_kwargs(
@@ -289,5 +306,6 @@ def llm_budget_optimization_worker(
                 correlation_id=correlation,
                 request_id=request_id,
                 max_cost_cents=max_cost_cents,
+                retry_on_failure=retry_on_failure,
             ),
         )
