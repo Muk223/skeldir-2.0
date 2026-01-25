@@ -1,6 +1,6 @@
 # B0.5.7-P5 Full-Chain E2E Integration Evidence
 
-Status: DRAFT (requires CI run + SHA/URL insertion)
+Status: FINAL
 
 ## Objective
 Prove the canonical full-chain path under least-privilege + RLS:
@@ -91,11 +91,27 @@ Expected CI artifacts uploaded by workflow:
 - `artifacts/b057-p5/db_probe.json`
 - `artifacts/b057-p5/timeout_diagnostics.json` (on failure)
 
-## Pending CI Evidence
-Update after CI run:
-- Commit SHA: pending
-- GitHub Actions run URL: pending
-- Evidence index row: pending
+## CI Evidence (Final)
+- Commit SHA: 88f9aa0034f2550cc1a47e776c142b0181e7369d
+- GitHub Actions run URL: https://github.com/Muk223/skeldir-2.0/actions/runs/21337908292
+- Workflow: `b057-p5-full-chain`
+
+## Empirical Results
+Test status:
+- `backend/tests/integration/test_b057_p5_full_chain_e2e.py` PASSED (1 test, 7.70s)
+
+DB probe (artifact `db_probe.json`):
+- attribution_recompute_jobs: status=succeeded, run_count=1
+- mv_allocation_summary: total_allocated_cents=1050, event_revenue_cents=1050, is_balanced=true, drift_cents=0
+- RLS isolation:
+  - tenant-scoped counts: events=1, allocations=3
+  - no-tenant counts: events=0, allocations=0
+
+Artifacts captured:
+- `api.log`
+- `worker.log`
+- `pytest.log`
+- `db_probe.json`
 
 ## Notes
 - No claims of local execution.
