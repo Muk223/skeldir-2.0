@@ -85,6 +85,20 @@ def _wait_ready(base_url: str, timeout_s: float = 30.0) -> None:
     raise RuntimeError(f"API never became ready; last_error={last_error}")
 
 
+def _wait_http_200(url: str, timeout_s: float = 20.0) -> None:
+    deadline = time.time() + timeout_s
+    last_error: Exception | None = None
+    while time.time() < deadline:
+        try:
+            res = httpx.get(url, timeout=2.0)
+            if res.status_code == 200:
+                return
+        except Exception as exc:
+            last_error = exc
+        time.sleep(0.25)
+    raise RuntimeError(f"Timed out waiting for 200 from {url}: {last_error}")
+
+
 def _wait_for_output(lines: list[str], substring: str, timeout_s: float) -> None:
     deadline = time.time() + timeout_s
     while time.time() < deadline:
@@ -136,6 +150,25 @@ def _start_worker(env: dict, log_path: Path) -> tuple[subprocess.Popen[str], lis
     threading.Thread(target=_reader, name="b057-p5-worker-reader", daemon=True).start()
     _wait_for_output(lines, "ready.", timeout_s=60)
     return proc, lines
+
+
+def _start_exporter(env: dict, log_path: Path) -> tuple[subprocess.Popen[str], str]:
+    backend_dir = _repo_root() / "backend"
+    port = _free_port()
+    exporter_env = dict(env)
+    exporter_env["WORKER_METRICS_EXPORTER_HOST"] = "127.0.0.1"
+    exporter_env["WORKER_METRICS_EXPORTER_PORT"] = str(port)
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "app.observability.worker_metrics_exporter"],
+        cwd=str(backend_dir),
+        env=exporter_env,
+        stdout=log_path.open("w", encoding="utf-8"),
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    exporter_url = f"http://127.0.0.1:{port}"
+    _wait_http_200(f"{exporter_url}/metrics", timeout_s=30.0)
+    return proc, exporter_url
 
 
 def _stop_process(proc: subprocess.Popen[str]) -> None:
@@ -503,6 +536,134 @@ def _write_db_probe(
     path.write_text(json.dumps(snapshot, default=str, indent=2), encoding="utf-8")
 
 
+def _scrape_metrics(url: str) -> str:
+    res = httpx.get(url, timeout=5.0)
+    if res.status_code != 200:
+        raise AssertionError(f"Expected 200 from {url}, got {res.status_code}")
+    return res.text
+
+
+def _parse_metric_value(text: str, name: str, labels: Optional[dict[str, str]] = None) -> float:
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if not line.startswith(name):
+            continue
+        if " " not in line:
+            continue
+        metric_part, value_part = line.split(" ", 1)
+        if not metric_part.startswith(name):
+            continue
+        if labels is None:
+            if "{" in metric_part:
+                continue
+        else:
+            if "{" not in metric_part:
+                continue
+            label_block = metric_part.split("{", 1)[1].rsplit("}", 1)[0]
+            parsed: dict[str, str] = {}
+            for key, val in _parse_label_pairs(label_block):
+                parsed[key] = val
+            if any(parsed.get(k) != v for k, v in labels.items()):
+                continue
+        try:
+            return float(value_part.strip())
+        except ValueError:
+            continue
+    return 0.0
+
+
+def _parse_label_pairs(label_block: str) -> list[tuple[str, str]]:
+    pairs: list[tuple[str, str]] = []
+    for part in label_block.split(","):
+        if "=" not in part:
+            continue
+        key, raw_val = part.split("=", 1)
+        key = key.strip()
+        val = raw_val.strip().strip('"')
+        pairs.append((key, val))
+    return pairs
+
+
+def _metrics_lint(text: str) -> dict[str, Any]:
+    from app.observability.metrics_policy import ALLOWED_LABEL_KEYS
+
+    application_prefixes = (
+        "events_",
+        "celery_task_",
+        "celery_queue_",
+        "matview_refresh_",
+        "ingestion_",
+        "multiproc_",
+    )
+    forbidden_keys = {"tenant_id", "correlation_id", "request_id", "session_id", "user_id"}
+    violations: list[str] = []
+    label_keys: set[str] = set()
+    uuid_hits: list[str] = []
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "{" not in line:
+            continue
+        if " " not in line:
+            continue
+        metric_part = line.split(" ", 1)[0]
+        metric_name = metric_part.split("{", 1)[0]
+        if not metric_name.startswith(application_prefixes):
+            continue
+        if "{" not in metric_part or "}" not in metric_part:
+            continue
+        label_block = metric_part.split("{", 1)[1].rsplit("}", 1)[0]
+        for key, val in _parse_label_pairs(label_block):
+            label_keys.add(key)
+            if key in forbidden_keys:
+                violations.append(f"forbidden_label_key:{key}")
+            if _looks_like_uuid(val):
+                uuid_hits.append(val)
+
+    unknown_keys = sorted(label_keys - set(ALLOWED_LABEL_KEYS) - {"le", "quantile"})
+    if unknown_keys:
+        violations.append(f"unknown_label_keys:{','.join(unknown_keys)}")
+    if uuid_hits:
+        violations.append("uuid_like_values_detected")
+
+    return {
+        "label_keys": sorted(label_keys),
+        "uuid_like_values": uuid_hits[:5],
+        "violations": violations,
+    }
+
+
+def _looks_like_uuid(value: str) -> bool:
+    if len(value) != 36:
+        return False
+    parts = value.split("-")
+    if len(parts) != 5:
+        return False
+    try:
+        int("".join(parts), 16)
+    except ValueError:
+        return False
+    return True
+
+
+def _assert_log_contains(path: Path, patterns: list[str]) -> None:
+    content = path.read_text(encoding="utf-8", errors="ignore")
+    missing = [p for p in patterns if p not in content]
+    if missing:
+        raise AssertionError(f"Missing log markers in {path.name}: {missing}")
+
+
+def _assert_log_contains_any(path: Path, patterns: list[str]) -> None:
+    content = path.read_text(encoding="utf-8", errors="ignore")
+    if any(p in content for p in patterns):
+        return
+    raise AssertionError(f"Missing any log markers in {path.name}: {patterns}")
+
+
 def test_b057_p5_full_chain_webhook_to_matview():
     admin_db_url = _require_env("B057_P5_ADMIN_DATABASE_URL")
     runtime_db_url = _runtime_sync_db_url()
@@ -518,17 +679,28 @@ def test_b057_p5_full_chain_webhook_to_matview():
     env["CELERY_RESULT_BACKEND"] = f"db+{runtime_db_url}"
     env.setdefault("ENVIRONMENT", "test")
     env["B057_P5_ARTIFACT_DIR"] = str(artifact_dir)
+    multiproc_dir = Path(tempfile.mkdtemp(prefix="b057_p5_prom_"))
+    env["PROMETHEUS_MULTIPROC_DIR"] = str(multiproc_dir)
 
     worker_log = artifact_dir / "worker.log"
     api_log = artifact_dir / "api.log"
+    exporter_log = artifact_dir / "exporter.log"
 
     worker_proc = None
     api_proc = None
+    exporter_proc = None
     base_url = None
+    exporter_url = None
 
     try:
         worker_proc, _ = _start_worker(env, worker_log)
+        exporter_proc, exporter_url = _start_exporter(env, exporter_log)
         api_proc, base_url = _start_api(env, api_log)
+
+        metrics_api_before = _scrape_metrics(f"{base_url}/metrics")
+        metrics_worker_before = _scrape_metrics(f"{exporter_url}/metrics")
+        (artifact_dir / "metrics_api_before.txt").write_text(metrics_api_before, encoding="utf-8")
+        (artifact_dir / "metrics_worker_before.txt").write_text(metrics_worker_before, encoding="utf-8")
 
         event_ts = datetime(2026, 1, 25, 12, 34, 56, tzinfo=timezone.utc)
         window_start, window_end = _compute_window(event_ts)
@@ -617,9 +789,112 @@ def test_b057_p5_full_chain_webhook_to_matview():
         assert _count_events(runtime_db_url, None, event_id) == 0
         assert _count_allocations(runtime_db_url, None, event_id) == 0
 
+        metrics_api_after = _scrape_metrics(f"{base_url}/metrics")
+        metrics_worker_after = _scrape_metrics(f"{exporter_url}/metrics")
+        (artifact_dir / "metrics_api_after.txt").write_text(metrics_api_after, encoding="utf-8")
+        (artifact_dir / "metrics_worker_after.txt").write_text(metrics_worker_after, encoding="utf-8")
+
+        events_ingested_before = _parse_metric_value(metrics_api_before, "events_ingested_total")
+        events_ingested_after = _parse_metric_value(metrics_api_after, "events_ingested_total")
+        task_success_recompute_before = _parse_metric_value(
+            metrics_worker_before,
+            "celery_task_success_total",
+            {"task_name": "app.tasks.attribution.recompute_window"},
+        )
+        task_success_recompute_after = _parse_metric_value(
+            metrics_worker_after,
+            "celery_task_success_total",
+            {"task_name": "app.tasks.attribution.recompute_window"},
+        )
+        task_success_matview_before = _parse_metric_value(
+            metrics_worker_before,
+            "celery_task_success_total",
+            {"task_name": "app.tasks.matviews.refresh_all_for_tenant"},
+        )
+        task_success_matview_after = _parse_metric_value(
+            metrics_worker_after,
+            "celery_task_success_total",
+            {"task_name": "app.tasks.matviews.refresh_all_for_tenant"},
+        )
+        matview_refresh_before = _parse_metric_value(
+            metrics_worker_before,
+            "matview_refresh_total",
+            {"view_name": "mv_allocation_summary", "outcome": "success"},
+        )
+        matview_refresh_after = _parse_metric_value(
+            metrics_worker_after,
+            "matview_refresh_total",
+            {"view_name": "mv_allocation_summary", "outcome": "success"},
+        )
+
+        deltas = {
+            "events_ingested_total": events_ingested_after - events_ingested_before,
+            "celery_task_success_total_recompute_window": task_success_recompute_after
+            - task_success_recompute_before,
+            "celery_task_success_total_matview_refresh_all_for_tenant": task_success_matview_after
+            - task_success_matview_before,
+            "matview_refresh_total_mv_allocation_summary_success": matview_refresh_after
+            - matview_refresh_before,
+            "api_metrics_url": f"{base_url}/metrics",
+            "worker_metrics_url": f"{exporter_url}/metrics",
+        }
+        (artifact_dir / "metrics_delta.json").write_text(
+            json.dumps(deltas, default=str, indent=2), encoding="utf-8"
+        )
+
+        assert deltas["events_ingested_total"] >= 1
+        assert deltas["celery_task_success_total_recompute_window"] >= 1
+        assert deltas["celery_task_success_total_matview_refresh_all_for_tenant"] >= 1
+        assert deltas["matview_refresh_total_mv_allocation_summary_success"] >= 1
+
+        assert "celery_task_success_total" not in metrics_api_after
+        assert "celery_task_success_total" in metrics_worker_after
+
+        lint_api = _metrics_lint(metrics_api_after)
+        lint_worker = _metrics_lint(metrics_worker_after)
+        lint_report = {
+            "api": lint_api,
+            "worker": lint_worker,
+        }
+        (artifact_dir / "metrics_lint.json").write_text(
+            json.dumps(lint_report, default=str, indent=2), encoding="utf-8"
+        )
+        assert not lint_api["violations"], f"API metrics lint failed: {lint_api['violations']}"
+        assert not lint_worker["violations"], f"Worker metrics lint failed: {lint_worker['violations']}"
+
+        _assert_log_contains(
+            api_log,
+            [
+                "ingestion_followup_tasks_enqueued",
+                str(tenant_a.tenant_id),
+            ],
+        )
+        _assert_log_contains(
+            worker_log,
+            [
+                '"task_name": "app.tasks.attribution.recompute_window"',
+                '"task_name":"app.tasks.attribution.recompute_window"',
+                '"task_name": "app.tasks.matviews.refresh_all_for_tenant"',
+                '"task_name":"app.tasks.matviews.refresh_all_for_tenant"',
+                '"status": "success"',
+                '"status":"success"',
+                str(tenant_a.tenant_id),
+            ],
+        )
+        _assert_log_contains_any(
+            worker_log,
+            [
+                "matview_refresh_all_task_start",
+                "matview_refresh_view_completed",
+                "matview_refresh_task_completed",
+            ],
+        )
+
         _write_db_probe(runtime_db_url, tenant_a.tenant_id, event_id, job_row, matview_row, artifact_dir)
     finally:
         if api_proc is not None:
             _stop_process(api_proc)
+        if exporter_proc is not None:
+            _stop_process(exporter_proc)
         if worker_proc is not None:
             _stop_process(worker_proc)
