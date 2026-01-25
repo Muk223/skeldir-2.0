@@ -92,13 +92,13 @@ Expected CI artifacts uploaded by workflow:
 - `artifacts/b057-p5/timeout_diagnostics.json` (on failure)
 
 ## CI Evidence (Final)
-- Commit SHA: 97264f05f5d87f668e5d4c916da5364c539a833c
-- GitHub Actions run URL: https://github.com/Muk223/skeldir-2.0/actions/runs/21339028148
+- Commit SHA: 1a7f136ca067b2610b336600e1b577b74f36e7c2
+- GitHub Actions run URL: https://github.com/Muk223/skeldir-2.0/actions/runs/21339065403
 - Workflow: `b057-p5-full-chain`
 
 ## Empirical Results
 Test status:
-- `backend/tests/integration/test_b057_p5_full_chain_e2e.py` PASSED (1 test, 7.75s)
+- `backend/tests/integration/test_b057_p5_full_chain_e2e.py` PASSED (1 test, 7.70s)
 
 DB probe (artifact `db_probe.json`):
 - attribution_recompute_jobs: status=succeeded, run_count=1
