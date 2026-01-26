@@ -1,0 +1,251 @@
+openapi: 3.1.0
+info:
+  title: Skeldir Revenue API
+  version: 2.0.0
+  description: |
+    Canonical realtime revenue surface (B0.6 interim).
+    Data is unverified and may be stale; verification arrives in later phases.
+servers:
+  - url: http://localhost:4019
+    description: Prism Mock Server (Revenue)
+security:
+  - bearerAuth: []
+tags:
+  - name: Revenue
+    description: Realtime revenue endpoints
+paths:
+  /api/v1/revenue/realtime:
+    get:
+      summary: Get realtime revenue (v1)
+      description: |
+        Returns interim realtime revenue aggregates. Payload is unverified.
+      operationId: getRealtimeRevenueV1
+      tags:
+        - Revenue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: &ref_4
+            type: string
+            format: uuid
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: &ref_5
+            type: string
+          description: Bearer token for authentication (format - Bearer <token>)
+      responses:
+        '200':
+          description: Realtime revenue aggregate
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID echoed back
+          content:
+            application/json:
+              schema:
+                type: object
+                required: &ref_2
+                  - tenant_id
+                  - interval
+                  - currency
+                  - revenue_total
+                  - verified
+                  - data_as_of
+                properties: &ref_3
+                  tenant_id:
+                    type: string
+                    format: uuid
+                    description: Tenant identifier associated with the revenue data
+                    example: 00000000-0000-0000-0000-000000000000
+                  interval:
+                    type: string
+                    description: Time interval represented by the aggregate
+                    example: minute
+                  currency:
+                    type: string
+                    description: ISO 4217 currency code
+                    minLength: 3
+                    maxLength: 3
+                    example: USD
+                  revenue_total:
+                    type: number
+                    format: double
+                    minimum: 0
+                    description: Total revenue amount for the interval
+                    example: 125430.5
+                  verified:
+                    type: boolean
+                    description: Whether revenue is verified through payment reconciliation
+                    example: false
+                  data_as_of:
+                    type:
+                      - string
+                      - 'null'
+                    format: date-time
+                    description: Timestamp of last successful upstream fetch (nullable during interim)
+                    example: '2026-01-26T12:00:00Z'
+                  sources:
+                    type: array
+                    description: Optional list of platform source identifiers
+                    items:
+                      type: string
+                    example: []
+              example:
+                tenant_id: 00000000-0000-0000-0000-000000000000
+                interval: minute
+                currency: USD
+                revenue_total: 125430.5
+                verified: false
+                data_as_of: '2026-01-26T12:00:00Z'
+                sources: []
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: &ref_6
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID for distributed tracing
+          content: &ref_7
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: &ref_0
+                  - type
+                  - title
+                  - status
+                  - detail
+                  - instance
+                  - correlation_id
+                  - timestamp
+                properties: &ref_1
+                  type:
+                    type: string
+                    format: uri
+                    description: URI reference identifying the problem type
+                    example: https://api.skeldir.com/problems/authentication-failed
+                  title:
+                    type: string
+                    description: Short, human-readable summary of the problem
+                    example: Authentication Failed
+                  status:
+                    type: integer
+                    description: HTTP status code
+                    example: 401
+                  detail:
+                    type: string
+                    description: Human-readable explanation specific to this occurrence
+                    example: The provided JWT token has expired. Please refresh your authentication token.
+                  instance:
+                    type: string
+                    format: uri
+                    description: URI reference identifying this specific occurrence
+                    example: https://api.skeldir.com/api/attribution/revenue/realtime
+                  correlation_id:
+                    type: string
+                    format: uuid
+                    description: Request correlation ID for distributed tracing
+                    example: 550e8400-e29b-41d4-a716-446655440000
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: ISO 8601 timestamp when the error occurred
+                    example: '2025-11-11T14:32:00Z'
+                  errors:
+                    type: array
+                    description: Optional array of specific validation errors
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                          example: email
+                        message:
+                          type: string
+                          example: Invalid email format
+                        code:
+                          type: string
+                          example: INVALID_FORMAT
+        '429':
+          description: Too Many Requests - rate limit exceeded
+          headers: &ref_8
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before retrying
+          content: &ref_9
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: *ref_0
+                properties: *ref_1
+        '500':
+          description: Internal server error
+          headers: &ref_10
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content: &ref_11
+            application/problem+json:
+              schema:
+                type: object
+                description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+                required: *ref_0
+                properties: *ref_1
+components:
+  schemas:
+    RealtimeRevenueV1Response:
+      type: object
+      required: *ref_2
+      properties: *ref_3
+    ProblemDetails:
+      type: object
+      description: RFC7807 Problem Details for HTTP APIs with Skeldir extensions
+      required: *ref_0
+      properties: *ref_1
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token authentication
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: true
+      schema: *ref_4
+      description: Unique request correlation ID for distributed tracing
+    Authorization:
+      name: Authorization
+      in: header
+      required: true
+      schema: *ref_5
+      description: Bearer token for authentication (format - Bearer <token>)
+  responses:
+    UnauthorizedError:
+      description: Unauthorized - invalid or missing authentication
+      headers: *ref_6
+      content: *ref_7
+    RateLimitError:
+      description: Too Many Requests - rate limit exceeded
+      headers: *ref_8
+      content: *ref_9
+    ServerError:
+      description: Internal server error
+      headers: *ref_10
+      content: *ref_11
