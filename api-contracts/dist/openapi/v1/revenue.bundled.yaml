@@ -69,6 +69,7 @@ paths:
                     example: minute
                   currency:
                     type: string
+                    pattern: ^[A-Z]{3}$
                     description: ISO 4217 currency code
                     minLength: 3
                     maxLength: 3
