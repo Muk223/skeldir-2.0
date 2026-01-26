@@ -9,6 +9,60 @@ from pathlib import Path
 INDEX_PATH = Path("docs/forensics/INDEX.md")
 EVIDENCE_ROOT = Path("docs/forensics")
 PLACEHOLDER_TOKENS = ("pending", "local-uncommitted", "ci-pending")
+B057_PHASE_TAG = "B0.5.7"
+
+
+def git_diff(base_ref: str | None, path: str | None = None) -> list[str]:
+    diff_args: list[str] = []
+    if path:
+        diff_args = ["--", path]
+    if base_ref:
+        subprocess.run(["git", "fetch", "origin", base_ref, "--depth=1"], check=True)
+        diff = run_git(
+            ["git", "diff", "--unified=0", f"origin/{base_ref}...HEAD", *diff_args]
+        )
+    else:
+        try:
+            head_parent = run_git(["git", "rev-parse", "HEAD^"])
+        except subprocess.CalledProcessError:
+            return []
+        diff = run_git(["git", "diff", "--unified=0", head_parent, "HEAD", *diff_args])
+    return diff.splitlines()
+
+
+def changed_index_rows() -> list[str]:
+    if os.environ.get("GITHUB_EVENT_NAME") == "pull_request":
+        base_ref = os.environ.get("GITHUB_BASE_REF")
+    else:
+        base_ref = None
+
+    rows: list[str] = []
+    for line in git_diff(base_ref, str(INDEX_PATH)):
+        if not line.startswith("+|"):
+            continue
+        # Skip diff metadata for files
+        if line.startswith("+++"):
+            continue
+        row = line[1:].strip()
+        if row.startswith("| ---"):
+            continue
+        if row.count("|") < 5:
+            continue
+        rows.append(row)
+    return rows
+
+
+def parse_commit_sha(row: str) -> str | None:
+    columns = [col.strip() for col in row.split("|")]
+    if len(columns) < 6:
+        return None
+    commit = columns[4]
+    return commit or None
+
+
+def row_is_b057_scope(row: str) -> bool:
+    lower = row.lower()
+    return B057_PHASE_TAG.lower() in lower or "b057_" in lower or "b057-" in lower
 
 
 def run_git(args: list[str]) -> str:
@@ -62,10 +116,26 @@ def main() -> int:
             errors.append(f"Missing INDEX entry for evidence pack: {path}")
 
     for line in index_text.splitlines():
-        if "| B0.5.7" in line:
+        if f"| {B057_PHASE_TAG}" in line:
             lower = line.lower()
             if any(token in lower for token in PLACEHOLDER_TOKENS):
                 errors.append(f"Placeholder token in B0.5.7 INDEX row: {line}")
+
+    expected_sha = os.environ.get("ADJUDICATED_SHA") or os.environ.get("GITHUB_SHA")
+    if expected_sha:
+        changed_rows = changed_index_rows()
+        for row in changed_rows:
+            if not row_is_b057_scope(row):
+                continue
+            commit = parse_commit_sha(row)
+            if not commit:
+                errors.append(f"Missing commit SHA in INDEX row: {row}")
+                continue
+            if commit != expected_sha:
+                errors.append(
+                    "INDEX commit SHA mismatch for B0.5.7 row: "
+                    f"expected {expected_sha}, got {commit}"
+                )
 
     if errors:
         print("Forensics INDEX enforcement failed:")
