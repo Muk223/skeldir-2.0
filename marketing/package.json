@@ -1,0 +1,57 @@
+{
+  "name": "@skeldir/marketing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SKELDIR marketing website - public-facing skeldir.com",
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "test": "jest",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "next": "^14.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@radix-ui/react-accordion": "^1.1.2",
+    "@radix-ui/react-dialog": "^1.0.5",
+    "@radix-ui/react-dropdown-menu": "^2.0.6",
+    "@radix-ui/react-slot": "^1.0.2",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.0",
+    "lucide-react": "^0.316.0",
+    "tailwind-merge": "^2.2.1",
+    "tailwindcss-animate": "^1.0.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "@playwright/test": "^1.41.2",
+    "autoprefixer": "^10.4.17",
+    "eslint": "^8",
+    "eslint-config-next": "^14.1.0",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Muk223/skeldir-2.0.git",
+    "directory": "marketing"
+  },
+  "keywords": [
+    "marketing",
+    "landing-page",
+    "next.js",
+    "skeldir",
+    "attribution-intelligence"
+  ]
+}
