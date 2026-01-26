@@ -13,6 +13,7 @@ from pathlib import Path
 EXPECTED_BUNDLES = [
     "auth.bundled.yaml",
     "attribution.bundled.yaml",
+    "revenue.bundled.yaml",
     "reconciliation.bundled.yaml",
     "export.bundled.yaml",
     "health.bundled.yaml",

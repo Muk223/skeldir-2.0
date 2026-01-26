@@ -84,11 +84,10 @@ jobs:
         if: success()
         run: |
           echo "✅ Contract validation PASSED"
-          echo "- All 12 bundles present (9 core + 3 LLM)"
+          echo "- All 13 bundles present (10 core + 3 LLM)"
           echo "- Zero external refs (fully dereferenced)"
           echo ""
           echo "Operational ≠ Functional: VALIDATED"
-
 
 
 

@@ -15,8 +15,8 @@ bash scripts/contracts/bundle.sh
 
 # Verify bundled files exist
 BUNDLE_COUNT=$(find api-contracts/dist/openapi/v1 -name "*.bundled.yaml" | wc -l)
-if [ "$BUNDLE_COUNT" -ne 9 ]; then
-    echo "ERROR: Expected 9 bundles, found $BUNDLE_COUNT"
+if [ "$BUNDLE_COUNT" -ne 13 ]; then
+    echo "ERROR: Expected 13 bundles, found $BUNDLE_COUNT"
     exit 1
 fi
 echo "✓ Bundling successful ($BUNDLE_COUNT bundles)"
@@ -46,7 +46,6 @@ cd ..
 echo "✓ Model tests pass"
 
 echo -e "\n=== Integration Test PASSED ==="
-
 
 
 

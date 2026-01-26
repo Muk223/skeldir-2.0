@@ -6,6 +6,8 @@ apis:
     root: openapi/v1/auth.yaml
   attribution:
     root: openapi/v1/attribution.yaml
+  revenue:
+    root: openapi/v1/revenue.yaml
   reconciliation:
     root: openapi/v1/reconciliation.yaml
   export:

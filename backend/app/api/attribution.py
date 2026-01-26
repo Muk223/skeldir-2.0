@@ -9,13 +9,13 @@ Contract Operations:
 All routes use generated Pydantic models from backend/app/schemas/attribution.py
 """
 
-from fastapi import APIRouter, Header
-from uuid import UUID, uuid4
+from fastapi import APIRouter, Header, Request, Response, status
+from uuid import UUID
 from typing import Annotated
-from decimal import Decimal
 
 # Import generated Pydantic models
 from app.schemas.attribution import RealtimeRevenueResponse
+from app.api.problem_details import problem_details_response
 
 router = APIRouter()
 
@@ -29,7 +29,11 @@ router = APIRouter()
     description="Retrieve realtime revenue attribution data with verification status and data freshness"
 )
 async def get_realtime_revenue(
-    x_correlation_id: Annotated[UUID, Header(alias="X-Correlation-ID")]
+    request: Request,
+    response: Response,
+    x_correlation_id: Annotated[UUID, Header(alias="X-Correlation-ID")],
+    authorization: Annotated[str | None, Header(alias="Authorization")] = None,
+    if_none_match: Annotated[str | None, Header(alias="If-None-Match")] = None,
 ):
     """
     Get realtime revenue attribution data.
@@ -49,6 +53,17 @@ async def get_realtime_revenue(
     
     import os
     from datetime import datetime
+
+    # Minimal auth guard to align with contract (no JWT verification in B0.1).
+    if not _has_bearer_token(authorization):
+        return problem_details_response(
+            request,
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            title="Authentication Failed",
+            detail="Missing or invalid Authorization header.",
+            correlation_id=x_correlation_id,
+            type_url="https://api.skeldir.com/problems/authentication-failed",
+        )
 
     # System phase determines verification status
     system_phase = os.getenv('SYSTEM_PHASE', 'B0.1')
@@ -74,5 +89,32 @@ async def get_realtime_revenue(
             "Full statistical verification available in Phase B2.6."
         )
 
+    etag = _compute_etag(response_data)
+    if if_none_match and if_none_match.strip() == etag:
+        return Response(
+            status_code=status.HTTP_304_NOT_MODIFIED,
+            headers={
+                "ETag": etag,
+                "Cache-Control": "max-age=30",
+            },
+        )
+
+    response.headers["ETag"] = etag
+    response.headers["Cache-Control"] = "max-age=30"
     return response_data
+
+
+def _has_bearer_token(value: str | None) -> bool:
+    if not value:
+        return False
+    return value.strip().lower().startswith("bearer ")
+
+
+def _compute_etag(payload: dict) -> str:
+    import hashlib
+    import json
+
+    body = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
+    return f"\"{digest}\""
 

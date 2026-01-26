@@ -34,6 +34,9 @@ log "✓ auth.bundled.yaml"
 npx @redocly/cli bundle attribution --config=redocly.yaml --output=dist/openapi/v1/attribution.bundled.yaml --ext yaml --dereferenced
 log "✓ attribution.bundled.yaml"
 
+npx @redocly/cli bundle revenue --config=redocly.yaml --output=dist/openapi/v1/revenue.bundled.yaml --ext yaml --dereferenced
+log "✓ revenue.bundled.yaml"
+
 npx @redocly/cli bundle reconciliation --config=redocly.yaml --output=dist/openapi/v1/reconciliation.bundled.yaml --ext yaml --dereferenced
 log "✓ reconciliation.bundled.yaml"
 

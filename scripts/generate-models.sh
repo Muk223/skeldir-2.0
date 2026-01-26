@@ -39,7 +39,7 @@ if [ ! -d "$SCHEMAS_DIR" ]; then
 fi
 
 # Verify manual schema files exist (hand-written for B0.1)
-REQUIRED_SCHEMAS=(attribution auth reconciliation export webhooks_shopify webhooks_woocommerce webhooks_stripe webhooks_paypal)
+REQUIRED_SCHEMAS=(attribution auth reconciliation export revenue webhooks_shopify webhooks_woocommerce webhooks_stripe webhooks_paypal)
 MISSING_COUNT=0
 
 for schema in "${REQUIRED_SCHEMAS[@]}"; do

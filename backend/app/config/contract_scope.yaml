@@ -5,6 +5,7 @@
 in_scope_prefixes:
   - /api/auth
   - /api/attribution
+  - /api/v1/revenue
   - /api/reconciliation
   - /api/export
   - /api/health
@@ -32,6 +33,7 @@ contract_only_allowlist:
 spec_mappings:
   /api/auth: api-contracts/dist/openapi/v1/auth.bundled.yaml
   /api/attribution: api-contracts/dist/openapi/v1/attribution.bundled.yaml
+  /api/v1/revenue: api-contracts/dist/openapi/v1/revenue.bundled.yaml
   /api/reconciliation: api-contracts/dist/openapi/v1/reconciliation.bundled.yaml
   /api/export: api-contracts/dist/openapi/v1/export.bundled.yaml
   /api/health: api-contracts/dist/openapi/v1/health.bundled.yaml
@@ -44,4 +46,3 @@ spec_mappings:
 # - Every FastAPI route MUST be either in-scope or explicitly out-of-scope
 # - "Unknown" classification indicates missing configuration and causes validation failure
 # - contract_only_allowlist is audited monthly; stale entries must be removed
-

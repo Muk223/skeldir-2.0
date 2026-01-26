@@ -15,6 +15,7 @@ try:
     from .auth import LoginRequest, LoginResponse, RefreshRequest, RefreshResponse
     from .reconciliation import ReconciliationStatusResponse
     from .export import ExportRevenueResponse
+    from .revenue import RealtimeRevenueV1Response
 except ImportError as e:
     # Operational Gate P5: Hard boot-time dependency
     # If models are missing, application cannot start
@@ -28,6 +29,7 @@ from .attribution import *
 from .auth import *
 from .reconciliation import *
 from .export import *
+from .revenue import *
 from .webhooks_shopify import *
 from .webhooks_stripe import *
 from .webhooks_paypal import *

@@ -1,0 +1,115 @@
+openapi: 3.1.0
+info:
+  title: Skeldir Revenue API
+  version: 2.0.0
+  description: |
+    Canonical realtime revenue surface (B0.6 interim).
+    Data is unverified and may be stale; verification arrives in later phases.
+
+servers:
+  - url: http://localhost:4019
+    description: Prism Mock Server (Revenue)
+
+tags:
+  - name: Revenue
+    description: Realtime revenue endpoints
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/revenue/realtime:
+    get:
+      summary: Get realtime revenue (v1)
+      description: |
+        Returns interim realtime revenue aggregates. Payload is unverified.
+      operationId: getRealtimeRevenueV1
+      tags:
+        - Revenue
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: './_common/base.yaml#/components/parameters/CorrelationId'
+        - $ref: './_common/base.yaml#/components/parameters/Authorization'
+      responses:
+        '200':
+          description: Realtime revenue aggregate
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+              description: Request correlation ID echoed back
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RealtimeRevenueV1Response'
+              example:
+                tenant_id: 00000000-0000-0000-0000-000000000000
+                interval: minute
+                currency: USD
+                revenue_total: 125430.50
+                verified: false
+                data_as_of: '2026-01-26T12:00:00Z'
+                sources: []
+        '401':
+          $ref: './_common/base.yaml#/components/responses/UnauthorizedError'
+        '429':
+          $ref: './_common/base.yaml#/components/responses/RateLimitError'
+        '500':
+          $ref: './_common/base.yaml#/components/responses/ServerError'
+
+components:
+  schemas:
+    RealtimeRevenueV1Response:
+      type: object
+      required:
+        - tenant_id
+        - interval
+        - currency
+        - revenue_total
+        - verified
+        - data_as_of
+      properties:
+        tenant_id:
+          type: string
+          format: uuid
+          description: Tenant identifier associated with the revenue data
+          example: 00000000-0000-0000-0000-000000000000
+        interval:
+          type: string
+          description: Time interval represented by the aggregate
+          example: minute
+        currency:
+          type: string
+          description: ISO 4217 currency code
+          minLength: 3
+          maxLength: 3
+          example: USD
+        revenue_total:
+          type: number
+          format: double
+          minimum: 0
+          description: Total revenue amount for the interval
+          example: 125430.50
+        verified:
+          type: boolean
+          description: Whether revenue is verified through payment reconciliation
+          example: false
+        data_as_of:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: Timestamp of last successful upstream fetch (nullable during interim)
+          example: '2026-01-26T12:00:00Z'
+        sources:
+          type: array
+          description: Optional list of platform source identifiers
+          items:
+            type: string
+          example: []
+
+  securitySchemes:
+    bearerAuth:
+      $ref: './_common/base.yaml#/components/securitySchemes/bearerAuth'

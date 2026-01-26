@@ -194,7 +194,10 @@ def test_attribution_revenue_realtime_happy_path():
     
     response = client.get(
         "/api/attribution/revenue/realtime",
-        headers={"X-Correlation-ID": str(uuid.uuid4())}
+        headers={
+            "X-Correlation-ID": str(uuid.uuid4()),
+            "Authorization": "Bearer test-token",
+        },
     )
     
     assert response.status_code == 200, f"Expected 200, got {response.status_code}"

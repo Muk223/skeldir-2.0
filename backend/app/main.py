@@ -25,7 +25,7 @@ from app.observability.logging_config import configure_logging
 configure_logging(os.getenv("LOG_LEVEL", "INFO"))
 
 # Import routers
-from app.api import auth, attribution, health, webhooks
+from app.api import auth, attribution, health, revenue, webhooks
 
 # Import middleware - Phase G: Active Privacy Defense
 from app.middleware import PIIStrippingMiddleware
@@ -60,6 +60,7 @@ app.add_middleware(
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(attribution.router, prefix="/api/attribution", tags=["Attribution"])
+app.include_router(revenue.router, prefix="/api/v1", tags=["Revenue"])
 app.include_router(health.router, tags=["Health"])
 app.include_router(webhooks.router, prefix="/api", tags=["Webhooks"])
 
