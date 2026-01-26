@@ -1,0 +1,634 @@
+"use client";
+
+import { useState, useRef, useCallback } from "react";
+
+// ============================================================================
+// INTERACTIVE PRODUCT DEMO COMPONENT
+// Reference: Combat-Grade Implementation Directive v1.0
+// State Machine: READY_TO_PLAY → PLAYING → ERROR
+// ============================================================================
+
+type DemoState = "READY_TO_PLAY" | "PLAYING" | "ERROR";
+
+// =============================================================================
+// PLAY ICON SVG
+// =============================================================================
+function PlayIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      style={{
+        width: "32px",
+        height: "32px",
+        fill: "#FFFFFF",
+        marginLeft: "4px",
+      }}
+    >
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+
+// =============================================================================
+// TOOLTIP COMPONENT
+// =============================================================================
+interface TooltipProps {
+  number: string;
+  title: string;
+  subtitle: string;
+  badgeTop: number;
+  badgeLeft: number;
+  calloutTop: number;
+  calloutLeft: number;
+  lineX1: number;
+  lineY1: number;
+  lineX2: number;
+  lineY2: number;
+  isVisible: boolean;
+}
+
+function Tooltip({
+  number,
+  title,
+  subtitle,
+  badgeTop,
+  badgeLeft,
+  calloutTop,
+  calloutLeft,
+  lineX1,
+  lineY1,
+  lineX2,
+  lineY2,
+  isVisible,
+}: TooltipProps) {
+  return (
+    <div
+      className="demo-tooltip-overlay"
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        pointerEvents: "none",
+        opacity: isVisible ? 1 : 0,
+        transition: "opacity 50ms ease-out",
+        display: isVisible ? "block" : "none",
+      }}
+    >
+
+      {/* Callout Box */}
+      <div
+        className="tooltip-callout"
+        style={{
+          position: "absolute",
+          top: `${calloutTop}px`,
+          left: `${calloutLeft}px`,
+          width: "220px",
+          padding: "16px 20px",
+          backgroundColor: "#FFFFFF",
+          border: "2px solid #2563EB",
+          borderRadius: "12px",
+          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+          zIndex: 11,
+        }}
+      >
+        <div
+          className="tooltip-title"
+          style={{
+            fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+            fontSize: "16px",
+            fontWeight: 600,
+            color: "#0F172A",
+            marginBottom: "4px",
+          }}
+        >
+          {title}
+        </div>
+        <div
+          className="tooltip-subtitle"
+          style={{
+            fontFamily: "Inter, -apple-system, BlinkMacSystemFont, sans-serif",
+            fontSize: "14px",
+            fontWeight: 400,
+            color: "#64748B",
+            lineHeight: 1.4,
+          }}
+        >
+          {subtitle}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// MAIN COMPONENT EXPORT
+// =============================================================================
+export function InteractiveDemo() {
+  const [state, setState] = useState<DemoState>("READY_TO_PLAY");
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Tooltip visibility based on state
+  const tooltipsVisible = state === "READY_TO_PLAY";
+
+  // Handle play click - transitions from READY_TO_PLAY → PLAYING
+  const handlePlayClick = useCallback(() => {
+    if (state !== "READY_TO_PLAY") return;
+
+    const startTime = performance.now();
+    console.log("[Skeldir Demo] Play triggered - starting transition");
+
+    // Create video element
+    const video = document.createElement("video");
+    video.id = "demo-video-player";
+    video.src = "/videos/demo-video.mp4";
+    video.controls = false; // No user controls
+    video.autoplay = true;
+    video.loop = true; // Loop continuously
+    video.playsInline = true;
+    video.muted = true; // Muted for autoplay compliance
+    video.preload = "auto";
+
+    video.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 16px;
+      object-fit: cover;
+      background: #0F172A;
+      z-index: 5;
+      cursor: pointer;
+    `;
+
+    // Add click handler to pause/resume video
+    video.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (video.paused) {
+        video.play().catch((error) => {
+          console.error("[Skeldir Demo] Resume failed:", error);
+        });
+      } else {
+        video.pause();
+      }
+    });
+
+    videoRef.current = video;
+
+    // Append video to container
+    if (containerRef.current) {
+      containerRef.current.appendChild(video);
+    }
+
+    // Start playback (muted for autoplay compliance)
+    video
+      .play()
+      .then(() => {
+        const latency = performance.now() - startTime;
+        console.log(
+          `[Skeldir Demo] Video playing (${latency.toFixed(0)}ms latency)`
+        );
+        setState("PLAYING");
+      })
+      .catch((error) => {
+        console.error("[Skeldir Demo] Playback failed:", error);
+        transitionToErrorState(error);
+      });
+  }, [state]);
+
+  // Handle video click - pause/resume when playing
+  const handleVideoClick = useCallback(() => {
+    if (state !== "PLAYING" || !videoRef.current) return;
+
+    const video = videoRef.current;
+    if (video.paused) {
+      video.play().catch((error) => {
+        console.error("[Skeldir Demo] Resume failed:", error);
+      });
+    } else {
+      video.pause();
+    }
+  }, [state]);
+
+  // Transition to error state
+  const transitionToErrorState = useCallback((error: Error) => {
+    console.log("[Skeldir Demo] Entering error state:", error);
+
+    // Remove failed video
+    if (videoRef.current) {
+      videoRef.current.remove();
+      videoRef.current = null;
+    }
+
+    setState("ERROR");
+  }, []);
+
+  // Reset to ready state (from error)
+  const resetToReadyState = useCallback(() => {
+    if (videoRef.current) {
+      videoRef.current.remove();
+      videoRef.current = null;
+    }
+
+    const existingVideo = document.getElementById("demo-video-player");
+    if (existingVideo) {
+      existingVideo.remove();
+    }
+
+    setState("READY_TO_PLAY");
+  }, []);
+
+  return (
+    <section
+      id="product-demo-section"
+      role="region"
+      aria-labelledby="demo-section-title"
+      style={{
+        width: "100%",
+        padding: "80px 48px",
+        backgroundColor: "#F8FAFC",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        overflow: "visible",
+        position: "relative",
+      }}
+    >
+      {/* Gradient transition overlay at the top */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: "120px",
+          background: "linear-gradient(to bottom, rgba(233, 236, 239, 1) 0%, rgba(233, 236, 239, 0.8) 20%, rgba(248, 250, 252, 0.6) 50%, rgba(248, 250, 252, 1) 100%)",
+          pointerEvents: "none",
+          zIndex: 1,
+        }}
+      />
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "1440px",
+          margin: "0 auto",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          position: "relative",
+          zIndex: 2,
+      }}
+    >
+      {/* Section Title */}
+      <h2
+        id="demo-section-title"
+        style={{
+          fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          fontSize: "48px",
+          fontWeight: 700,
+          lineHeight: 1.2,
+          letterSpacing: "-0.02em",
+          color: "#0F172A",
+          textAlign: "center",
+          margin: "0 0 16px 0",
+        }}
+      >
+        See Skeldir in Action
+      </h2>
+
+      {/* Section Subtitle */}
+      <p
+        id="demo-section-subtitle"
+        style={{
+          fontFamily: "Inter, -apple-system, sans-serif",
+          fontSize: "18px",
+          fontWeight: 400,
+          lineHeight: 1.6,
+          color: "#64748B",
+          textAlign: "center",
+          margin: "0 0 48px 0",
+        }}
+      >
+          Explore a live dashboard
+      </p>
+
+      {/* Media Container */}
+      <div
+        id="demo-media-container"
+        ref={containerRef}
+        onClick={handleVideoClick}
+        style={{
+          position: "relative",
+          width: "800px",
+          height: "450px",
+          borderRadius: "16px",
+          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+          overflow: "visible",
+          backgroundColor: "#E2E8F0",
+          marginBottom: "40px",
+          cursor: state === "PLAYING" ? "pointer" : "default",
+        }}
+      >
+        {/* Thumbnail Image */}
+        <img
+          id="demo-thumbnail-img"
+          src="/images/demo-thumbnail.png"
+          alt="Skeldir Channel Comparison dashboard preview"
+          loading="eager"
+          draggable={false}
+          onClick={handlePlayClick}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: "center top",
+            borderRadius: "16px",
+            cursor: "pointer",
+            userSelect: "none",
+            display: state === "READY_TO_PLAY" ? "block" : "none",
+          }}
+        />
+
+        {/* Play Button Overlay */}
+        <button
+          id="demo-play-overlay"
+          type="button"
+          aria-label="Play Skeldir demo video"
+          onClick={handlePlayClick}
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: "80px",
+            height: "80px",
+            borderRadius: "50%",
+            background: "rgba(37, 99, 235, 0.95)",
+            border: "none",
+            cursor: "pointer",
+            display: state === "READY_TO_PLAY" ? "flex" : "none",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 8px 24px rgba(37, 99, 235, 0.4)",
+            transition: "transform 150ms ease, box-shadow 150ms ease",
+            zIndex: 5,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "translate(-50%, -50%) scale(1.1)";
+            e.currentTarget.style.boxShadow =
+              "0 12px 32px rgba(37, 99, 235, 0.5)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "translate(-50%, -50%)";
+            e.currentTarget.style.boxShadow =
+              "0 8px 24px rgba(37, 99, 235, 0.4)";
+          }}
+        >
+          <PlayIcon />
+        </button>
+
+        {/* Tooltip 1: Revenue Verification */}
+        <Tooltip
+          number="1"
+          title="Revenue Verification"
+          subtitle="Platform-claimed vs. verified revenue"
+          badgeTop={185}
+          badgeLeft={310}
+          calloutTop={115}
+          calloutLeft={820}
+          lineX1={342}
+          lineY1={201}
+          lineX2={820}
+          lineY2={155}
+          isVisible={tooltipsVisible}
+        />
+
+        {/* Tooltip 2: Confidence Ranges */}
+        <Tooltip
+          number="2"
+          title="Confidence Ranges"
+          subtitle="See exactly how certain the model is"
+          badgeTop={265}
+          badgeLeft={520}
+          calloutTop={295}
+          calloutLeft={820}
+          lineX1={552}
+          lineY1={281}
+          lineX2={820}
+          lineY2={335}
+          isVisible={tooltipsVisible}
+        />
+
+        {/* Tooltip 3: Budget Recommendations */}
+        <Tooltip
+          number="3"
+          title="Budget Recommendations"
+          subtitle="Approve changes with one click"
+          badgeTop={355}
+          badgeLeft={280}
+          calloutTop={340}
+          calloutLeft={-240}
+          lineX1={280}
+          lineY1={371}
+          lineX2={-20}
+          lineY2={380}
+          isVisible={tooltipsVisible}
+        />
+
+        {/* Error Overlay */}
+        {state === "ERROR" && (
+          <div
+            id="demo-error-overlay"
+            onClick={resetToReadyState}
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              background: "#FEE2E2",
+              border: "1px solid #F87171",
+              padding: "24px 32px",
+              borderRadius: "12px",
+              textAlign: "center",
+              zIndex: 20,
+              cursor: "pointer",
+            }}
+          >
+            <p
+              style={{
+                margin: "0 0 8px",
+                fontWeight: 600,
+                color: "#991B1B",
+                fontFamily: "Inter, -apple-system, sans-serif",
+              }}
+            >
+              Video unavailable
+            </p>
+            <p
+              style={{
+                margin: 0,
+                fontSize: "14px",
+                color: "#B91C1C",
+                fontFamily: "Inter, -apple-system, sans-serif",
+              }}
+            >
+              Click to try again
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* CTA Button Row */}
+      <div
+        id="demo-cta-row"
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          justifyContent: "center",
+          alignItems: "center",
+          gap: "24px",
+        }}
+      >
+        {/* Primary CTA: Watch 90-Sec Overview */}
+        <button
+          id="try-demo-btn"
+          type="button"
+          onClick={handlePlayClick}
+          style={{
+            width: "240px",
+            height: "52px",
+            padding: "14px 32px",
+            backgroundColor: "#2563EB",
+            color: "#FFFFFF",
+            fontFamily: "Inter, -apple-system, sans-serif",
+            fontSize: "16px",
+            fontWeight: 600,
+            border: "none",
+            borderRadius: "12px",
+            cursor: "pointer",
+            boxShadow: "0 4px 14px rgba(37, 99, 235, 0.35)",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition:
+              "background 150ms ease, transform 150ms ease, box-shadow 150ms ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#1D4ED8";
+            e.currentTarget.style.transform = "translateY(-2px)";
+            e.currentTarget.style.boxShadow =
+              "0 8px 20px rgba(37, 99, 235, 0.45)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "#2563EB";
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow =
+              "0 4px 14px rgba(37, 99, 235, 0.35)";
+          }}
+        >
+          Watch 90-Sec Overview
+        </button>
+      </div>
+      </div>
+
+      {/* Responsive styles */}
+      <style>{`
+        @media (max-width: 767px) {
+          #product-demo-section {
+            padding: 48px 20px !important;
+          }
+
+          #demo-section-title {
+            font-size: 32px !important;
+            line-height: 1.25 !important;
+            margin-bottom: 12px !important;
+            padding: 0 16px !important;
+          }
+
+          #demo-section-subtitle {
+            font-size: 16px !important;
+            line-height: 1.5 !important;
+            margin-bottom: 32px !important;
+            padding: 0 16px !important;
+          }
+
+          #demo-media-container {
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            aspect-ratio: 16 / 9 !important;
+            margin-bottom: 32px !important;
+          }
+
+          .demo-tooltip-overlay {
+            display: none !important;
+          }
+
+          #demo-cta-row {
+            flex-direction: column !important;
+            gap: 12px !important;
+            width: 100% !important;
+            padding: 0 16px !important;
+          }
+
+          #try-demo-btn,
+          #watch-overview-btn {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-height: 48px !important;
+            height: 48px !important;
+            font-size: 16px !important;
+          }
+
+          #demo-play-overlay {
+            width: 64px !important;
+            height: 64px !important;
+          }
+        }
+
+        @media (min-width: 768px) and (max-width: 900px) {
+          #demo-media-container {
+            width: 100% !important;
+            max-width: 600px !important;
+            height: auto !important;
+            aspect-ratio: 16 / 9 !important;
+          }
+
+          .demo-tooltip-overlay {
+            display: none !important;
+          }
+
+          #demo-cta-row {
+            flex-direction: column !important;
+            gap: 16px !important;
+          }
+
+          #try-demo-btn,
+          #watch-overview-btn {
+            width: 100% !important;
+            max-width: 280px !important;
+          }
+        }
+
+        #demo-play-overlay:focus-visible {
+          outline: 3px solid #93C5FD;
+          outline-offset: 4px;
+        }
+
+        #try-demo-btn:focus-visible,
+        #watch-overview-btn:focus-visible {
+          outline: 3px solid #93C5FD;
+          outline-offset: 3px;
+        }
+      `}</style>
+    </section>
+  );
+}
