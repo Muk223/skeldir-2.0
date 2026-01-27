@@ -110,6 +110,7 @@ def test_contract_semantic_conformance(spec_path: Path):
             if operation.security._parameters and "Authorization" not in headers:
                 headers["Authorization"] = "Bearer test-token"
             case.headers.update(headers)
+            case.headers = dict(case.headers)
             if operation.security._parameters:
                 case._has_explicit_auth = True
             body_payload = None if case.body.__class__.__name__ == "NotSet" else case.body
