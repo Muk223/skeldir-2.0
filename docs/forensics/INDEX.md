@@ -39,6 +39,7 @@ This index enumerates evidence packs stored under `docs/forensics/`.
 | B0.5.7 Phase 7 | docs/forensics/b057_phase7_operational_readiness_closure_pack_evidence.md | Operational readiness closure pack + governance durability proof | ca485f1db918a5d8764c927189626d17e3093bf2 | https://github.com/Muk223/skeldir-2.0/actions/runs/21363064948 |
 | B0.6 Phase 1 context delta | docs/forensics/phase1_context_delta_notes.md | Phase 1 re-validation context delta notes (pre-remediation) | PR #29 / pending | pending |
 | B0.6 Phase 1 remediation | docs/forensics/b060_phase1_remediation_evidence_v2.md | Phase 1 remediation evidence pack (auth + tenant boundary) | PR #29 / 29174fa | https://github.com/Muk223/skeldir-2.0/actions/runs/21409231639 |
+| B0.6 Phase 1 remediation (superseded) | docs/forensics/b060_phase1_remediation_evidence.md | Superseded by v2 evidence pack. | PR #29 / 29174fa | https://github.com/Muk223/skeldir-2.0/actions/runs/21409231639 |
 
 ## Root evidence packs
 | Phase/Topic | Evidence pack | Purpose | PR/Commit | CI Run |
