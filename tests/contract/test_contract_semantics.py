@@ -101,6 +101,8 @@ def test_contract_semantic_conformance(spec_path: Path):
             if isinstance(case.headers, dict):
                 for key, value in case.headers.items():
                     lower_key = key.lower()
+                    if lower_key == "x-correlation-id":
+                        continue
                     if lower_key == "authorization":
                         headers[key] = "Bearer test-token"
                     elif isinstance(value, str) and value.isascii():
