@@ -11,25 +11,29 @@ Contract-First Enforcement:
 """
 
 import os
+from uuid import UUID, uuid4
 
 # B0.5.6.7: No split-brain. PROMETHEUS_MULTIPROC_DIR is reserved for Celery worker
 # task metrics shards and must not influence API process metrics.
 os.environ.pop("PROMETHEUS_MULTIPROC_DIR", None)
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 # Structured logging for API process (JSON with tenant/correlation context).
 from app.observability.logging_config import configure_logging
+from app.observability.context import get_request_correlation_id
 
 configure_logging(os.getenv("LOG_LEVEL", "INFO"))
 
 # Import routers
 from app.api import auth, attribution, health, revenue, webhooks
+from app.api.problem_details import problem_details_response
 
 # Import middleware - Phase G: Active Privacy Defense
 from app.middleware import PIIStrippingMiddleware
 from app.middleware.observability import ObservabilityMiddleware
+from app.security.auth import AuthError
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -79,6 +83,23 @@ async def root():
         "docs": "/docs",
         "openapi": "/openapi.json"
     }
+
+
+@app.exception_handler(AuthError)
+async def auth_error_handler(request: Request, exc: AuthError):
+    correlation_value = get_request_correlation_id() or request.headers.get("X-Correlation-ID")
+    try:
+        correlation_id = UUID(str(correlation_value))
+    except (TypeError, ValueError):
+        correlation_id = uuid4()
+    return problem_details_response(
+        request,
+        status_code=exc.status_code,
+        title=exc.title,
+        detail=exc.detail,
+        correlation_id=correlation_id,
+        type_url=exc.type_url,
+    )
 
 
 if __name__ == "__main__":

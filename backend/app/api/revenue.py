@@ -7,15 +7,16 @@ no platform fetch, no caching. Contract-first alignment only.
 
 from __future__ import annotations
 
-import os
 from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Header, Request, status
+from fastapi import APIRouter, Depends, Header
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.problem_details import problem_details_response
+from app.db.deps import get_db_session
 from app.schemas.revenue import RealtimeRevenueV1Response
+from app.security.auth import AuthContext, get_auth_context
 
 router = APIRouter()
 
@@ -29,9 +30,9 @@ router = APIRouter()
     description="Return interim realtime revenue payload aligned to B0.6 contract.",
 )
 async def get_realtime_revenue_v1(
-    request: Request,
     x_correlation_id: Annotated[UUID, Header(alias="X-Correlation-ID")],
-    authorization: Annotated[str | None, Header(alias="Authorization")] = None,
+    auth_context: Annotated[AuthContext, Depends(get_auth_context)],
+    db_session: Annotated[AsyncSession, Depends(get_db_session)],
 ):
     """
     Canonical v1 realtime revenue endpoint.
@@ -39,17 +40,8 @@ async def get_realtime_revenue_v1(
     Contract: GET /api/v1/revenue/realtime
     Spec: api-contracts/dist/openapi/v1/revenue.bundled.yaml
     """
-    if not _has_bearer_token(authorization):
-        return problem_details_response(
-            request,
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            title="Authentication Failed",
-            detail="Missing or invalid Authorization header.",
-            correlation_id=x_correlation_id,
-            type_url="https://api.skeldir.com/problems/authentication-failed",
-        )
-
-    tenant_id = UUID(os.getenv("TEST_TENANT_ID", "00000000-0000-0000-0000-000000000000"))
+    _ = db_session
+    tenant_id = auth_context.tenant_id
     return {
         "tenant_id": tenant_id,
         "interval": "minute",
@@ -59,13 +51,3 @@ async def get_realtime_revenue_v1(
         "data_as_of": datetime.now(timezone.utc),
         "sources": [],
     }
-
-
-def _has_bearer_token(value: str | None) -> bool:
-    if not value:
-        return False
-    stripped = value.strip()
-    if not stripped.lower().startswith("bearer "):
-        return False
-    expected = os.getenv("B0_6_BEARER_TOKEN", "test-token")
-    return stripped.split(" ", 1)[1] == expected
