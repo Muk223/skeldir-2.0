@@ -64,4 +64,8 @@ async def get_realtime_revenue_v1(
 def _has_bearer_token(value: str | None) -> bool:
     if not value:
         return False
-    return value.strip().lower().startswith("bearer ")
+    stripped = value.strip()
+    if not stripped.lower().startswith("bearer "):
+        return False
+    expected = os.getenv("B0_6_BEARER_TOKEN", "test-token")
+    return stripped.split(" ", 1)[1] == expected
