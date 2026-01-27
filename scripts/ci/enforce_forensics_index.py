@@ -18,9 +18,14 @@ def git_diff(base_ref: str | None, path: str | None = None) -> list[str]:
         diff_args = ["--", path]
     if base_ref:
         subprocess.run(["git", "fetch", "origin", base_ref, "--depth=1"], check=True)
-        diff = run_git(
-            ["git", "diff", "--unified=0", f"origin/{base_ref}...HEAD", *diff_args]
-        )
+        try:
+            diff = run_git(
+                ["git", "diff", "--unified=0", f"origin/{base_ref}...HEAD", *diff_args]
+            )
+        except subprocess.CalledProcessError:
+            diff = run_git(
+                ["git", "diff", "--unified=0", f"origin/{base_ref}..HEAD", *diff_args]
+            )
     else:
         try:
             head_parent = run_git(["git", "rev-parse", "HEAD^"])
@@ -76,7 +81,14 @@ def changed_files() -> list[str]:
         base_ref = os.environ.get("GITHUB_BASE_REF")
         if base_ref:
             subprocess.run(["git", "fetch", "origin", base_ref, "--depth=1"], check=True)
-            diff = run_git(["git", "diff", "--name-only", f"origin/{base_ref}...HEAD"])
+            try:
+                diff = run_git(
+                    ["git", "diff", "--name-only", f"origin/{base_ref}...HEAD"]
+                )
+            except subprocess.CalledProcessError:
+                diff = run_git(
+                    ["git", "diff", "--name-only", f"origin/{base_ref}..HEAD"]
+                )
             return [line for line in diff.splitlines() if line.strip()]
 
     try:
