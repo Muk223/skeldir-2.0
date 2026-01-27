@@ -87,12 +87,15 @@ def test_contract_semantic_conformance(spec_path: Path):
             continue
     
     skipped_due_to_missing = 0
+    executed_in_scope = 0
+    is_revenue_spec = spec_path.name == "revenue.bundled.yaml"
     for operation in operation_results:
         if not is_in_scope(operation.path):
             continue
-        if operation.security._parameters:
+        if operation.security._parameters and not is_revenue_spec:
             continue
         try:
+            executed_in_scope += 1
             case = operation.as_strategy().example()
             headers = {"X-Correlation-ID": str(uuid.uuid4())}
             if isinstance(case.headers, dict):
@@ -102,6 +105,8 @@ def test_contract_semantic_conformance(spec_path: Path):
                         headers[key] = "Bearer test-token"
                     elif isinstance(value, str) and value.isascii():
                         headers[key] = value
+            if operation.security._parameters and "Authorization" not in headers:
+                headers["Authorization"] = "Bearer test-token"
             body_payload = None if case.body.__class__.__name__ == "NotSet" else case.body
             response = client.request(
                 case.method.upper(),
@@ -143,9 +148,12 @@ def test_contract_semantic_conformance(spec_path: Path):
         )
     
     if not operations_tested:
-        if skipped_due_to_missing:
-            pytest.skip(f"All operations returned 404 (not implemented) in {spec_path.name}")
+    if skipped_due_to_missing:
+        pytest.skip(f"All operations returned 404 (not implemented) in {spec_path.name}")
+    if not is_revenue_spec:
         pytest.skip(f"No operations without security requirements in {spec_path.name}")
+    if executed_in_scope == 0:
+        pytest.fail(f"No in-scope operations executed for {spec_path.name}")
 
 
 def test_auth_login_happy_path():

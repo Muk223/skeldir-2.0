@@ -3,6 +3,8 @@ B0.6 Phase 0: Canonical v1 realtime revenue contract alignment tests.
 """
 
 import os
+import sys
+from pathlib import Path
 from uuid import UUID
 
 import pytest
@@ -13,6 +15,8 @@ os.environ.setdefault(
     "DATABASE_URL",
     "postgresql://app_user:Sk3ld1r_App_Pr0d_2025!@ep-lucky-base-aedv3gwo-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require",
 )
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 from app.main import app  # noqa: E402
 

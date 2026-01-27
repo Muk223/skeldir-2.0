@@ -1223,7 +1223,7 @@ jobs:
 
           export DATABASE_URL="$DATABASE_URL_ASYNC"
           pytest tests/test_b0533_revenue_input_contract.py -v --tb=short
-          pytest tests/test_b06_realtime_revenue_v1.py -v --tb=short
+          pytest ../tests/test_b06_realtime_revenue_v1.py -v --tb=short
           pytest ../tests/contract/test_contract_semantics.py -v --tb=short
 
           echo "✓ R5-5 MET / G5 PASSED: Contract tests executed (see pytest output above for pass/fail status)"
