@@ -32,6 +32,7 @@ os.environ.setdefault("AUTH_JWT_SECRET", "test-secret")
 os.environ.setdefault("AUTH_JWT_ALGORITHM", "HS256")
 os.environ.setdefault("AUTH_JWT_ISSUER", "https://issuer.skeldir.test")
 os.environ.setdefault("AUTH_JWT_AUDIENCE", "skeldir-api")
+os.environ.setdefault("CONTRACT_TESTING", "1")
 from app.main import app
 
 
