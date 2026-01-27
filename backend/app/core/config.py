@@ -38,6 +38,22 @@ class Settings(BaseSettings):
     TENANT_API_KEY_HEADER: str = Field(
         "X-Skeldir-Tenant-Key", description="Header carrying tenant API key"
     )
+    # JWT Authentication (Phase 1)
+    AUTH_JWT_SECRET: Optional[str] = Field(
+        None, description="JWT HMAC secret (HS*). Required when JWKS URL is not set."
+    )
+    AUTH_JWT_ALGORITHM: Optional[str] = Field(
+        None, description="JWT signing algorithm (e.g., HS256, RS256)."
+    )
+    AUTH_JWT_ISSUER: Optional[str] = Field(
+        None, description="Expected JWT issuer (iss claim)."
+    )
+    AUTH_JWT_AUDIENCE: Optional[str] = Field(
+        None, description="Expected JWT audience (aud claim)."
+    )
+    AUTH_JWT_JWKS_URL: Optional[str] = Field(
+        None, description="JWKS URL for JWT signature verification."
+    )
 
     # Application
     ENVIRONMENT: str = Field("development", description="Deployment environment")
@@ -164,6 +180,14 @@ class Settings(BaseSettings):
         if not value or not value.strip():
             raise ValueError("TENANT_API_KEY_HEADER cannot be empty")
         return value.strip()
+
+    @field_validator("AUTH_JWT_SECRET", "AUTH_JWT_ALGORITHM", "AUTH_JWT_ISSUER", "AUTH_JWT_AUDIENCE", "AUTH_JWT_JWKS_URL")
+    @classmethod
+    def validate_optional_strings(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
 
     @field_validator("IDEMPOTENCY_CACHE_TTL")
     @classmethod

@@ -13,6 +13,8 @@ Dynamic conformance catches status code changes, missing fields, and schema viol
 Coverage Requirement: All in-scope operations hit at least once.
 """
 
+import os
+import time
 import pytest
 import schemathesis
 from pathlib import Path
@@ -21,11 +23,30 @@ import yaml
 from fastapi.testclient import TestClient
 from schemathesis.core.failures import FailureGroup
 import uuid
+import jwt
 
 # Import FastAPI app for ASGI testing (no network required)
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "backend"))
+os.environ.setdefault("AUTH_JWT_SECRET", "test-secret")
+os.environ.setdefault("AUTH_JWT_ALGORITHM", "HS256")
+os.environ.setdefault("AUTH_JWT_ISSUER", "https://issuer.skeldir.test")
+os.environ.setdefault("AUTH_JWT_AUDIENCE", "skeldir-api")
+os.environ.setdefault("CONTRACT_TESTING", "1")
 from app.main import app
+
+
+def _build_token() -> str:
+    now = int(time.time())
+    payload = {
+        "sub": "contract-user",
+        "iss": os.environ["AUTH_JWT_ISSUER"],
+        "aud": os.environ["AUTH_JWT_AUDIENCE"],
+        "iat": now,
+        "exp": now + 3600,
+        "tenant_id": "00000000-0000-0000-0000-000000000000",
+    }
+    return jwt.encode(payload, os.environ["AUTH_JWT_SECRET"], algorithm=os.environ["AUTH_JWT_ALGORITHM"])
 
 
 def load_scope_config() -> dict:
@@ -104,11 +125,11 @@ def test_contract_semantic_conformance(spec_path: Path):
                     if lower_key == "x-correlation-id":
                         continue
                     if lower_key == "authorization":
-                        headers[key] = "Bearer test-token"
+                        headers[key] = f"Bearer {_build_token()}"
                     elif isinstance(value, str) and value.isascii():
                         headers[key] = value
             if operation.security._parameters and "Authorization" not in headers:
-                headers["Authorization"] = "Bearer test-token"
+                headers["Authorization"] = f"Bearer {_build_token()}"
             case.headers.update(headers)
             case.headers = dict(case.headers)
             if operation.security._parameters:
@@ -209,7 +230,7 @@ def test_attribution_revenue_realtime_happy_path():
         "/api/attribution/revenue/realtime",
         headers={
             "X-Correlation-ID": str(uuid.uuid4()),
-            "Authorization": "Bearer test-token",
+            "Authorization": f"Bearer {_build_token()}",
         },
     )
     
