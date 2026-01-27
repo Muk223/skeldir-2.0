@@ -57,6 +57,7 @@ paths:
                   - currency
                   - revenue_total
                   - verified
+                  - data_as_of
                 properties: &ref_3
                   tenant_id:
                     type: string
@@ -85,11 +86,9 @@ paths:
                     description: Whether revenue is verified through payment reconciliation
                     example: false
                   data_as_of:
-                    type:
-                      - string
-                      - 'null'
+                    type: string
                     format: date-time
-                    description: Timestamp of last successful upstream fetch (nullable during interim)
+                    description: Timestamp of last successful upstream fetch
                     example: '2026-01-26T12:00:00Z'
                   sources:
                     type: array

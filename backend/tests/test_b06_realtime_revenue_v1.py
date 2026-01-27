@@ -39,8 +39,7 @@ async def test_realtime_revenue_v1_response_shape():
     assert isinstance(body["revenue_total"], (int, float))
     assert isinstance(body["verified"], bool)
     assert "data_as_of" in body
-    if body["data_as_of"] is not None:
-        assert isinstance(body["data_as_of"], str)
+    assert isinstance(body["data_as_of"], str)
     assert "sources" in body
     assert isinstance(body["sources"], list)
 

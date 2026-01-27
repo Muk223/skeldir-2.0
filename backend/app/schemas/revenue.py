@@ -31,9 +31,9 @@ class RealtimeRevenueV1Response(BaseModel):
     """
     Whether revenue is verified through payment reconciliation
     """
-    data_as_of: Annotated[Optional[datetime], Field(example="2026-01-26T12:00:00Z")] = None
+    data_as_of: Annotated[datetime, Field(example="2026-01-26T12:00:00Z")]
     """
-    Timestamp of the last successful upstream data fetch (nullable during interim)
+    Timestamp of the last successful upstream data fetch
     """
     sources: Annotated[Optional[list[str]], Field(example=["meta", "google"])] = None
     """
