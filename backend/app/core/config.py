@@ -55,6 +55,20 @@ class Settings(BaseSettings):
         None, description="JWKS URL for JWT signature verification."
     )
 
+    # Platform Credentials (Phase 2)
+    PLATFORM_TOKEN_ENCRYPTION_KEY: Optional[str] = Field(
+        None,
+        description="Symmetric key for encrypting platform tokens at rest (pgcrypto).",
+    )
+    PLATFORM_TOKEN_KEY_ID: Optional[str] = Field(
+        None,
+        description="Identifier for the active platform token encryption key.",
+    )
+    PLATFORM_SUPPORTED_PLATFORMS: str = Field(
+        "google_ads,meta_ads,tiktok_ads,linkedin_ads,stripe,paypal,shopify,woocommerce",
+        description="Comma-separated list of supported platform identifiers.",
+    )
+
     # Application
     ENVIRONMENT: str = Field("development", description="Deployment environment")
     LOG_LEVEL: str = Field("INFO", description="Application log level")
@@ -181,13 +195,29 @@ class Settings(BaseSettings):
             raise ValueError("TENANT_API_KEY_HEADER cannot be empty")
         return value.strip()
 
-    @field_validator("AUTH_JWT_SECRET", "AUTH_JWT_ALGORITHM", "AUTH_JWT_ISSUER", "AUTH_JWT_AUDIENCE", "AUTH_JWT_JWKS_URL")
+    @field_validator(
+        "AUTH_JWT_SECRET",
+        "AUTH_JWT_ALGORITHM",
+        "AUTH_JWT_ISSUER",
+        "AUTH_JWT_AUDIENCE",
+        "AUTH_JWT_JWKS_URL",
+        "PLATFORM_TOKEN_ENCRYPTION_KEY",
+        "PLATFORM_TOKEN_KEY_ID",
+    )
     @classmethod
     def validate_optional_strings(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return None
         cleaned = value.strip()
         return cleaned or None
+
+    @field_validator("PLATFORM_SUPPORTED_PLATFORMS")
+    @classmethod
+    def validate_supported_platforms(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("PLATFORM_SUPPORTED_PLATFORMS cannot be empty")
+        return cleaned
 
     @field_validator("IDEMPOTENCY_CACHE_TTL")
     @classmethod

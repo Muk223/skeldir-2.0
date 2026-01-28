@@ -91,6 +91,77 @@ class ChannelAttribution(BaseModel):
     """
 
 
+class Platform(Enum):
+    """
+    Supported platform identifier
+    """
+
+    google_ads = 'google_ads'
+    meta_ads = 'meta_ads'
+    tiktok_ads = 'tiktok_ads'
+    linkedin_ads = 'linkedin_ads'
+    stripe = 'stripe'
+    paypal = 'paypal'
+    shopify = 'shopify'
+    woocommerce = 'woocommerce'
+
+
+class PlatformConnectionStatus(Enum):
+    """
+    Connection lifecycle state
+    """
+
+    pending = 'pending'
+    active = 'active'
+    disabled = 'disabled'
+
+
+class PlatformConnectionUpsertRequest(BaseModel):
+    platform: Platform
+    platform_account_id: Annotated[str, Field(description='Platform account identifier (e.g., Google Ads customer ID)')]
+    status: Optional[PlatformConnectionStatus] = None
+    metadata: Optional[dict] = None
+
+
+class PlatformConnectionResponse(BaseModel):
+    id: Annotated[str, Field(pattern=r'^[0-9a-fA-F-]{36}$')]
+    tenant_id: Annotated[str, Field(pattern=r'^[0-9a-fA-F-]{36}$')]
+    platform: Platform
+    platform_account_id: str
+    status: PlatformConnectionStatus
+    created_at: datetime
+    updated_at: datetime
+
+
+class PlatformCredentialUpsertRequest(BaseModel):
+    platform: Platform
+    platform_account_id: str
+    access_token: Annotated[str, Field(description='Access token (never returned once stored)')]
+    refresh_token: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    scope: Optional[str] = None
+    token_type: Optional[str] = None
+
+
+class PlatformCredentialStatus(Enum):
+    """
+    Credential storage status
+    """
+
+    stored = 'stored'
+    expired = 'expired'
+    missing = 'missing'
+
+
+class PlatformCredentialStatusResponse(BaseModel):
+    tenant_id: Annotated[str, Field(pattern=r'^[0-9a-fA-F-]{36}$')]
+    platform: Platform
+    platform_account_id: str
+    status: PlatformCredentialStatus
+    expires_at: Optional[datetime] = None
+    updated_at: datetime
+
+
 # Alias for CI compatibility (must be a class definition to match workflow grep pattern)
 class RealtimeRevenueResponse(RealtimeRevenueCounter):
     """Alias for RealtimeRevenueCounter to match CI expectations."""

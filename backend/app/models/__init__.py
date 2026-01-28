@@ -34,6 +34,8 @@ from app.models.llm import (
     LLMApiCall,
     LLMMonthlyCost,
 )
+from app.models.platform_connection import PlatformConnection
+from app.models.platform_credential import PlatformCredential
 
 __all__ = [
     "Base",
@@ -45,4 +47,6 @@ __all__ = [
     "LLMMonthlyCost",
     "Investigation",
     "BudgetOptimizationJob",
+    "PlatformConnection",
+    "PlatformCredential",
 ]

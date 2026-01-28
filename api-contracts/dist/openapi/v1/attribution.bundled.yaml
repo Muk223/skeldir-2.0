@@ -19,6 +19,8 @@ tags:
     description: Attribution and revenue tracking endpoints
   - name: LLM Explanation
     description: LLM-powered natural language explanations for attribution data
+  - name: Platform Connections
+    description: Tenant-scoped platform connection and credential management
 paths:
   /api/attribution/revenue/realtime:
     get:
@@ -510,6 +512,368 @@ paths:
       x-latency-requirement: 500ms
       x-cost-budget: 0.02
       x-complexity-score: 5
+  /api/attribution/platform-connections:
+    post:
+      summary: Create or update a platform connection
+      description: |
+        Binds a tenant to a platform account identifier and stores the connection state.
+        This is Phase 2 substrate only; no outbound platform calls occur here.
+      operationId: upsertPlatformConnection
+      tags:
+        - Platform Connections
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: *ref_2
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: *ref_3
+          description: Bearer token for authentication (format - Bearer <token>)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - platform
+                - platform_account_id
+              properties:
+                platform:
+                  type: string
+                  description: Supported platform identifier
+                  enum:
+                    - google_ads
+                    - meta_ads
+                    - tiktok_ads
+                    - linkedin_ads
+                    - stripe
+                    - paypal
+                    - shopify
+                    - woocommerce
+                platform_account_id:
+                  type: string
+                  description: Platform account identifier (e.g., Google Ads customer ID)
+                status:
+                  type: string
+                  description: Connection lifecycle state
+                  enum:
+                    - pending
+                    - active
+                    - disabled
+                metadata:
+                  type: object
+                  additionalProperties: true
+                  description: Optional non-PII metadata for the connection
+      responses:
+        '200':
+          description: Platform connection stored
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - tenant_id
+                  - platform
+                  - platform_account_id
+                  - status
+                  - created_at
+                  - updated_at
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  tenant_id:
+                    type: string
+                    format: uuid
+                  platform:
+                    type: string
+                    description: Supported platform identifier
+                    enum:
+                      - google_ads
+                      - meta_ads
+                      - tiktok_ads
+                      - linkedin_ads
+                      - stripe
+                      - paypal
+                      - shopify
+                      - woocommerce
+                  platform_account_id:
+                    type: string
+                  status:
+                    type: string
+                    description: Connection lifecycle state
+                    enum:
+                      - pending
+                      - active
+                      - disabled
+                  created_at:
+                    type: string
+                    format: date-time
+                  updated_at:
+                    type: string
+                    format: date-time
+        '400':
+          description: Bad Request - validation failed
+          headers: *ref_4
+          content: *ref_5
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: *ref_4
+          content: *ref_5
+        '500':
+          description: Internal server error
+          headers: *ref_6
+          content: *ref_7
+  /api/attribution/platform-connections/{platform}:
+    get:
+      summary: Get platform connection status
+      description: |
+        Returns the connection status for a tenant and platform.
+      operationId: getPlatformConnection
+      tags:
+        - Platform Connections
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: *ref_2
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: *ref_3
+          description: Bearer token for authentication (format - Bearer <token>)
+        - name: platform
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Supported platform identifier
+            enum:
+              - google_ads
+              - meta_ads
+              - tiktok_ads
+              - linkedin_ads
+              - stripe
+              - paypal
+              - shopify
+              - woocommerce
+          description: Platform identifier
+        - name: platform_account_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional platform account ID filter
+      responses:
+        '200':
+          description: Platform connection status
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - id
+                  - tenant_id
+                  - platform
+                  - platform_account_id
+                  - status
+                  - created_at
+                  - updated_at
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  tenant_id:
+                    type: string
+                    format: uuid
+                  platform:
+                    type: string
+                    description: Supported platform identifier
+                    enum:
+                      - google_ads
+                      - meta_ads
+                      - tiktok_ads
+                      - linkedin_ads
+                      - stripe
+                      - paypal
+                      - shopify
+                      - woocommerce
+                  platform_account_id:
+                    type: string
+                  status:
+                    type: string
+                    description: Connection lifecycle state
+                    enum:
+                      - pending
+                      - active
+                      - disabled
+                  created_at:
+                    type: string
+                    format: date-time
+                  updated_at:
+                    type: string
+                    format: date-time
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: *ref_4
+          content: *ref_5
+        '404':
+          description: Resource not found
+          headers: *ref_17
+          content: *ref_18
+        '500':
+          description: Internal server error
+          headers: *ref_6
+          content: *ref_7
+  /api/attribution/platform-credentials:
+    post:
+      summary: Store or update platform credentials
+      description: |
+        Stores platform access/refresh tokens for a tenant and connection.
+        Tokens are encrypted at rest and never returned.
+      operationId: upsertPlatformCredentials
+      tags:
+        - Platform Connections
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: X-Correlation-ID
+          in: header
+          required: true
+          schema: *ref_2
+          description: Unique request correlation ID for distributed tracing
+        - name: Authorization
+          in: header
+          required: true
+          schema: *ref_3
+          description: Bearer token for authentication (format - Bearer <token>)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - platform
+                - platform_account_id
+                - access_token
+              properties:
+                platform:
+                  type: string
+                  description: Supported platform identifier
+                  enum:
+                    - google_ads
+                    - meta_ads
+                    - tiktok_ads
+                    - linkedin_ads
+                    - stripe
+                    - paypal
+                    - shopify
+                    - woocommerce
+                platform_account_id:
+                  type: string
+                access_token:
+                  type: string
+                  description: Access token (never returned once stored)
+                refresh_token:
+                  type: string
+                  nullable: true
+                expires_at:
+                  type: string
+                  format: date-time
+                  nullable: true
+                scope:
+                  type: string
+                  nullable: true
+                token_type:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Platform credentials stored
+          headers:
+            X-Correlation-ID:
+              schema:
+                type: string
+                format: uuid
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - tenant_id
+                  - platform
+                  - platform_account_id
+                  - status
+                  - updated_at
+                properties:
+                  tenant_id:
+                    type: string
+                    format: uuid
+                  platform:
+                    type: string
+                    description: Supported platform identifier
+                    enum:
+                      - google_ads
+                      - meta_ads
+                      - tiktok_ads
+                      - linkedin_ads
+                      - stripe
+                      - paypal
+                      - shopify
+                      - woocommerce
+                  platform_account_id:
+                    type: string
+                  status:
+                    type: string
+                    description: Credential storage status
+                    enum:
+                      - stored
+                      - expired
+                      - missing
+                  expires_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  updated_at:
+                    type: string
+                    format: date-time
+        '400':
+          description: Bad Request - validation failed
+          headers: *ref_4
+          content: *ref_5
+        '401':
+          description: Unauthorized - invalid or missing authentication
+          headers: *ref_4
+          content: *ref_5
+        '404':
+          description: Resource not found
+          headers: *ref_17
+          content: *ref_18
+        '500':
+          description: Internal server error
+          headers: *ref_6
+          content: *ref_7
 components:
   schemas:
     RealtimeRevenueCounter:
