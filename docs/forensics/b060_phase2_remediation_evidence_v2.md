@@ -2,8 +2,9 @@
 
 Date: 2026-01-28
 
-## Commit SHA
-- ab3cd8651b8b6f760691a9691900f52f81b319e3
+## Commit SHAs
+- Implementation SHA: ab3cd8651b8b6f760691a9691900f52f81b319e3
+- Evidence SHA: 62b43708e8f67ce04f4f48a610f5f725dd0b5b1a
 
 ## CI Run (green)
 - https://github.com/Muk223/skeldir-2.0/actions/runs/21445442097
