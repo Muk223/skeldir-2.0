@@ -5,7 +5,7 @@ Repo: C:\Users\ayewhy\II SKELDIR II
 
 ## SHAs
 - Before: 09048cb1af81886c7138cf898ed0f4d765756fb6
-- After: (pending commit)
+- After: 60f4f6e2228c62998735801da1421e76683e8af0 (merge commit for PR #33)
 
 ## Migration
 - ID: 202601281230
@@ -16,7 +16,7 @@ Repo: C:\Users\ayewhy\II SKELDIR II
 
 ## Cache + Singleflight Substrate
 - Service: backend/app/services/realtime_revenue_cache.py
-- Locking: pg_try_advisory_lock with deterministic 64-bit key (tenant_id + cache_key)
+- Locking: pg_try_advisory_xact_lock with deterministic 64-bit key (tenant_id + cache_key)
 - Follower behavior: poll until cache fresh or timeout
 - Failure cooldown: error_cooldown_until + Retry-After on 503
 
@@ -46,9 +46,19 @@ python -m pytest backend/tests/test_b060_phase3_realtime_revenue_cache.py -v
 ```
 
 ## Actions Evidence
-- Run URL: (pending)
-- Logs: (pending)
+- Run URL (CI, required checks): https://github.com/Muk223/skeldir-2.0/actions/runs/21452308598
+- Run URL (Contract Artifacts CI): https://github.com/Muk223/skeldir-2.0/actions/runs/21452308636
+- Logs (CI run 21452308598):
+  - Validate Migrations: success (job 61784100181)
+  - Phase Gates (B0.6): success (job 61784132283)
+  - Test Backend: success (job 61784100108)
+  - Validate Contracts: success (job 61784100107)
+  - Governance Guardrails: success (job 61784100125)
+- Logs (Contract Artifacts run 21452308636):
+  - Contract Integrity Tests (Mocks vs Contracts): success (job 61784130804)
+  - Provider Contract Tests (Implementation vs Contracts): success (job 61784130827)
 
 ## Docs Updated
 - docs/forensics/b06_realtime_revenue_context_pack.md
 - docs/forensics/b060_phase3_context_delta_notes.md
+- docs/forensics/INDEX.md
