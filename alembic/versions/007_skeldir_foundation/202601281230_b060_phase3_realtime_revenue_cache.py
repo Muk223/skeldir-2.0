@@ -92,5 +92,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute(
-        "DROP TABLE IF EXISTS revenue_cache_entries CASCADE"
-    )  # CI:DESTRUCTIVE_OK - Downgrade rollback
+        "DROP TABLE IF EXISTS revenue_cache_entries CASCADE; -- CI:DESTRUCTIVE_OK - See docs/database/RUNBOOK-MIGRATION-POLICY.md"
+    )
