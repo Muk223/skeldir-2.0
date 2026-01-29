@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { BusinessEmailInput } from '../signup/BusinessEmailInput';
 import { GoogleOAuthButton } from '../signup/GoogleOAuthButton';
@@ -8,6 +9,7 @@ import { MicrosoftOAuthButton } from '../signup/MicrosoftOAuthButton';
 import { ArrowRight, Loader2 } from 'lucide-react';
 
 export function LoginForm() {
+    const router = useRouter();
     const [email, setEmail] = useState('');
     const [isValid, setIsValid] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -90,7 +92,8 @@ export function LoginForm() {
                     )}
 
                     <Button
-                        type="submit"
+                        type="button"
+                        onClick={() => router.push('/book-demo')}
                         disabled={!isValid || isLoading}
                         className="w-full h-12 text-white font-semibold transition-all duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
                         style={{

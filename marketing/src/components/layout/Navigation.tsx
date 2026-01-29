@@ -9,7 +9,7 @@ import { useState, useEffect } from "react";
 const navLinks = [
   { href: "/product", label: "Product" },
   { href: "/pricing", label: "Pricing" },
-  { href: "#agencies", label: "Agencies" },
+  { href: "/agencies", label: "Agencies" },
   { href: "/resources", label: "Resources" },
 ];
 
@@ -31,10 +31,13 @@ export function Navigation({ forceVisible = false }: { forceVisible?: boolean })
 
   return (
     <header
-      className="fixed top-0 z-[9999] w-full border-b border-gray-200/40 backdrop-blur-md pb-2 transition-all duration-300"
+      className="fixed top-0 z-[9999] w-full pb-2 transition-all duration-300"
       style={{
-        backgroundColor: isVisible ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.2)',
-        boxShadow: isVisible ? '0 4px 20px rgba(0, 0, 0, 0.1)' : 'none',
+        // Visible state (scrolled or forceVisible): solid + blur + subtle border
+        backgroundColor: isVisible ? "rgba(255, 255, 255, 0.95)" : "transparent",
+        boxShadow: isVisible ? "0 4px 20px rgba(0, 0, 0, 0.1)" : "none",
+        borderBottom: isVisible ? "1px solid rgba(229, 231, 235, 0.4)" : "none",
+        backdropFilter: isVisible ? "blur(12px)" : "none",
       }}
     >
       <nav className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
@@ -56,15 +59,23 @@ export function Navigation({ forceVisible = false }: { forceVisible?: boolean })
             <Link
               key={link.href}
               href={link.href}
-              className="text-sm font-medium transition-colors"
+              className="text-[15px] font-semibold transition-all px-3 py-2 rounded-lg"
               style={{
                 color: isVisible ? '#1E293B' : '#FFFFFF',
+                backgroundColor: 'transparent',
+                transform: 'translateY(0px)',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.color = isVisible ? '#2563EB' : '#93C5FD';
+                e.currentTarget.style.backgroundColor = isVisible
+                  ? 'rgba(37, 99, 235, 0.08)'
+                  : 'rgba(255, 255, 255, 0.12)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.color = isVisible ? '#1E293B' : '#FFFFFF';
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.transform = 'translateY(0px)';
               }}
             >
               {link.label}
@@ -75,16 +86,24 @@ export function Navigation({ forceVisible = false }: { forceVisible?: boolean })
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-4">
           <Link
-            href="http://localhost:3002/Login"
-            className="text-sm font-medium transition-colors"
+            href="/Login"
+            className="text-[15px] font-semibold transition-all px-3 py-2 rounded-lg"
             style={{
               color: isVisible ? '#1E293B' : '#FFFFFF',
+              backgroundColor: 'transparent',
+              transform: 'translateY(0px)',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.color = isVisible ? '#2563EB' : '#93C5FD';
+              e.currentTarget.style.backgroundColor = isVisible
+                ? 'rgba(37, 99, 235, 0.08)'
+                : 'rgba(255, 255, 255, 0.12)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.color = isVisible ? '#1E293B' : '#FFFFFF';
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.transform = 'translateY(0px)';
             }}
           >
             Login
@@ -287,7 +306,7 @@ export function Navigation({ forceVisible = false }: { forceVisible?: boolean })
             ))}
             <div className="pt-4 border-t border-gray-200 space-y-3 mt-4">
               <Link
-                href="http://localhost:3002/Login"
+                href="/Login"
                 className="mobile-menu-link block text-sm font-medium text-gray-700 transition-colors hover:text-blue-600"
                 style={{
                   minHeight: '44px',

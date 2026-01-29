@@ -126,7 +126,7 @@ export function FinalCTA() {
             Get Started  $149/mo
           </a>
           <a
-            href="/pricing"
+            href="/book-demo"
             style={{
               display: "inline-flex",
               alignItems: "center",

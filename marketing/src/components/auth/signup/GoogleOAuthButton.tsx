@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -9,9 +10,10 @@ interface GoogleOAuthButtonProps extends React.ButtonHTMLAttributes<HTMLButtonEl
 }
 
 export function GoogleOAuthButton({ className, ...props }: GoogleOAuthButtonProps) {
-    const handleGoogleLogin = () => {
-        // Direct navigation to backend OAuth endpoint
-        window.location.href = '/api/v1/auth/google';
+    const router = useRouter();
+
+    const handleClick = () => {
+        router.push('/book-demo');
     };
 
     return (
@@ -22,7 +24,7 @@ export function GoogleOAuthButton({ className, ...props }: GoogleOAuthButtonProp
                 "w-full h-12 bg-white hover:bg-gray-50 text-gray-900 border-gray-300 hover:border-gray-400 transition-all font-medium flex items-center justify-center gap-2",
                 className
             )}
-            onClick={handleGoogleLogin}
+            onClick={handleClick}
             {...props}
         >
             <svg className="h-5 w-5" viewBox="0 0 24 24">

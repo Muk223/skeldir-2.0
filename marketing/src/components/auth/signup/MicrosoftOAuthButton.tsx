@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -9,9 +10,10 @@ interface MicrosoftOAuthButtonProps extends React.ButtonHTMLAttributes<HTMLButto
 }
 
 export function MicrosoftOAuthButton({ className, ...props }: MicrosoftOAuthButtonProps) {
-    const handleMicrosoftLogin = () => {
-        // Direct navigation to backend OAuth endpoint
-        window.location.href = '/api/v1/auth/microsoft';
+    const router = useRouter();
+
+    const handleClick = () => {
+        router.push('/book-demo');
     };
 
     return (
@@ -22,7 +24,7 @@ export function MicrosoftOAuthButton({ className, ...props }: MicrosoftOAuthButt
                 "w-full h-12 bg-white hover:bg-gray-50 text-gray-900 border-gray-300 hover:border-gray-400 transition-all font-medium flex items-center justify-center gap-2",
                 className
             )}
-            onClick={handleMicrosoftLogin}
+            onClick={handleClick}
             {...props}
         >
             <svg className="h-5 w-5" viewBox="0 0 23 23" fill="none">

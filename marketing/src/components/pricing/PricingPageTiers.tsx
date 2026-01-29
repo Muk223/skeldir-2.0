@@ -57,7 +57,7 @@ function Card1() {
     const benefits = ["Spot inflated or misleading performance numbers", "Stop making decisions based on bad data", "Save 10\u201315 hours per week on reporting"];
 
     const handleAction = () => {
-        router.push(`/signup?tier=free`);
+        router.push('/signup');
     };
 
     return (
@@ -111,11 +111,7 @@ function Card2() {
     const benefits = ["Reduce wasted ad spend", "Move money with more confidence", "Justify decisions with clear evidence"];
 
     const handleAction = () => {
-        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            alert("Please enter a valid email address");
-            return;
-        }
-        router.push(`/contact?tier=plus&email=${encodeURIComponent(email)}`);
+        router.push('/book-demo');
     };
 
     return (
@@ -190,11 +186,7 @@ function Card3() {
     const benefits = ["Reduce operational overhead", "Standardize reporting across teams or clients", "Rely on Skeldir as core infrastructure"];
 
     const handleAction = () => {
-        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            alert("Please enter a valid email address");
-            return;
-        }
-        router.push(`/contact?tier=enterprise&email=${encodeURIComponent(email)}`);
+        router.push('/book-demo');
     };
 
     return (
