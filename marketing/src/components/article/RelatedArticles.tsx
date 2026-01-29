@@ -157,7 +157,7 @@ function CTACard() {
 
             {/* CTA Button */}
             <Link
-                href="/signup"
+                href="/book-demo"
                 className="relative z-10 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all duration-200 group mt-6 w-full sm:w-auto"
                 style={{
                     backgroundColor: "#FFFFFF",

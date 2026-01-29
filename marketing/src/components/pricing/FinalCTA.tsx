@@ -21,7 +21,7 @@ export function FinalCTA() {
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                     {/* Primary Button */}
                     <Link
-                        href="/signup?tier=starter"
+                        href="/signup"
                         style={{
                             display: "inline-flex",
                             flexDirection: "column",
@@ -59,7 +59,7 @@ export function FinalCTA() {
 
                     {/* Secondary Button */}
                     <Link
-                        href="/contact-sales?source=pricing_footer"
+                        href="/book-demo"
                         className="flex items-center justify-center bg-white border border-gray-200 text-slate-700 rounded-lg px-8 py-3.5 min-w-[200px] h-[66px] sm:h-auto transition-all duration-200 hover:bg-gray-50 hover:border-gray-300 hover:text-slate-900 font-semibold shadow-sm"
                     >
                         Contact Sales

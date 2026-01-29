@@ -55,7 +55,7 @@ export function HeroSection() {
                   Get Started
                 </Button>
               </Link>
-              <Link href="/pricing" className="hero-cta-link-secondary">
+              <Link href="/book-demo" className="hero-cta-link-secondary">
                 <Button
                   className="transition-all hero-cta-button hero-cta-button-secondary"
                   style={{
@@ -107,7 +107,7 @@ export function HeroSection() {
             >
               <div className="overflow-hidden rounded-2xl">
                 <Image
-                  src="/images/Channel Comparison Demo image 10 .png"
+                  src="/images/Channel Comp IOS 3.png"
                   alt="Channel Comparison Dashboard"
                   width={950}
                   height={713}

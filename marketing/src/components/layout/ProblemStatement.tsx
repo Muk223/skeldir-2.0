@@ -162,10 +162,11 @@ function ProblemCard({ icon, headline, metric, metricColor, body }: ProblemCardP
       className="problem-card"
       style={{
         padding: "40px",
-        border: "1px solid #E9ECEF",
-        borderRadius: "12px",
-        boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-        backgroundColor: "#FFFFFF",
+        // Remove the "card" container so content appears to float
+        border: "none",
+        borderRadius: "0px",
+        boxShadow: "none",
+        backgroundColor: "transparent",
         display: "flex",
         flexDirection: "column",
         height: "100%",
@@ -323,6 +324,11 @@ export function ProblemStatement() {
 
             .problem-card {
               padding: 24px !important;
+              /* Bring back containers on mobile for organization */
+              background-color: #ffffff !important;
+              border: 1px solid #E9ECEF !important;
+              border-radius: 12px !important;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
             }
 
             .problem-card h3 {
