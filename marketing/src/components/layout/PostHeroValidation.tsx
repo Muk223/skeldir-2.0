@@ -79,9 +79,9 @@ export function PostHeroValidation() {
       <div
         className="phv-stats-row"
         style={{
-          maxWidth: "1400px",
+          maxWidth: "87.5rem",
           margin: "0 auto",
-          padding: "56px 48px",
+          padding: "3.5rem 3rem",
         }}
       >
         <div className="phv-stats-grid">
@@ -94,7 +94,7 @@ export function PostHeroValidation() {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                gap: "12px",
+                gap: "0.75rem",
               }}
             >
               <h3
@@ -121,7 +121,7 @@ export function PostHeroValidation() {
                   lineHeight: 1.6,
                   color: "#4B5563",
                   margin: 0,
-                  maxWidth: "280px",
+                  maxWidth: "17.5rem",
                 }}
               >
                 {stat.secondary}
@@ -135,9 +135,9 @@ export function PostHeroValidation() {
       <div
         className="phv-testimonial-wrapper"
         style={{
-          maxWidth: "900px",
+          maxWidth: "56.25rem",
           margin: "0 auto",
-          padding: "72px 48px",
+          padding: "4.5rem 3rem",
           textAlign: "center",
           position: "relative",
         }}
@@ -148,11 +148,11 @@ export function PostHeroValidation() {
           className="phv-quote-mark"
           style={{
             fontFamily: FONT_SERIF,
-            fontSize: "120px",
+            fontSize: "7.5rem",
             lineHeight: 1,
             color: "rgba(17, 24, 39, 0.08)",
             position: "absolute",
-            top: "28px",
+            top: "1.75rem",
             left: "0",
             userSelect: "none",
             pointerEvents: "none",
@@ -191,7 +191,7 @@ export function PostHeroValidation() {
             fontWeight: 600,
             fontSize: "1rem",
             color: "#111827",
-            marginTop: "24px",
+            marginTop: "1.5rem",
             marginBottom: 0,
           }}
         >
@@ -362,7 +362,7 @@ export function PostHeroValidation() {
                       display: "flex",
                       flexDirection: "column",
                       alignItems: "center",
-                      gap: "12px",
+                      gap: "0.75rem",
                       opacity: 0.7,
                     }}
                   >
@@ -500,19 +500,19 @@ export function PostHeroValidation() {
 
           /* Keep stats header high in viewport and tighten vertical rhythm */
           .phv-stats-row {
-            padding-top: 40px !important;
-            padding-bottom: 28px !important;
+            padding-top: 2.5rem !important;
+            padding-bottom: 1.75rem !important;
           }
 
           .phv-testimonial-wrapper {
-            padding-top: 44px !important;
-            padding-bottom: 36px !important;
+            padding-top: 2.75rem !important;
+            padding-bottom: 2.25rem !important;
           }
 
           /* Let feature cards peek above the fold */
           .phv-features-wrapper {
-            padding-top: 24px !important;
-            padding-bottom: 40px !important;
+            padding-top: 1.5rem !important;
+            padding-bottom: 2.5rem !important;
           }
 
           /* Slightly tighten typography for above-fold fit */
@@ -526,22 +526,22 @@ export function PostHeroValidation() {
           }
           .phv-features-header {
             font-size: 1.85rem !important;
-            margin-bottom: 32px !important;
+            margin-bottom: 2rem !important;
           }
 
           /* Reduce internal spacing so cards start sooner */
           .phv-features-wrapper > .phv-features-header {
-            margin-bottom: 28px !important;
+            margin-bottom: 1.75rem !important;
           }
           .phv-cards-grid {
-            gap: 20px !important;
+            gap: 1.25rem !important;
           }
         }
 
         /* ===== Tablet: 768px – 1023px ===== */
         @media (max-width: 1023px) {
           .phv-stats-row {
-            padding: 48px 32px !important;
+            padding: 3rem 2rem !important;
           }
 
           .phv-stat-primary {
@@ -553,7 +553,7 @@ export function PostHeroValidation() {
           }
 
           .phv-testimonial-wrapper {
-            padding: 56px 32px !important;
+            padding: 3.5rem 2rem !important;
           }
 
           .phv-quote-text {
@@ -562,22 +562,22 @@ export function PostHeroValidation() {
           }
 
           .phv-quote-mark {
-            font-size: 80px !important;
-            top: 18px !important;
+            font-size: 5rem !important;
+            top: 1.125rem !important;
           }
 
           .phv-features-wrapper {
-            padding: 0 32px 56px !important;
+            padding: 0 2rem 3.5rem !important;
           }
 
           .phv-features-header {
             font-size: 2rem !important;
-            margin-bottom: 48px !important;
+            margin-bottom: 3rem !important;
           }
 
           .phv-cards-grid {
             grid-template-columns: 1fr !important;
-            max-width: 600px;
+            max-width: 37.5rem;
             margin: 0 auto;
           }
         }
@@ -585,12 +585,12 @@ export function PostHeroValidation() {
         /* ===== Mobile: <768px ===== */
         @media (max-width: 767px) {
           .phv-stats-row {
-            padding: 40px 20px !important;
+            padding: 2.5rem 1.25rem !important;
           }
 
           .phv-stats-grid {
             grid-template-columns: repeat(2, 1fr) !important;
-            gap: 32px 24px !important;
+            gap: 2rem 1.5rem !important;
           }
 
           .phv-stat-primary {
@@ -599,11 +599,11 @@ export function PostHeroValidation() {
 
           .phv-stat-secondary {
             font-size: 0.875rem !important;
-            max-width: 200px !important;
+            max-width: 12.5rem !important;
           }
 
           .phv-testimonial-wrapper {
-            padding: 44px 20px !important;
+            padding: 2.75rem 1.25rem !important;
           }
 
           .phv-quote-text {
@@ -619,31 +619,31 @@ export function PostHeroValidation() {
           }
 
           .phv-quote-mark {
-            font-size: 64px !important;
-            top: 14px !important;
-            left: 4px !important;
+            font-size: 4rem !important;
+            top: 0.875rem !important;
+            left: 0.25rem !important;
           }
 
           .phv-features-wrapper {
-            padding: 0 16px 44px !important;
+            padding: 0 1rem 2.75rem !important;
           }
 
           .phv-features-header {
             font-size: 1.625rem !important;
-            margin-bottom: 32px !important;
+            margin-bottom: 2rem !important;
           }
 
           .phv-cards-grid {
             grid-template-columns: 1fr !important;
-            gap: 24px !important;
+            gap: 1.5rem !important;
           }
 
           .phv-card-mockup {
-            height: 180px !important;
+            height: 11.25rem !important;
           }
 
           .phv-cta-button {
-            padding: 14px 24px !important;
+            padding: 0.875rem 1.5rem !important;
             font-size: 0.9375rem !important;
           }
         }

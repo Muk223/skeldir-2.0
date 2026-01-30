@@ -29,10 +29,10 @@ function BookDemoContent() {
         <section
           className="book-demo-hero-section"
           style={{
-            minHeight: "calc(100vh - 80px)",
+            minHeight: "calc(100vh - 5rem)",
             display: "flex",
             alignItems: "flex-start",
-            paddingTop: "40px",
+            paddingTop: "2.5rem",
             background: "linear-gradient(135deg, #F8FAFC 0%, #FFFFFF 50%, #F1F5F9 100%)",
             position: "relative",
             overflow: "hidden",
@@ -47,7 +47,7 @@ function BookDemoContent() {
               right: 0,
               bottom: 0,
               backgroundImage: `radial-gradient(circle at 1px 1px, rgba(0,0,0,0.03) 1px, transparent 0)`,
-              backgroundSize: "40px 40px",
+              backgroundSize: "2.5rem 2.5rem",
               pointerEvents: "none",
             }}
           />
@@ -55,7 +55,7 @@ function BookDemoContent() {
           <div
             className="book-demo-container container mx-auto px-4 md:px-6 lg:px-8"
             style={{
-              maxWidth: "1280px",
+              maxWidth: "80rem",
               position: "relative",
               zIndex: 1,
             }}
@@ -65,16 +65,16 @@ function BookDemoContent() {
               style={{
                 display: "grid",
                 gridTemplateColumns: "1fr",
-                gap: "48px",
+                gap: "3rem",
                 alignItems: "center",
-                padding: "20px 0 80px",
+                padding: "1.25rem 0 5rem",
               }}
             >
               {/* Left Column - Value Proposition */}
               <div
                 className="value-prop-column"
                 style={{
-                  maxWidth: "560px",
+                  maxWidth: "35rem",
                 }}
               >
                 {/* Badge — button style, transparent except border and text */}
@@ -83,18 +83,18 @@ function BookDemoContent() {
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    height: "52px",
-                    padding: "0 24px",
+                    height: "3.25rem",
+                    padding: "0 1.5rem",
                     backgroundColor: "transparent",
                     border: "1px solid #2563EB",
-                    borderRadius: "10px",
-                    marginBottom: "24px",
+                    borderRadius: "0.625rem",
+                    marginBottom: "1.5rem",
                     marginLeft: "-10vw",
                   }}
                 >
                   <span
                     style={{
-                      fontSize: "16px",
+                      fontSize: "1rem",
                       fontWeight: 700,
                       color: "#2563EB",
                       fontFamily: "Inter, sans-serif",
@@ -107,11 +107,11 @@ function BookDemoContent() {
                 {/* Main Headline — exactly 2 lines, no wrapping within either line */}
                 <h1
                   style={{
-                    fontSize: "clamp(36px, 6.5vw, 56px)",
+                    fontSize: "clamp(2.25rem, 6.5vw, 3.5rem)",
                     fontWeight: 800,
                     color: "#0F172A",
                     lineHeight: 1.12,
-                    marginBottom: "24px",
+                    marginBottom: "1.5rem",
                     marginLeft: "-10vw",
                     fontFamily: "'DM Sans', sans-serif",
                     letterSpacing: "-0.03em",
@@ -127,7 +127,7 @@ function BookDemoContent() {
                   {/* Subheadline */}
                   <p
                     style={{
-                      fontSize: "18px",
+                      fontSize: "1.125rem",
                       fontWeight: 400,
                       color: "#64748B",
                       lineHeight: 1.6,
@@ -144,11 +144,11 @@ function BookDemoContent() {
                     style={{
                       display: "flex",
                       flexDirection: "column",
-                      gap: "10px",
-                      margin: "0 0 48px 0",
+                      gap: "0.625rem",
+                      margin: "0 0 3rem 0",
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "0.625rem" }}>
                       <svg width="20" height="20" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0, marginTop: "2px" }}>
                         <defs>
                           <linearGradient id="book-demo-arrow-1" x1="0%" y1="0%" x2="100%" y2="100%" gradientUnits="userSpaceOnUse">
@@ -159,11 +159,11 @@ function BookDemoContent() {
                         </defs>
                         <path d="M4 3L8 6L4 9" stroke="url(#book-demo-arrow-1)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                       </svg>
-                      <span style={{ fontSize: "18px", lineHeight: 1.45, color: "#4B5563", fontFamily: "Inter, sans-serif" }}>
+                      <span style={{ fontSize: "1.125rem", lineHeight: 1.45, color: "#4B5563", fontFamily: "Inter, sans-serif" }}>
                         Know which ads actually drive revenue, not just clicks
                       </span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "0.625rem" }}>
                       <svg width="20" height="20" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0, marginTop: "2px" }}>
                         <defs>
                           <linearGradient id="book-demo-arrow-2" x1="0%" y1="0%" x2="100%" y2="100%" gradientUnits="userSpaceOnUse">
@@ -174,11 +174,11 @@ function BookDemoContent() {
                         </defs>
                         <path d="M4 3L8 6L4 9" stroke="url(#book-demo-arrow-2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                       </svg>
-                      <span style={{ fontSize: "18px", lineHeight: 1.45, color: "#4B5563", fontFamily: "Inter, sans-serif" }}>
+                      <span style={{ fontSize: "1.125rem", lineHeight: 1.45, color: "#4B5563", fontFamily: "Inter, sans-serif" }}>
                         One dashboard to manage all your clients without technical expertise
                       </span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "0.625rem" }}>
                       <svg width="20" height="20" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0, marginTop: "2px" }}>
                         <defs>
                           <linearGradient id="book-demo-arrow-3" x1="0%" y1="0%" x2="100%" y2="100%" gradientUnits="userSpaceOnUse">
@@ -189,11 +189,11 @@ function BookDemoContent() {
                         </defs>
                         <path d="M4 3L8 6L4 9" stroke="url(#book-demo-arrow-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                       </svg>
-                      <span style={{ fontSize: "18px", lineHeight: 1.45, color: "#4B5563", fontFamily: "Inter, sans-serif" }}>
+                      <span style={{ fontSize: "1.125rem", lineHeight: 1.45, color: "#4B5563", fontFamily: "Inter, sans-serif" }}>
                         Reliable numbers backed by your actual sales data
                       </span>
                     </div>
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "0.625rem" }}>
                       <svg width="20" height="20" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0, marginTop: "2px" }}>
                         <defs>
                           <linearGradient id="book-demo-arrow-4" x1="0%" y1="0%" x2="100%" y2="100%" gradientUnits="userSpaceOnUse">
@@ -204,7 +204,7 @@ function BookDemoContent() {
                         </defs>
                         <path d="M4 3L8 6L4 9" stroke="url(#book-demo-arrow-4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                       </svg>
-                      <span style={{ fontSize: "18px", lineHeight: 1.45, color: "#4B5563", fontFamily: "Inter, sans-serif" }}>
+                      <span style={{ fontSize: "1.125rem", lineHeight: 1.45, color: "#4B5563", fontFamily: "Inter, sans-serif" }}>
                         Deploy for new clients faster than your competitors can send a proposal
                       </span>
                     </div>
@@ -229,7 +229,7 @@ function BookDemoContent() {
                             style={{
                               height: logo.height,
                               width: "auto",
-                              maxWidth: "140px",
+                              maxWidth: "8.75rem",
                               objectFit: "contain",
                               filter: "grayscale(100%)",
                               opacity: 0.7,
@@ -248,15 +248,15 @@ function BookDemoContent() {
                 className="form-column"
                 style={{
                   width: "100%",
-                  maxWidth: "480px",
+                  maxWidth: "30rem",
                   justifySelf: "end",
                 }}
               >
                 <div
                   style={{
                     backgroundColor: "rgba(255, 255, 255, 0.35)",
-                    borderRadius: "20px",
-                    padding: "40px",
+                    borderRadius: "1.25rem",
+                    padding: "2.5rem",
                     boxShadow: "0 2px 12px rgba(0, 0, 0, 0.03)",
                     border: "1px solid rgba(0, 0, 0, 0.06)",
                     backdropFilter: "blur(8px)",
@@ -267,29 +267,29 @@ function BookDemoContent() {
                     <div
                       style={{
                         textAlign: "center",
-                        padding: "40px 20px",
+                        padding: "2.5rem 1.25rem",
                       }}
                     >
                       <div
                         style={{
-                          width: "72px",
-                          height: "72px",
+                          width: "4.5rem",
+                          height: "4.5rem",
                           backgroundColor: "rgba(34, 197, 94, 0.1)",
                           borderRadius: "50%",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          margin: "0 auto 24px",
+                          margin: "0 auto 1.5rem",
                         }}
                       >
                         <CheckCircle2 size={36} color="#22C55E" />
                       </div>
                       <h2
                         style={{
-                          fontSize: "24px",
+                          fontSize: "1.5rem",
                           fontWeight: 700,
                           color: "#0F172A",
-                          marginBottom: "12px",
+                          marginBottom: "0.75rem",
                           fontFamily: "'DM Sans', sans-serif",
                         }}
                       >
@@ -297,10 +297,10 @@ function BookDemoContent() {
                       </h2>
                       <p
                         style={{
-                          fontSize: "16px",
+                          fontSize: "1rem",
                           color: "#64748B",
                           lineHeight: 1.6,
-                          marginBottom: "32px",
+                          marginBottom: "2rem",
                           fontFamily: "Inter, sans-serif",
                         }}
                       >
@@ -309,15 +309,15 @@ function BookDemoContent() {
                       </p>
                       <div
                         style={{
-                          padding: "16px 20px",
+                          padding: "1rem 1.25rem",
                           backgroundColor: "#F8FAFC",
-                          borderRadius: "12px",
+                          borderRadius: "0.75rem",
                           border: "1px solid #E2E8F0",
                         }}
                       >
                         <p
                           style={{
-                            fontSize: "14px",
+                            fontSize: "0.875rem",
                             color: "#64748B",
                             fontFamily: "Inter, sans-serif",
                           }}
@@ -327,7 +327,7 @@ function BookDemoContent() {
                         <a
                           href="mailto:info@synergyscape.io"
                           style={{
-                            fontSize: "15px",
+                            fontSize: "0.9375rem",
                             fontWeight: 600,
                             color: "#2563EB",
                             textDecoration: "none",
@@ -342,13 +342,13 @@ function BookDemoContent() {
                     /* Form State */
                     <>
                       {/* Form Header */}
-                      <div style={{ marginBottom: "32px" }}>
+                      <div style={{ marginBottom: "2rem" }}>
                         <h2
                           style={{
-                            fontSize: "24px",
+                            fontSize: "1.5rem",
                             fontWeight: 700,
                             color: "#0F172A",
-                            marginBottom: "8px",
+                            marginBottom: "0.5rem",
                             fontFamily: "'DM Sans', sans-serif",
                           }}
                         >
@@ -356,7 +356,7 @@ function BookDemoContent() {
                         </h2>
                         <p
                           style={{
-                            fontSize: "15px",
+                            fontSize: "0.9375rem",
                             color: "#64748B",
                             fontFamily: "Inter, sans-serif",
                           }}
@@ -389,8 +389,8 @@ function BookDemoContent() {
                           style={{
                             display: "grid",
                             gridTemplateColumns: "1fr 1fr",
-                            gap: "16px",
-                            marginBottom: "16px",
+                            gap: "1rem",
+                            marginBottom: "1rem",
                           }}
                         >
                           {/* First Name */}
@@ -399,10 +399,10 @@ function BookDemoContent() {
                               htmlFor="first-name"
                               style={{
                                 display: "block",
-                                fontSize: "14px",
+                                fontSize: "0.875rem",
                                 fontWeight: 500,
                                 color: "#374151",
-                                marginBottom: "6px",
+                                marginBottom: "0.375rem",
                                 fontFamily: "Inter, sans-serif",
                               }}
                             >
@@ -416,12 +416,12 @@ function BookDemoContent() {
                               placeholder="Jane"
                               style={{
                                 width: "100%",
-                                height: "46px",
-                                padding: "0 14px",
-                                fontSize: "15px",
+                                height: "2.875rem",
+                                padding: "0 0.875rem",
+                                fontSize: "0.9375rem",
                                 fontFamily: "Inter, sans-serif",
                                 border: "1px solid #D1D5DB",
-                                borderRadius: "8px",
+                                borderRadius: "0.5rem",
                                 backgroundColor: "#FFFFFF",
                                 color: "#0F172A",
                                 outline: "none",
@@ -444,10 +444,10 @@ function BookDemoContent() {
                               htmlFor="last-name"
                               style={{
                                 display: "block",
-                                fontSize: "14px",
+                                fontSize: "0.875rem",
                                 fontWeight: 500,
                                 color: "#374151",
-                                marginBottom: "6px",
+                                marginBottom: "0.375rem",
                                 fontFamily: "Inter, sans-serif",
                               }}
                             >
@@ -461,12 +461,12 @@ function BookDemoContent() {
                               placeholder="Smith"
                               style={{
                                 width: "100%",
-                                height: "46px",
-                                padding: "0 14px",
-                                fontSize: "15px",
+                                height: "2.875rem",
+                                padding: "0 0.875rem",
+                                fontSize: "0.9375rem",
                                 fontFamily: "Inter, sans-serif",
                                 border: "1px solid #D1D5DB",
-                                borderRadius: "8px",
+                                borderRadius: "0.5rem",
                                 backgroundColor: "#FFFFFF",
                                 color: "#0F172A",
                                 outline: "none",
@@ -490,7 +490,7 @@ function BookDemoContent() {
                             htmlFor="work-email"
                             style={{
                               display: "block",
-                              fontSize: "14px",
+                              fontSize: "0.875rem",
                               fontWeight: 500,
                               color: "#374151",
                               marginBottom: "6px",
@@ -507,9 +507,9 @@ function BookDemoContent() {
                             placeholder="jane@company.com"
                             style={{
                               width: "100%",
-                              height: "46px",
-                              padding: "0 14px",
-                              fontSize: "15px",
+                              height: "2.875rem",
+                              padding: "0 0.875rem",
+                              fontSize: "0.9375rem",
                               fontFamily: "Inter, sans-serif",
                               border: "1px solid #D1D5DB",
                               borderRadius: "8px",
@@ -535,7 +535,7 @@ function BookDemoContent() {
                             htmlFor="company-name"
                             style={{
                               display: "block",
-                              fontSize: "14px",
+                              fontSize: "0.875rem",
                               fontWeight: 500,
                               color: "#374151",
                               marginBottom: "6px",
@@ -552,9 +552,9 @@ function BookDemoContent() {
                             placeholder="Acme Inc."
                             style={{
                               width: "100%",
-                              height: "46px",
-                              padding: "0 14px",
-                              fontSize: "15px",
+                              height: "2.875rem",
+                              padding: "0 0.875rem",
+                              fontSize: "0.9375rem",
                               fontFamily: "Inter, sans-serif",
                               border: "1px solid #D1D5DB",
                               borderRadius: "8px",
@@ -580,7 +580,7 @@ function BookDemoContent() {
                             htmlFor="monthly-ad-spend"
                             style={{
                               display: "block",
-                              fontSize: "14px",
+                              fontSize: "0.875rem",
                               fontWeight: 500,
                               color: "#374151",
                               marginBottom: "6px",
@@ -596,9 +596,9 @@ function BookDemoContent() {
                             defaultValue=""
                             style={{
                               width: "100%",
-                              height: "46px",
-                              padding: "0 14px",
-                              fontSize: "15px",
+                              height: "2.875rem",
+                              padding: "0 0.875rem",
+                              fontSize: "0.9375rem",
                               fontFamily: "Inter, sans-serif",
                               border: "1px solid #D1D5DB",
                               borderRadius: "8px",
@@ -609,8 +609,8 @@ function BookDemoContent() {
                               appearance: "none",
                               backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
                               backgroundRepeat: "no-repeat",
-                              backgroundPosition: "right 14px center",
-                              paddingRight: "40px",
+                              backgroundPosition: "right 0.875rem center",
+                              paddingRight: "2.5rem",
                               transition: "border-color 150ms ease, box-shadow 150ms ease",
                             }}
                             onFocus={(e) => {
@@ -638,7 +638,7 @@ function BookDemoContent() {
                             htmlFor="attribution-challenge"
                             style={{
                               display: "block",
-                              fontSize: "14px",
+                              fontSize: "0.875rem",
                               fontWeight: 500,
                               color: "#374151",
                               marginBottom: "6px",
@@ -654,9 +654,9 @@ function BookDemoContent() {
                             defaultValue=""
                             style={{
                               width: "100%",
-                              height: "46px",
-                              padding: "0 14px",
-                              fontSize: "15px",
+                              height: "2.875rem",
+                              padding: "0 0.875rem",
+                              fontSize: "0.9375rem",
                               fontFamily: "Inter, sans-serif",
                               border: "1px solid #D1D5DB",
                               borderRadius: "8px",
@@ -667,8 +667,8 @@ function BookDemoContent() {
                               appearance: "none",
                               backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
                               backgroundRepeat: "no-repeat",
-                              backgroundPosition: "right 14px center",
-                              paddingRight: "40px",
+                              backgroundPosition: "right 0.875rem center",
+                              paddingRight: "2.5rem",
                               transition: "border-color 150ms ease, box-shadow 150ms ease",
                             }}
                             onFocus={(e) => {
@@ -691,12 +691,12 @@ function BookDemoContent() {
                         </div>
 
                         {/* Referral Source */}
-                        <div style={{ marginBottom: "28px" }}>
+                        <div style={{ marginBottom: "1.75rem" }}>
                           <label
                             htmlFor="referral-source"
                             style={{
                               display: "block",
-                              fontSize: "14px",
+                              fontSize: "0.875rem",
                               fontWeight: 500,
                               color: "#374151",
                               marginBottom: "6px",
@@ -712,9 +712,9 @@ function BookDemoContent() {
                             defaultValue=""
                             style={{
                               width: "100%",
-                              height: "46px",
-                              padding: "0 14px",
-                              fontSize: "15px",
+                              height: "2.875rem",
+                              padding: "0 0.875rem",
+                              fontSize: "0.9375rem",
                               fontFamily: "Inter, sans-serif",
                               border: "1px solid #D1D5DB",
                               borderRadius: "8px",
@@ -725,8 +725,8 @@ function BookDemoContent() {
                               appearance: "none",
                               backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
                               backgroundRepeat: "no-repeat",
-                              backgroundPosition: "right 14px center",
-                              paddingRight: "40px",
+                              backgroundPosition: "right 0.875rem center",
+                              paddingRight: "2.5rem",
                               transition: "border-color 150ms ease, box-shadow 150ms ease",
                             }}
                             onFocus={(e) => {
@@ -752,14 +752,14 @@ function BookDemoContent() {
                           type="submit"
                           style={{
                             width: "100%",
-                            height: "52px",
+                            height: "3.25rem",
                             backgroundColor: "#2563EB",
                             color: "#FFFFFF",
-                            fontSize: "16px",
+                            fontSize: "1rem",
                             fontWeight: 700,
                             fontFamily: "Inter, sans-serif",
                             border: "none",
-                            borderRadius: "10px",
+                            borderRadius: "0.625rem",
                             cursor: "pointer",
                             boxShadow: "0 4px 14px rgba(37, 99, 235, 0.35)",
                             transition: "all 200ms ease",
@@ -784,10 +784,10 @@ function BookDemoContent() {
                         {/* Privacy Note */}
                         <p
                           style={{
-                            fontSize: "12px",
+                            fontSize: "0.75rem",
                             color: "#94A3B8",
                             textAlign: "center",
-                            marginTop: "16px",
+                            marginTop: "1rem",
                             fontFamily: "Inter, sans-serif",
                             lineHeight: 1.5,
                           }}
@@ -838,8 +838,8 @@ function BookDemoContent() {
         @media (min-width: 1024px) {
           .book-demo-grid {
             grid-template-columns: 55% 45% !important;
-            gap: 64px !important;
-            padding: 20px 0 100px !important;
+            gap: 4rem !important;
+            padding: 1.25rem 0 6.25rem !important;
           }
 
           .value-prop-column {
@@ -847,7 +847,7 @@ function BookDemoContent() {
           }
 
           .form-column {
-            max-width: 480px !important;
+            max-width: 30rem !important;
             justify-self: end !important;
           }
         }
@@ -863,8 +863,8 @@ function BookDemoContent() {
         @media (min-width: 768px) and (max-width: 1023px) {
           .book-demo-grid {
             grid-template-columns: 1fr !important;
-            gap: 48px !important;
-            padding: 20px 0 80px !important;
+            gap: 3rem !important;
+            padding: 1.25rem 0 5rem !important;
           }
 
           .value-prop-column {
@@ -878,7 +878,7 @@ function BookDemoContent() {
           }
 
           .book-demo-bullets {
-            max-width: 500px !important;
+            max-width: 31.25rem !important;
             margin-left: auto !important;
             margin-right: auto !important;
           }
@@ -897,14 +897,14 @@ function BookDemoContent() {
         /* Mobile (≤767px) — aligned with rest of site */
         @media (max-width: 767px) {
           .book-demo-hero-section {
-            padding-top: 48px !important;
+            padding-top: 3rem !important;
             min-height: auto !important;
             align-items: flex-start !important;
           }
 
           .book-demo-container {
-            padding-left: 16px !important;
-            padding-right: 16px !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
           }
 
           .book-demo-grid {
@@ -948,8 +948,8 @@ function BookDemoContent() {
           }
 
           .form-column > div {
-            padding: 24px 16px !important;
-            border-radius: 16px !important;
+            padding: 1.5rem 1rem !important;
+            border-radius: 1rem !important;
           }
 
           /* Stack name fields on mobile */
@@ -987,8 +987,8 @@ export default function BookDemoPage() {
         <div className="min-h-screen flex items-center justify-center bg-white">
           <div
             style={{
-              width: "40px",
-              height: "40px",
+              width: "2.5rem",
+              height: "2.5rem",
               border: "3px solid #E5E7EB",
               borderTopColor: "#2563EB",
               borderRadius: "50%",

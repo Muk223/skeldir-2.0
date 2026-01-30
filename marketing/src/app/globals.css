@@ -48,6 +48,8 @@
 }
 
 :root {
+  /* Single lever for viewport density: 1 = default, <1 = zoom out (more content in viewport). */
+  --ui-viewport-scale: 0.9;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -125,8 +127,13 @@
     outline: none !important;
     box-shadow: none !important;
   }
+  /* Scaled root: all rem-based layout and type shrink uniformly so more fits in viewport. */
+  html {
+    font-size: calc(16px * var(--ui-viewport-scale));
+  }
   body {
     @apply bg-background text-foreground;
+    font-size: 1rem;
   }
 }
 
@@ -149,9 +156,8 @@
       overflow-wrap: break-word;
     }
 
-    /* Prevent text from being too small */
+    /* Preserve scaled size; avoid browser zoom overrides. */
     body {
-      font-size: 16px;
       -webkit-text-size-adjust: 100%;
       -moz-text-size-adjust: 100%;
       text-size-adjust: 100%;

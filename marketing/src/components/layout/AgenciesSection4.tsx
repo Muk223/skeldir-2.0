@@ -93,13 +93,13 @@ export function AgenciesSection4() {
       <div
         className="s4-upper-container"
         style={{
-          maxWidth: "1280px",
+          maxWidth: "80rem",
           margin: "0 auto",
-          padding: "96px 48px 72px",
+          padding: "6rem 3rem 4.5rem",
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
           alignItems: "center",
-          gap: "64px",
+          gap: "4rem",
         }}
       >
         {/* LEFT COLUMN: Laptop Mockup */}
@@ -522,7 +522,7 @@ export function AgenciesSection4() {
         @media (min-width: 1440px) {
           .s4-upper-container {
             max-width: 1400px !important;
-            padding: 112px 64px 80px !important;
+            padding: 7rem 4rem 5rem !important;
           }
           .s4-headline {
             font-size: 2.75rem !important;
@@ -546,8 +546,8 @@ export function AgenciesSection4() {
         @media (min-width: 768px) and (max-width: 1023px) {
           .s4-upper-container {
             grid-template-columns: 2fr 3fr !important;
-            padding: 72px 32px 56px !important;
-            gap: 40px !important;
+            padding: 4.5rem 2rem 3.5rem !important;
+            gap: 2.5rem !important;
           }
           .s4-headline {
             font-size: 2rem !important;
@@ -556,7 +556,7 @@ export function AgenciesSection4() {
             font-size: 1rem !important;
           }
           .s4-lower-container {
-            padding: 56px 32px 72px !important;
+            padding: 3.5rem 2rem 4.5rem !important;
           }
           .s4-playbook-heading {
             font-size: 1.75rem !important;
@@ -576,8 +576,8 @@ export function AgenciesSection4() {
         @media (max-width: 767px) {
           .s4-upper-container {
             grid-template-columns: 1fr !important;
-            padding: 64px 24px 48px !important;
-            gap: 36px !important;
+            padding: 4rem 1.5rem 3rem !important;
+            gap: 2.25rem !important;
           }
           .s4-image-col {
             order: 1 !important;
@@ -602,7 +602,7 @@ export function AgenciesSection4() {
             max-width: 100% !important;
           }
           .s4-lower-container {
-            padding: 48px 24px 64px !important;
+            padding: 3rem 1.5rem 4rem !important;
           }
           .s4-playbook-heading {
             font-size: 1.5rem !important;
@@ -625,8 +625,8 @@ export function AgenciesSection4() {
         /* ===== Very small screens: <375px ===== */
         @media (max-width: 374px) {
           .s4-upper-container {
-            padding: 48px 16px 40px !important;
-            gap: 28px !important;
+            padding: 3rem 1rem 2.5rem !important;
+            gap: 1.75rem !important;
           }
           .s4-headline {
             font-size: 1.625rem !important;
@@ -635,7 +635,7 @@ export function AgenciesSection4() {
             font-size: 0.9375rem !important;
           }
           .s4-lower-container {
-            padding: 40px 16px 56px !important;
+            padding: 2.5rem 1rem 3.5rem !important;
           }
           .s4-playbook-heading {
             font-size: 1.375rem !important;

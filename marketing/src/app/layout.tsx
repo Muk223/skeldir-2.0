@@ -29,6 +29,9 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Preload hero background images so they are fetched early and ready before hero paint */}
+        <link rel="preload" as="image" href="/images/Background-2.png" />
+        <link rel="preload" as="image" href="/images/Background%202%20Agencies.png" />
       </head>
       <body className={`${dmSans.variable} ${playfairDisplay.variable} font-sans antialiased`}>
         {children}

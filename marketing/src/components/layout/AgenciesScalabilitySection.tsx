@@ -27,13 +27,13 @@ export function AgenciesScalabilitySection() {
       <div
         className="scalability-container"
         style={{
-          maxWidth: "1280px",
+          maxWidth: "80rem",
           margin: "0 auto",
-          padding: "96px 48px",
+          padding: "6rem 3rem",
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
           alignItems: "center",
-          gap: "64px",
+          gap: "4rem",
         }}
       >
         {/* ─── LEFT COLUMN: Text Stack ─── */}
@@ -71,7 +71,7 @@ export function AgenciesScalabilitySection() {
               lineHeight: 1.15,
               letterSpacing: "-0.025em",
               color: "#1A1A1A",
-              margin: "0 0 24px 0",
+              margin: "0 0 1.5rem 0",
             }}
           >
             Grow client portfolios with unified Bayesian attribution
@@ -105,7 +105,7 @@ export function AgenciesScalabilitySection() {
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: "12px",
+                gap: "0.75rem",
                 fontFamily: FONT_SANS,
                 fontSize: "1rem",
                 fontWeight: 600,
@@ -198,7 +198,7 @@ export function AgenciesScalabilitySection() {
         @media (min-width: 1440px) {
           .scalability-container {
             max-width: 1400px !important;
-            padding: 112px 64px !important;
+            padding: 7rem 4rem !important;
           }
           .scalability-headline {
             font-size: 2.75rem !important;
@@ -219,8 +219,8 @@ export function AgenciesScalabilitySection() {
         @media (min-width: 768px) and (max-width: 1023px) {
           .scalability-container {
             grid-template-columns: 1.4fr 1fr !important;
-            padding: 72px 32px !important;
-            gap: 40px !important;
+            padding: 4.5rem 2rem !important;
+            gap: 2.5rem !important;
           }
           .scalability-headline {
             font-size: 2rem !important;
@@ -237,8 +237,8 @@ export function AgenciesScalabilitySection() {
         @media (max-width: 767px) {
           .scalability-container {
             grid-template-columns: 1fr !important;
-            padding: 64px 24px !important;
-            gap: 48px !important;
+            padding: 4rem 1.5rem !important;
+            gap: 3rem !important;
           }
           .scalability-text {
             order: 2 !important;
@@ -267,8 +267,8 @@ export function AgenciesScalabilitySection() {
         /* ===== Very small screens: <375px ===== */
         @media (max-width: 374px) {
           .scalability-container {
-            padding: 48px 16px !important;
-            gap: 36px !important;
+            padding: 3rem 1rem !important;
+            gap: 2.25rem !important;
           }
           .scalability-headline {
             font-size: 1.625rem !important;
