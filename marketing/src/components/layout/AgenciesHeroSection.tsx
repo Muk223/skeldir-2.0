@@ -2,42 +2,59 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useHeroBackgroundPreload } from "@/hooks/useHeroBackgroundPreload";
+
+const AGENCIES_HERO_IMAGE = "/images/Background 2 Agencies.png";
+const AGENCIES_HERO_FALLBACK_COLOR = "#1e293b";
 
 export function AgenciesHeroSection() {
+  const { isReady } = useHeroBackgroundPreload(AGENCIES_HERO_IMAGE);
+
   return (
     <section
       className="agencies-hero"
       aria-labelledby="agencies-hero-heading"
       style={{
-        position: 'relative',
-        width: '100%',
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        // Use a quoted URL so the space in the filename is valid CSS
-        backgroundImage: 'url(\"/images/Background 2 Agencies.png\")',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        overflow: 'hidden',
-        paddingTop: '96px',
-        paddingBottom: '48px',
+        position: "relative",
+        width: "100%",
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        ["--agencies-hero-zoom" as string]: "0.82",
+        backgroundImage: isReady ? `url("${AGENCIES_HERO_IMAGE}")` : undefined,
+        backgroundColor: AGENCIES_HERO_FALLBACK_COLOR,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        overflow: "hidden",
+        paddingTop: "6rem",
+        paddingBottom: "3rem",
       }}
     >
+      {/* Exaggerated zoom-out for Agencies hero only: scaled content so more viewport/background is visible */}
+      <div
+        className="agencies-hero-scaled"
+        style={{
+          width: '100%',
+          maxWidth: '80rem',
+          margin: '0 auto',
+          padding: '0 1rem',
+          transform: 'scale(var(--agencies-hero-zoom, 0.82))',
+          transformOrigin: 'center center',
+        }}
+      >
       <div
         className="agencies-hero-container"
         style={{
           width: '100%',
-          maxWidth: '1280px',
-          margin: '0 auto',
-          padding: '0 16px',
         }}
       >
         <div
           style={{
             display: 'grid',
             gridTemplateColumns: '1fr',
-            gap: '48px',
+            gap: '3rem',
             alignItems: 'center',
           }}
           className="agencies-hero-grid"
@@ -50,7 +67,7 @@ export function AgenciesHeroSection() {
               flexDirection: 'column',
               justifyContent: 'center',
               textAlign: 'center',
-              marginTop: '-200px',
+              marginTop: '-12.5rem',
               marginLeft: '-10%',
             }}
           >
@@ -59,12 +76,12 @@ export function AgenciesHeroSection() {
             className="agencies-hero-headline"
             style={{
               fontFamily: "'DM Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-              fontSize: '56px',
+              fontSize: '3.5rem',
               fontWeight: 700,
               lineHeight: 1.15,
               letterSpacing: '-0.025em',
               color: '#111827',
-              margin: '0 0 32px 0',
+              margin: '0 0 2rem 0',
             }}
           >
             <span style={{ color: '#FFFFFF' }}>Enterprise Attribution Intelligence Without</span> Enterprise Complexity
@@ -74,12 +91,12 @@ export function AgenciesHeroSection() {
             className="agencies-hero-subheadline"
             style={{
               fontFamily: "'DM Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-              fontSize: '20px',
+              fontSize: '1.25rem',
               fontWeight: 400,
               lineHeight: 1.6,
               color: '#FFFFFF',
-              margin: '0 auto 32px auto',
-              maxWidth: '600px',
+              margin: '0 auto 2rem auto',
+              maxWidth: '37.5rem',
             }}
           >
             Skeldir delivers Bayesian confidence ranges for multi-client portfolios—exposing platform over-reporting discrepancies, eliminating manual reconciliation cycles, with deployment measured in days instead of months.
@@ -91,8 +108,8 @@ export function AgenciesHeroSection() {
             style={{
               display: 'flex',
               flexWrap: 'wrap',
-              gap: '12px',
-              margin: '0 0 32px 0',
+              gap: '0.75rem',
+              margin: '0 0 2rem 0',
             }}
           >
             {['Multi-tenant Dashboard', 'White-label Branding', 'REST API Access'].map((badge, index) => (
@@ -101,13 +118,13 @@ export function AgenciesHeroSection() {
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 16px',
+                  gap: '0.5rem',
+                  padding: '0.5rem 1rem',
                   borderRadius: '999px',
                   backgroundColor: '#FFFFFF',
                   border: '1px solid #E5E7EB',
                   fontFamily: "'DM Sans', 'Inter', sans-serif",
-                  fontSize: '14px',
+                  fontSize: '0.875rem',
                   fontWeight: 500,
                   color: '#374151',
                 }}
@@ -144,15 +161,15 @@ export function AgenciesHeroSection() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '0 32px',
-                height: '52px',
-                minWidth: '180px',
+                padding: '0 2rem',
+                height: '3.25rem',
+                minWidth: '11.25rem',
                 backgroundColor: '#2563EB',
                 color: '#FFFFFF',
                 fontFamily: "'DM Sans', 'Inter', sans-serif",
-                fontSize: '16px',
+                fontSize: '1rem',
                 fontWeight: 600,
-                borderRadius: '10px',
+                borderRadius: '0.625rem',
                 textDecoration: 'none',
                 boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
                 transition: 'all 200ms ease',
@@ -178,15 +195,15 @@ export function AgenciesHeroSection() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                minWidth: '160px',
-                height: '56px',
-                padding: '0 26px',
+                minWidth: '10rem',
+                height: '3.5rem',
+                padding: '0 1.625rem',
                 borderRadius: '999px',
                 border: '2px solid #000000',
                 color: '#000000',
                 background: 'transparent',
                 fontFamily: "'DM Sans', 'Inter', sans-serif",
-                fontSize: '16px',
+                fontSize: '1rem',
                 fontWeight: 600,
                 textDecoration: 'none',
                 cursor: 'pointer',
@@ -205,7 +222,7 @@ export function AgenciesHeroSection() {
         </div>
 
           {/* Right Column: Product Visual */}
-          <div className="relative mx-auto w-full max-w-[1600px] lg:ml-[45%] agencies-hero-visual" style={{ marginTop: '-250px' }}>
+          <div className="relative mx-auto w-full max-w-[1600px] lg:ml-[45%] agencies-hero-visual" style={{ marginTop: '-15.625rem' }}>
             <div 
               className="relative rounded-2xl overflow-visible agencies-hero-image-glass"
               style={{
@@ -231,6 +248,7 @@ export function AgenciesHeroSection() {
           </div>
         </div>
       </div>
+      </div>
 
       {/* Bottom gradient overlay for transition feel */}
       <div
@@ -241,7 +259,7 @@ export function AgenciesHeroSection() {
           bottom: 0,
           left: 0,
           right: 0,
-          height: '260px',
+          height: '16.25rem',
           background:
             'linear-gradient(to bottom, transparent 0%, transparent 40%, rgba(255, 255, 255, 0.4) 65%, rgba(255, 255, 255, 0.85) 85%, rgba(255, 255, 255, 1) 100%)',
           pointerEvents: 'none',
@@ -255,7 +273,7 @@ export function AgenciesHeroSection() {
         aria-hidden="true"
         style={{
           position: 'absolute',
-          bottom: '-120px',
+          bottom: '-7.5rem',
           left: 0,
           right: 0,
           lineHeight: 0,
@@ -269,7 +287,7 @@ export function AgenciesHeroSection() {
           style={{
             display: 'block',
             width: '100%',
-            height: '120px',
+            height: '7.5rem',
           }}
           xmlns="http://www.w3.org/2000/svg"
         >
@@ -287,7 +305,7 @@ export function AgenciesHeroSection() {
             transform: translateY(0px);
           }
           50% {
-            transform: translateY(-12px);
+            transform: translateY(-0.75rem);
           }
         }
         .agencies-hero-image-glass {
@@ -297,14 +315,14 @@ export function AgenciesHeroSection() {
         .agencies-hero-image-glass::after {
           content: '';
           position: absolute;
-          bottom: -25px;
+          bottom: -1.5625rem;
           left: 5%;
           right: 5%;
-          height: 50px;
+          height: 3.125rem;
           background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.1) 30%, rgba(0, 0, 0, 0.05) 50%, transparent 75%);
           border-radius: 50%;
           z-index: -1;
-          filter: blur(16px);
+          filter: blur(1rem);
           pointer-events: none;
           transform: scale(1.1);
         }
@@ -312,17 +330,17 @@ export function AgenciesHeroSection() {
         /* Desktop: 1024px+ — two columns with overlap like home page */
         @media (min-width: 1024px) {
           .agencies-hero-container {
-            padding: 0 24px !important;
+            padding: 0 1.5rem !important;
           }
           .agencies-hero-grid {
             grid-template-columns: 1fr 1fr !important;
-            gap: 48px !important;
+            gap: 3rem !important;
           }
           .agencies-hero-text {
             text-align: left !important;
-            padding-right: 32px !important;
+            padding-right: 2rem !important;
             margin-left: -35% !important;
-            margin-top: -200px !important;
+            margin-top: -12.5rem !important;
           }
           .agencies-hero-headline {
             text-align: left !important;
@@ -340,8 +358,8 @@ export function AgenciesHeroSection() {
           }
           .agencies-hero-visual {
             margin-left: 45% !important;
-            margin-top: -250px !important;
-            max-width: 1600px !important;
+            margin-top: -15.625rem !important;
+            max-width: 100rem !important;
           }
           .agencies-hero-image-glass {
             transform: scale(1.4) !important;
@@ -351,16 +369,16 @@ export function AgenciesHeroSection() {
         /* Tablet: 768px - 1023px — single column stacked, visual first */
         @media (min-width: 768px) and (max-width: 1023px) {
           .agencies-hero {
-            padding-top: 80px !important;
+            padding-top: 5rem !important;
             min-height: auto !important;
-            padding-bottom: 56px !important;
+            padding-bottom: 3.5rem !important;
           }
           .agencies-hero-container {
-            padding: 0 24px !important;
+            padding: 0 1.5rem !important;
           }
           .agencies-hero-grid {
             grid-template-columns: 1fr !important;
-            gap: 48px !important;
+            gap: 3rem !important;
           }
           .agencies-hero-text {
             order: 2 !important;
@@ -370,11 +388,11 @@ export function AgenciesHeroSection() {
             order: 1 !important;
           }
           .agencies-hero-headline {
-            font-size: 42px !important;
-            margin-bottom: 20px !important;
+            font-size: 2.625rem !important;
+            margin-bottom: 1.25rem !important;
           }
           .agencies-hero-subheadline {
-            font-size: 18px !important;
+            font-size: 1.125rem !important;
             max-width: 100% !important;
           }
           .agencies-hero-image-glass {
@@ -382,20 +400,24 @@ export function AgenciesHeroSection() {
           }
         }
 
-        /* Mobile: < 768px — Enterprise-grade mobile optimization */
+        /* Mobile: < 768px — Revert zoom/alignment so mobile stays as before (no scale) */
         @media (max-width: 767px) {
           .agencies-hero {
-            padding-top: 80px !important;
+            padding-top: 5rem !important;
             min-height: auto !important;
-            padding-bottom: 48px !important;
+            padding-bottom: 3rem !important;
+            justify-content: flex-start !important;
+          }
+          .agencies-hero-scaled {
+            transform: none !important;
           }
           .agencies-hero-container {
-            padding: 0 20px !important;
+            padding: 0 1.25rem !important;
             max-width: 100% !important;
           }
           .agencies-hero-grid {
             grid-template-columns: 1fr !important;
-            gap: 40px !important;
+            gap: 2.5rem !important;
             align-items: flex-start !important;
           }
           .agencies-hero-text {
@@ -416,37 +438,37 @@ export function AgenciesHeroSection() {
             padding: 0 !important;
           }
           .agencies-hero-headline {
-            font-size: 36px !important;
+            font-size: 2.25rem !important;
             line-height: 1.25 !important;
             letter-spacing: -0.03em !important;
             font-weight: 700 !important;
-            margin-bottom: 20px !important;
-            padding: 0 4px !important;
+            margin-bottom: 1.25rem !important;
+            padding: 0 0.25rem !important;
           }
           .agencies-hero-headline span {
             white-space: normal !important;
             display: inline !important;
           }
           .agencies-hero-subheadline {
-            font-size: 16px !important;
+            font-size: 1rem !important;
             line-height: 1.6 !important;
             max-width: 100% !important;
-            margin-bottom: 24px !important;
+            margin-bottom: 1.5rem !important;
             margin-left: auto !important;
             margin-right: auto !important;
-            padding: 0 4px !important;
+            padding: 0 0.25rem !important;
           }
           .agencies-hero-badges {
-            gap: 10px !important;
-            margin-bottom: 32px !important;
+            gap: 0.625rem !important;
+            margin-bottom: 2rem !important;
             justify-content: center !important;
-            padding: 0 4px !important;
+            padding: 0 0.25rem !important;
             flex-wrap: wrap !important;
           }
           .agencies-hero-badges span {
-            font-size: 13px !important;
-            padding: 10px 16px !important;
-            min-height: 40px !important;
+            font-size: 0.8125rem !important;
+            padding: 0.625rem 1rem !important;
+            min-height: 2.5rem !important;
             display: inline-flex !important;
             align-items: center !important;
           }
@@ -454,19 +476,19 @@ export function AgenciesHeroSection() {
             width: 100% !important;
             flex-direction: column !important;
             align-items: stretch !important;
-            padding: 0 4px !important;
-            gap: 12px !important;
+            padding: 0 0.25rem !important;
+            gap: 0.75rem !important;
           }
           .agencies-hero-cta-button,
           .agencies-hero-cta-button-secondary {
             width: 100% !important;
             min-width: unset !important;
-            height: 56px !important;
-            min-height: 56px !important;
-            font-size: 16px !important;
+            height: 3.5rem !important;
+            min-height: 3.5rem !important;
+            font-size: 1rem !important;
             font-weight: 600 !important;
-            padding: 0 24px !important;
-            border-radius: 12px !important;
+            padding: 0 1.5rem !important;
+            border-radius: 0.75rem !important;
           }
           .agencies-hero-cta-button {
             box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3) !important;
@@ -492,45 +514,45 @@ export function AgenciesHeroSection() {
         /* Very small screens: 320px - 374px — Enhanced readability */
         @media (max-width: 374px) {
           .agencies-hero-container {
-            padding: 0 16px !important;
+            padding: 0 1rem !important;
           }
           .agencies-hero-headline {
-            font-size: 32px !important;
+            font-size: 2rem !important;
             line-height: 1.2 !important;
-            margin-bottom: 16px !important;
+            margin-bottom: 1rem !important;
           }
           .agencies-hero-subheadline {
-            font-size: 15px !important;
+            font-size: 0.9375rem !important;
             line-height: 1.5 !important;
-            margin-bottom: 20px !important;
+            margin-bottom: 1.25rem !important;
           }
           .agencies-hero-badges {
             flex-direction: column !important;
             align-items: stretch !important;
-            gap: 8px !important;
+            gap: 0.5rem !important;
           }
           .agencies-hero-badges span {
             width: 100% !important;
             justify-content: center !important;
           }
           .agencies-hero-cta-button {
-            font-size: 15px !important;
-            padding: 0 20px !important;
+            font-size: 0.9375rem !important;
+            padding: 0 1.25rem !important;
           }
         }
 
         /* Large screens: 1440px+ */
         @media (min-width: 1440px) {
           .agencies-hero-container {
-            max-width: 1400px !important;
-            padding: 0 64px !important;
+            max-width: 87.5rem !important;
+            padding: 0 4rem !important;
           }
         }
 
         /* Ultra-wide screens: 2560px */
         @media (min-width: 2560px) {
           .agencies-hero-container {
-            max-width: 1600px !important;
+            max-width: 100rem !important;
           }
         }
       `}</style>

@@ -1,5 +1,6 @@
 import { Navigation } from "@/components/layout/Navigation";
 import { HeroSection } from "@/components/layout/HeroSection";
+import { HeroBackgroundGate } from "@/components/layout/HeroBackgroundGate";
 import { PartnerLogos } from "@/components/layout/PartnerLogos";
 import { ProblemStatement } from "@/components/layout/ProblemStatement";
 import { SolutionOverview } from "@/components/layout/SolutionOverview";
@@ -13,22 +14,13 @@ import { Footer } from "@/components/layout/Footer";
 export default function Home() {
   return (
     <main className="min-h-screen flex flex-col font-sans">
-      {/* Hero Section with Background - includes navigation area */}
-      <div
-        className="relative flex flex-col"
-        style={{
-          backgroundImage: 'url(/images/Background-2.png)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center top',
-          backgroundRepeat: 'no-repeat',
-          minHeight: '100vh'
-        }}
-      >
+      {/* Hero Section: background image gated until loaded to prevent roll-down effect */}
+      <HeroBackgroundGate>
         {/* Subtle overlay for text contrast (WCAG AA compliance) */}
         <div
           className="absolute inset-0 -z-10"
           style={{
-            backgroundColor: 'rgba(0, 0, 0, 0.15)'
+            backgroundColor: "rgba(0, 0, 0, 0.15)",
           }}
         />
 
@@ -84,7 +76,7 @@ export default function Home() {
             }
           `}</style>
         </section>
-      </div>
+      </HeroBackgroundGate>
 
       {/* Problem Statement Section */}
       <ProblemStatement />

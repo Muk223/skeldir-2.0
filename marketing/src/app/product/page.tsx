@@ -74,7 +74,7 @@ export default function ProductPage() {
           bottom: 0;
           left: 0;
           right: 0;
-          height: 150px;
+          height: 9.375rem;
           background: linear-gradient(to bottom, 
             transparent 0%,
             rgba(248, 250, 252, 0.2) 20%,
@@ -103,10 +103,10 @@ export default function ProductPage() {
           position: absolute;
           left: 1241px;
           top: 233px;
-          width: 700px;
+          width: 43.75rem;
           aspect-ratio: 1619 / 1080;
           background: #FFFFFF;
-          border-radius: 16px;
+          border-radius: 1rem;
           border: 1px solid rgba(15, 23, 42, 0.08);
           box-shadow:
             0 20px 60px rgba(15, 23, 42, 0.15),
@@ -161,8 +161,8 @@ export default function ProductPage() {
           left: 0;
           top: 50%;
           transform: translateY(-50%);
-          max-width: 620px;
-          padding: 0 0 0 120px;
+          max-width: 38.75rem;
+          padding: 0 0 0 7.5rem;
           z-index: 10;
         }
 
@@ -181,13 +181,13 @@ export default function ProductPage() {
             background-size: 1840px 900px;
           }
           .product-hero__text-column {
-            padding-left: 100px;
-            max-width: 500px;
+            padding-left: 6.25rem;
+            max-width: 31.25rem;
           }
           .product-hero__mockup-card {
             left: 1034px;
             top: 194px;
-            width: 583px;
+            width: 36.4375rem;
             aspect-ratio: 1619 / 1080;
           }
         }
@@ -204,16 +204,16 @@ export default function ProductPage() {
             background-size: 1656px 810px;
           }
           .product-hero__text-column {
-            padding-left: 80px;
-            max-width: 460px;
+            padding-left: 5rem;
+            max-width: 28.75rem;
           }
           .product-hero__text-column h1 {
-            font-size: 44px !important;
+            font-size: 2.75rem !important;
           }
           .product-hero__mockup-card {
             left: 930px;
             top: 175px;
-            width: 525px;
+            width: 32.8125rem;
             aspect-ratio: 1619 / 1080;
           }
         }
@@ -230,16 +230,16 @@ export default function ProductPage() {
             background-size: 1472px 720px;
           }
           .product-hero__text-column {
-            padding-left: 60px;
-            max-width: 420px;
+            padding-left: 3.75rem;
+            max-width: 26.25rem;
           }
           .product-hero__text-column h1 {
-            font-size: 40px !important;
+            font-size: 2.5rem !important;
           }
           .product-hero__mockup-card {
             left: 827px;
             top: 155px;
-            width: 467px;
+            width: 29.1875rem;
             aspect-ratio: 1619 / 1080;
           }
         }
@@ -296,44 +296,44 @@ export default function ProductPage() {
         /* Mobile */
         @media (max-width: 767px) {
           .product-hero-section {
-            padding: 100px 20px 60px 20px !important;
-            margin-top: 80px !important;
+            padding: 6.25rem 1.25rem 3.75rem 1.25rem !important;
+            margin-top: 5rem !important;
           }
           .product-hero__text-column {
             padding: 0 !important;
             max-width: 100% !important;
           }
           .product-hero__text-column h1 {
-            font-size: 32px !important;
+            font-size: 2rem !important;
             line-height: 1.25 !important;
-            margin-bottom: 20px !important;
+            margin-bottom: 1.25rem !important;
           }
           .product-hero__text-column p {
-            font-size: 16px !important;
+            font-size: 1rem !important;
             line-height: 1.5 !important;
-            margin-bottom: 20px !important;
+            margin-bottom: 1.25rem !important;
           }
           .product-hero__bullets {
-            margin-bottom: 24px !important;
+            margin-bottom: 1.5rem !important;
           }
           .product-hero__bullets > div {
-            margin-bottom: 8px !important;
+            margin-bottom: 0.5rem !important;
           }
           .product-hero__ctas {
             flex-direction: column !important;
-            gap: 12px !important;
+            gap: 0.75rem !important;
             width: 100% !important;
           }
           .product-hero__ctas button {
             width: 100% !important;
             max-width: 100% !important;
-            min-height: 48px !important;
+            min-height: 3rem !important;
           }
           .product-hero__mockup-card {
             width: 100% !important;
             max-width: 100% !important;
-            min-height: 300px !important;
-            margin-top: 32px !important;
+            min-height: 18.75rem !important;
+            margin-top: 2rem !important;
           }
         }
       `}</style>
@@ -349,13 +349,13 @@ export default function ProductPage() {
             <h1
               style={{
                 fontFamily: "'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                fontSize: "52px",
+                fontSize: "3.25rem",
                 fontWeight: 800,
                 lineHeight: 1.12,
                 letterSpacing: "-0.03em",
                 color: "#0F172A",
-                maxWidth: "760px",
-                margin: "0 0 24px 0",
+                maxWidth: "47.5rem",
+                margin: "0 0 1.5rem 0",
               }}
             >
               Verify Every Dollar of Ad Spend with Automated Attribution
@@ -364,12 +364,12 @@ export default function ProductPage() {
             {/* Body Paragraph */}
             <p
               style={{
-                fontSize: "18px",
+                fontSize: "1.125rem",
                 fontWeight: 400,
                 lineHeight: 1.55,
                 color: "#4B5563",
-                maxWidth: "640px",
-                margin: "0 0 24px 0",
+                maxWidth: "40rem",
+                margin: "0 0 1.5rem 0",
               }}
             >
               Stop guessing where your budget works. Skeldir connects all ad platforms, reconciles claimed revenue vs. verified revenue, and shows exactly which channels drive real growth.
@@ -381,12 +381,12 @@ export default function ProductPage() {
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: "10px",
-                margin: "0 0 28px 0",
+                gap: "0.625rem",
+                margin: "0 0 1.75rem 0",
               }}
             >
               {/* Bullet 1: Revenue Verification */}
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "0.625rem" }}>
                 <svg width="20" height="20" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0, marginTop: "2px" }}>
                   <defs>
                     <linearGradient id="arrowGradient" x1="0%" y1="0%" x2="100%" y2="100%" gradientUnits="userSpaceOnUse">
@@ -397,13 +397,13 @@ export default function ProductPage() {
                   </defs>
                   <path d="M4 3L8 6L4 9" stroke="url(#arrowGradient)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                 </svg>
-                <span style={{ fontSize: "16px", lineHeight: 1.45, color: "#4B5563" }}>
+                <span style={{ fontSize: "1rem", lineHeight: 1.45, color: "#4B5563" }}>
                   <strong style={{ color: "#111827", fontWeight: 600 }}>Revenue Verification</strong> – See platform-claimed vs. verified revenue side-by-side
                 </span>
               </div>
 
               {/* Bullet 2: Confidence Ranges */}
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "0.625rem" }}>
                 <svg width="20" height="20" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0, marginTop: "2px" }}>
                   <defs>
                     <linearGradient id="arrowGradient2" x1="0%" y1="0%" x2="100%" y2="100%" gradientUnits="userSpaceOnUse">
@@ -414,13 +414,13 @@ export default function ProductPage() {
                   </defs>
                   <path d="M4 3L8 6L4 9" stroke="url(#arrowGradient2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                 </svg>
-                <span style={{ fontSize: "16px", lineHeight: 1.45, color: "#4B5563" }}>
+                <span style={{ fontSize: "1rem", lineHeight: 1.45, color: "#4B5563" }}>
                   <strong style={{ color: "#111827", fontWeight: 600 }}>Confidence Ranges</strong> – Know exactly how certain your attribution model is
                 </span>
               </div>
 
               {/* Bullet 3: 48-Hour Deployment */}
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "0.625rem" }}>
                 <svg width="20" height="20" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0, marginTop: "2px" }}>
                   <defs>
                     <linearGradient id="arrowGradient3" x1="0%" y1="0%" x2="100%" y2="100%" gradientUnits="userSpaceOnUse">
@@ -431,14 +431,14 @@ export default function ProductPage() {
                   </defs>
                   <path d="M4 3L8 6L4 9" stroke="url(#arrowGradient3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                 </svg>
-                <span style={{ fontSize: "16px", lineHeight: 1.45, color: "#4B5563" }}>
+                <span style={{ fontSize: "1rem", lineHeight: 1.45, color: "#4B5563" }}>
                   <strong style={{ color: "#111827", fontWeight: 600 }}>48-Hour Deployment</strong> – Start analyzing without 6-month integration projects
                 </span>
               </div>
             </div>
 
             {/* CTA Row */}
-            <div className="product-hero__ctas" style={{ display: "flex", alignItems: "center", gap: "16px", marginTop: "4px" }}>
+            <div className="product-hero__ctas" style={{ display: "flex", alignItems: "center", gap: "1rem", marginTop: "0.25rem" }}>
               {/* Primary CTA */}
               <button
                 onClick={() => router.push('/signup')}
@@ -447,14 +447,14 @@ export default function ProductPage() {
                   flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
-                  minWidth: "220px",
-                  height: "56px",
-                  padding: "0 28px",
+                  minWidth: "13.75rem",
+                  height: "3.5rem",
+                  padding: "0 1.75rem",
                   borderRadius: "999px",
                   border: "none",
                   background: "#2563EB",
                   color: "#FFFFFF",
-                  fontSize: "16px",
+                  fontSize: "1rem",
                   fontWeight: 600,
                   boxShadow: "0 8px 24px rgba(37, 99, 235, 0.35)",
                   cursor: "pointer",
@@ -473,7 +473,7 @@ export default function ProductPage() {
                 }}
               >
                 Get started
-                <span style={{ fontSize: "14px", fontWeight: 500 }}>$149/mo</span>
+                <span style={{ fontSize: "0.875rem", fontWeight: 500 }}>$149/mo</span>
               </button>
 
               {/* Secondary CTA */}
@@ -483,14 +483,14 @@ export default function ProductPage() {
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  minWidth: "160px",
-                  height: "56px",
-                  padding: "0 26px",
+                  minWidth: "10rem",
+                  height: "3.5rem",
+                  padding: "0 1.625rem",
                   borderRadius: "999px",
                   border: "2px solid #2563EB",
                   color: "#2563EB",
                   background: "transparent",
-                  fontSize: "16px",
+                  fontSize: "1rem",
                   fontWeight: 600,
                   cursor: "pointer",
                   transition: "all 180ms ease-out",
@@ -523,7 +523,7 @@ export default function ProductPage() {
         style={{
           width: "100%",
           backgroundColor: "#F8FAFC",
-          padding: "100px 60px",
+          padding: "6.25rem 3.75rem",
           position: "relative",
         }}
       >
@@ -534,7 +534,7 @@ export default function ProductPage() {
             top: 0,
             left: 0,
             right: 0,
-            height: "150px",
+            height: "9.375rem",
             background: "linear-gradient(to bottom, rgba(248, 250, 252, 0) 0%, rgba(248, 250, 252, 0.3) 30%, rgba(248, 250, 252, 0.7) 60%, rgba(248, 250, 252, 0.95) 85%, #F8FAFC 100%)",
             pointerEvents: "none",
             zIndex: 1,
@@ -543,11 +543,11 @@ export default function ProductPage() {
         <div
           className="product-features-container"
           style={{
-            maxWidth: "1300px",
+            maxWidth: "81.25rem",
             margin: "0 auto",
             display: "grid",
-            gridTemplateColumns: "340px 1fr",
-            gap: "90px",
+            gridTemplateColumns: "21.25rem 1fr",
+            gap: "5.625rem",
             alignItems: "start",
             position: "relative",
             zIndex: 2,
@@ -581,16 +581,16 @@ export default function ProductPage() {
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(3, 1fr)",
-              gap: "54px",
+              gap: "3.375rem",
             }}
           >
             {/* Feature 1: Everything in one place */}
             <div className="product-feature-card">
               <div
                 style={{
-                  width: "30px",
-                  height: "30px",
-                  marginBottom: "18px",
+                  width: "1.875rem",
+                  height: "1.875rem",
+                  marginBottom: "1.125rem",
                 }}
               >
                 <svg
@@ -611,7 +611,7 @@ export default function ProductPage() {
                   fontSize: "1.125rem",
                   fontWeight: 500,
                   color: "#000000",
-                  marginBottom: "12px",
+                  marginBottom: "0.75rem",
                   fontFamily: "'SF Pro Display', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                   letterSpacing: "-0.01em",
                 }}
@@ -635,9 +635,9 @@ export default function ProductPage() {
             <div className="product-feature-card">
               <div
                 style={{
-                  width: "30px",
-                  height: "30px",
-                  marginBottom: "18px",
+                  width: "1.875rem",
+                  height: "1.875rem",
+                  marginBottom: "1.125rem",
                 }}
               >
                 <svg
@@ -662,7 +662,7 @@ export default function ProductPage() {
                   fontSize: "1.125rem",
                   fontWeight: 500,
                   color: "#000000",
-                  marginBottom: "12px",
+                  marginBottom: "0.75rem",
                   fontFamily: "'SF Pro Display', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                   letterSpacing: "-0.01em",
                 }}
@@ -686,9 +686,9 @@ export default function ProductPage() {
             <div className="product-feature-card">
               <div
                 style={{
-                  width: "36px",
-                  height: "30px",
-                  marginBottom: "18px",
+                  width: "2.25rem",
+                  height: "1.875rem",
+                  marginBottom: "1.125rem",
                 }}
               >
                 <svg
@@ -738,7 +738,7 @@ export default function ProductPage() {
                   fontSize: "1.125rem",
                   fontWeight: 500,
                   color: "#000000",
-                  marginBottom: "12px",
+                  marginBottom: "0.75rem",
                   fontFamily: "'SF Pro Display', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                   letterSpacing: "-0.01em",
                 }}
@@ -763,12 +763,12 @@ export default function ProductPage() {
         <style>{`
           @media (max-width: 1024px) {
             .product-features-section {
-              padding: 80px 40px !important;
+              padding: 5rem 2.5rem !important;
             }
             
             .product-features-container {
               grid-template-columns: 1fr !important;
-              gap: 48px !important;
+              gap: 3rem !important;
             }
             
             .product-features-heading {
@@ -781,20 +781,20 @@ export default function ProductPage() {
             
             .product-features-grid {
               grid-template-columns: 1fr !important;
-              gap: 40px !important;
+              gap: 2.5rem !important;
             }
           }
 
           @media (max-width: 767px) {
             .product-features-section {
-              padding: 60px 20px !important;
+              padding: 3.75rem 1.25rem !important;
               overflow-x: hidden !important;
             }
             
             .product-features-container {
               display: flex !important;
               flex-direction: column !important;
-              gap: 40px !important;
+              gap: 2.5rem !important;
               width: 100% !important;
               max-width: 100% !important;
               padding: 0 !important;
@@ -809,7 +809,7 @@ export default function ProductPage() {
             }
             
             .product-features-title {
-              font-size: 32px !important;
+              font-size: 2rem !important;
               line-height: 1.25 !important;
               text-align: center !important;
             }
@@ -817,7 +817,7 @@ export default function ProductPage() {
             .product-features-grid {
               display: flex !important;
               flex-direction: column !important;
-              gap: 32px !important;
+              gap: 2rem !important;
               width: 100% !important;
               max-width: 100% !important;
               padding: 0 !important;
@@ -835,13 +835,13 @@ export default function ProductPage() {
             }
             
             .product-feature-card h3 {
-              font-size: 18px !important;
+              font-size: 1.125rem !important;
               line-height: 1.4 !important;
-              margin-bottom: 12px !important;
+              margin-bottom: 0.75rem !important;
             }
             
             .product-feature-card p {
-              font-size: 15px !important;
+              font-size: 0.9375rem !important;
               line-height: 1.6 !important;
             }
           }
