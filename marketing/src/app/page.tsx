@@ -12,7 +12,7 @@ import { FinalCTA } from "@/components/layout/FinalCTA";
 import { Footer } from "@/components/layout/Footer";
 
 export const metadata: Metadata = {
-  
+  };
 
 export default function Home() {
   return (
