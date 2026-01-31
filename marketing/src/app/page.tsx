@@ -49,7 +49,7 @@ export default function Home() {
                       display: "block",
                       willChange: "transform",
                       opacity: 1,
-            ,
+          
             zIndex: 0,
           }}
         />
