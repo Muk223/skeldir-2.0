@@ -46,9 +46,7 @@ export default function Home() {
             height: "100%",
             objectFit: "cover",
             objectPosition: "center",
-            48
-                        38
-            ,
+                      display: "block",
                       willChange: "transform",
                       opacity: 1,
             ,
