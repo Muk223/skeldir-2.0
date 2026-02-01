@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export default function AgenciesPage() {
   return (
     <main className="min-h-screen flex flex-col font-sans">
-      {/* Navigation – same translucent behavior as homepage */}
+      {/* Navigation — same translucent behavior as homepage */}
       <Navigation />
 
       {/* Hero Section */}

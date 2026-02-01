@@ -198,7 +198,7 @@ export function InteractiveDemo() {
           alignItems: "center",
           position: "relative",
           zIndex: 2,
-        }}
+      }}
     >
       {/* Section Title */}
       <h2

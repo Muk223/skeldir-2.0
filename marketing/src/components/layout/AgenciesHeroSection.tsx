@@ -168,7 +168,7 @@ export function AgenciesHeroSection() {
             }}
           >
             <Link
-              href="/contact-sales?tier=3&source=agencies-hero"
+              href="/book-demo?source=agencies-hero"
               className="agencies-hero-cta-button"
               style={{
                 display: 'inline-flex',

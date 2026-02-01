@@ -2,9 +2,16 @@
 
 import { Navigation } from "@/components/layout/Navigation";
 import { Footer } from "@/components/layout/Footer";
-import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import Script from "next/script";
+import { Suspense, useRef, useState, useCallback, useEffect } from "react";
 import { CheckCircle2 } from "lucide-react";
+
+declare global {
+  interface Window {
+    Cal?: (method: string, namespace: string, ...args: unknown[]) => void;
+  }
+}
 
 // Partner logos for book-demo carousel — inherently small logos get larger height so they're legible
 const bookDemoPartnerLogos = [
@@ -18,10 +25,132 @@ const bookDemoPartnerLogos = [
 
 function BookDemoContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
+  const calTriggerRef = useRef<HTMLButtonElement>(null);
   const isSuccess = searchParams.get("success") === "true";
+
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showCalConfirmation, setShowCalConfirmation] = useState(false);
+  const [calReady, setCalReady] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(typeof window !== "undefined" && window.innerWidth <= 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  const initCal = useCallback(() => {
+    if (typeof window !== "undefined" && window.Cal) {
+      try {
+        window.Cal("init", "skeldir-demo", { origin: "https://app.cal.com" });
+        (window.Cal as { ns?: Record<string, (a: string, o: object) => void> }).ns?.["skeldir-demo"]?.("ui", {
+          hideEventTypeDetails: false,
+          layout: "month_view",
+        });
+        setCalReady(true);
+      } catch {
+        setCalReady(true);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!calReady || typeof window === "undefined") return;
+    const calNs = (window.Cal as { ns?: Record<string, (a: string, o: object) => void> } | undefined)?.ns?.["skeldir-demo"];
+    if (!calNs) return;
+    try {
+      calNs("on", {
+        action: "bookingSuccessful",
+        callback: () => {
+          setShowCalConfirmation(true);
+          setTimeout(() => router.push("/"), 3000);
+        },
+      });
+    } catch {
+      // Event API may vary; user can still use Cal and we redirect from modal
+    }
+  }, [calReady, router]);
+
+  const CAL_BASE = "https://cal.com/skeldir/skeldir-demo";
+  const THANK_YOU_PATH = "/book-demo/thank-you";
+  const getCalUrlMobile = useCallback(() => {
+    if (typeof window === "undefined") return CAL_BASE;
+    const origin = window.location.origin;
+    const redirectUrl = encodeURIComponent(`${origin}${THANK_YOU_PATH}`);
+    return `${CAL_BASE}?returnTo=${redirectUrl}&redirectUrl=${redirectUrl}`;
+  }, []);
+
+  const openCalPopup = useCallback(() => {
+    if (isMobile) {
+      window.location.href = getCalUrlMobile();
+      return;
+    }
+    const trigger = calTriggerRef.current;
+    if (trigger && calReady) {
+      trigger.click();
+    } else {
+      window.open(`${CAL_BASE}?overlayCalendar=true`, "cal-com-booking", "width=600,height=700,scrollbars=yes,resizable=yes");
+    }
+  }, [calReady, isMobile, getCalUrlMobile]);
+
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      const form = formRef.current;
+      if (!form) return;
+      setSubmitError(null);
+      if (!form.reportValidity()) return;
+      setSubmitting(true);
+      const formData = new FormData(form);
+      const body = new URLSearchParams(
+        Array.from(formData.entries()) as [string, string][]
+      ).toString();
+      openCalPopup();
+      try {
+        await fetch("/book-demo", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body,
+        });
+      } catch {
+        setSubmitError("Form could not be saved; your booking will still work.");
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [openCalPopup]
+  );
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
+      <Script
+        src="https://app.cal.com/embed/embed.js"
+        strategy="afterInteractive"
+        onLoad={initCal}
+      />
+      {/* Cal.com trigger — opened when user submits form; off-screen but clickable for programmatic open */}
+      <button
+        ref={calTriggerRef}
+        type="button"
+        data-cal-link="skeldir/skeldir-demo"
+        data-cal-namespace="skeldir-demo"
+        data-cal-config='{"layout":"month_view","useSlotsViewOnSmallScreen":"true"}'
+        aria-hidden
+        tabIndex={-1}
+        style={{
+          position: "absolute",
+          left: -9999,
+          width: 1,
+          height: 1,
+          opacity: 0,
+          overflow: "hidden",
+          clip: "rect(0,0,0,0)",
+        }}
+      />
       <Navigation forceVisible={true} />
 
       <main className="flex-grow pt-8">
@@ -226,6 +355,8 @@ function BookDemoContent() {
                             key={`${logo.name}-${index}`}
                             src={logo.src}
                             alt={logo.name}
+                            loading="lazy"
+                            decoding="async"
                             style={{
                               height: logo.height,
                               width: "auto",
@@ -365,13 +496,13 @@ function BookDemoContent() {
                         </p>
                       </div>
 
-                      {/* Netlify Form */}
+                      {/* Form: AJAX submit, then open Cal.com popup on success */}
                       <form
+                        ref={formRef}
                         name="skeldir-demo-request"
-                        method="POST"
-                        action="/book-demo/?success=true"
                         data-netlify="true"
                         data-netlify-honeypot="bot-field"
+                        onSubmit={handleSubmit}
                       >
                         {/* Hidden field for Netlify form detection */}
                         <input type="hidden" name="form-name" value="skeldir-demo-request" />
@@ -747,30 +878,44 @@ function BookDemoContent() {
                           </select>
                         </div>
 
-                        {/* Submit Button */}
+                        {submitError && (
+                          <p
+                            style={{
+                              fontSize: "14px",
+                              color: "#DC2626",
+                              marginBottom: "12px",
+                              fontFamily: "Inter, sans-serif",
+                            }}
+                          >
+                            {submitError}
+                          </p>
+                        )}
+                        {/* Submit Button — AJAX submit, then Cal.com opens on success */}
                         <button
                           type="submit"
+                          disabled={submitting}
                           style={{
                             width: "100%",
                             height: "52px",
-                            backgroundColor: "#2563EB",
+                            backgroundColor: submitting ? "#93C5FD" : "#2563EB",
                             color: "#FFFFFF",
                             fontSize: "16px",
                             fontWeight: 700,
                             fontFamily: "Inter, sans-serif",
                             border: "none",
                             borderRadius: "10px",
-                            cursor: "pointer",
+                            cursor: submitting ? "wait" : "pointer",
                             boxShadow: "0 4px 14px rgba(37, 99, 235, 0.35)",
                             transition: "all 200ms ease",
                           }}
                           onMouseEnter={(e) => {
+                            if (submitting) return;
                             e.currentTarget.style.backgroundColor = "#1D4ED8";
                             e.currentTarget.style.boxShadow = "0 6px 20px rgba(37, 99, 235, 0.45)";
                             e.currentTarget.style.transform = "translateY(-1px)";
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = "#2563EB";
+                            e.currentTarget.style.backgroundColor = submitting ? "#93C5FD" : "#2563EB";
                             e.currentTarget.style.boxShadow = "0 4px 14px rgba(37, 99, 235, 0.35)";
                             e.currentTarget.style.transform = "translateY(0)";
                           }}
@@ -778,7 +923,7 @@ function BookDemoContent() {
                             e.currentTarget.style.transform = "translateY(0)";
                           }}
                         >
-                          Book Your Demo
+                          {submitting ? "Submitting…" : "Book Your Demo"}
                         </button>
 
                         {/* Privacy Note */}
@@ -810,6 +955,94 @@ function BookDemoContent() {
           </div>
         </section>
       </main>
+
+      {/* Confirmation modal after Cal.com booking — "You will receive a confirmation email shortly", then redirect home */}
+      {showCalConfirmation && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cal-confirmation-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(15, 23, 42, 0.6)",
+            padding: "24px",
+          }}
+          onClick={() => router.push("/")}
+        >
+          <div
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderRadius: "16px",
+              padding: "32px",
+              maxWidth: "400px",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+              textAlign: "center",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                width: "56px",
+                height: "56px",
+                backgroundColor: "rgba(34, 197, 94, 0.1)",
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 20px",
+              }}
+            >
+              <CheckCircle2 size={28} color="#22C55E" />
+            </div>
+            <h2
+              id="cal-confirmation-title"
+              style={{
+                fontSize: "20px",
+                fontWeight: 700,
+                color: "#0F172A",
+                marginBottom: "12px",
+                fontFamily: "'DM Sans', sans-serif",
+              }}
+            >
+              You're all set
+            </h2>
+            <p
+              style={{
+                fontSize: "16px",
+                color: "#64748B",
+                lineHeight: 1.6,
+                marginBottom: "24px",
+                fontFamily: "Inter, sans-serif",
+              }}
+            >
+              You will receive a confirmation email shortly.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              style={{
+                width: "100%",
+                height: "48px",
+                backgroundColor: "#2563EB",
+                color: "#FFFFFF",
+                fontSize: "16px",
+                fontWeight: 600,
+                fontFamily: "Inter, sans-serif",
+                border: "none",
+                borderRadius: "10px",
+                cursor: "pointer",
+              }}
+            >
+              Return to home
+            </button>
+          </div>
+        </div>
+      )}
 
       <Footer />
 
