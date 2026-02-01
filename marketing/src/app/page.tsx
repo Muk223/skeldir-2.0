@@ -1,3 +1,4 @@
+import { Navigation } from "@/components/layout/Navigation";
 import { HeroSection } from "@/components/layout/HeroSection";
 import { PartnerLogos } from "@/components/layout/PartnerLogos";
 import { ProblemStatement } from "@/components/layout/ProblemStatement";
