@@ -1,5 +1,3 @@
-import type { Metadata } from "next";
-import { Navigation } from "@/components/layout/Navigation";
 import { HeroSection } from "@/components/layout/HeroSection";
 import { PartnerLogos } from "@/components/layout/PartnerLogos";
 import { ProblemStatement } from "@/components/layout/ProblemStatement";
@@ -10,9 +8,6 @@ import { TestimonialCarousel } from "@/components/layout/TestimonialCarousel";
 import { InteractiveDemo } from "@/components/layout/InteractiveDemo";
 import { FinalCTA } from "@/components/layout/FinalCTA";
 import { Footer } from "@/components/layout/Footer";
-
-export const metadata: Metadata = {
-  
 
 export default function Home() {
   return (
