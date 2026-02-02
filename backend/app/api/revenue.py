@@ -21,6 +21,7 @@ from app.services.realtime_revenue_cache import (
     get_realtime_revenue_snapshot,
 )
 from app.services.realtime_revenue_providers import build_realtime_revenue_fetcher
+from app.services.realtime_revenue_response import build_realtime_revenue_v1_response
 from app.api.problem_details import problem_details_response
 
 router = APIRouter()
@@ -71,12 +72,4 @@ async def get_realtime_revenue_v1(
         return error_response
 
     response.headers["Cache-Control"] = "max-age=30"
-    return {
-        "tenant_id": str(tenant_id),
-        "interval": snapshot.interval,
-        "currency": snapshot.currency,
-        "revenue_total": snapshot.revenue_total_cents / 100.0,
-        "verified": snapshot.verified,
-        "data_as_of": snapshot.data_as_of,
-        "sources": snapshot.sources,
-    }
+    return build_realtime_revenue_v1_response(snapshot, tenant_id)

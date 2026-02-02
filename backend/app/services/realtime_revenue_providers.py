@@ -13,6 +13,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import clock as clock_module
 from app.core.config import settings
 from app.db.session import set_tenant_guc_async
 from app.models.platform_connection import PlatformConnection
@@ -260,7 +261,7 @@ def micros_to_cents(micros: int) -> int:
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return clock_module.utcnow()
 
 
 def _parse_retry_after(response: httpx.Response) -> int | None:

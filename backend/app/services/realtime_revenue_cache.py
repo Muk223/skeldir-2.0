@@ -9,7 +9,7 @@ import hashlib
 import json
 import os
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable
 from uuid import UUID
@@ -18,6 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import clock as clock_module
 from app.db.session import set_tenant_guc_async
 from app.services.realtime_revenue_providers import ProviderFetchError
 
@@ -85,7 +86,7 @@ FetchSnapshotFn = Callable[[UUID], Awaitable[RealtimeRevenueSnapshot]]
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return clock_module.utcnow()
 
 
 def _parse_datetime(value: str) -> datetime:
@@ -96,6 +97,12 @@ def _parse_datetime(value: str) -> datetime:
         return parsed.astimezone(timezone.utc)
     except Exception:
         return _utcnow()
+
+
+def _normalize_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 def _get_int_env(name: str, default: int, minimum: int = 0) -> int:
@@ -153,6 +160,15 @@ def _compute_etag(payload: dict[str, Any]) -> str:
     body = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
     digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
     return f"\"{digest}\""
+
+
+def _snapshot_from_cache_row(row: dict[str, Any]) -> RealtimeRevenueSnapshot:
+    payload = row.get("payload") or {}
+    snapshot = RealtimeRevenueSnapshot.from_payload(payload)
+    data_as_of = row.get("data_as_of")
+    if isinstance(data_as_of, datetime):
+        snapshot = replace(snapshot, data_as_of=_normalize_datetime(data_as_of))
+    return replace(snapshot, verified=False)
 
 
 async def _fetch_cache_row(
@@ -230,11 +246,12 @@ async def _refresh_snapshot(
     fetcher: FetchSnapshotFn,
 ) -> tuple[RealtimeRevenueSnapshot, str]:
     snapshot = await fetcher(tenant_id)
+    fetch_time = _utcnow()
+    snapshot = replace(snapshot, data_as_of=fetch_time, verified=False)
     payload = snapshot.to_payload()
     etag = _compute_etag(payload)
-    now = _utcnow()
     ttl_seconds = _cache_ttl_seconds()
-    expires_at = now + timedelta(seconds=ttl_seconds)
+    expires_at = fetch_time + timedelta(seconds=ttl_seconds)
     try:
         await _upsert_cache_row(
             session,
@@ -268,6 +285,7 @@ async def _record_failure(
     await set_tenant_guc_async(session, tenant_id, local=False)
     cooldown_value = cooldown_seconds if cooldown_seconds is not None else _error_cooldown_seconds()
     cooldown = now + timedelta(seconds=max(1, int(cooldown_value)))
+    data_as_of = existing_data_as_of or now
     payload = existing_payload or {
         "tenant_id": str(tenant_id),
         "interval": "minute",
@@ -275,12 +293,15 @@ async def _record_failure(
         "revenue_total_cents": 0,
         "event_count": 0,
         "verified": False,
-        "data_as_of": now.isoformat(),
+        "data_as_of": data_as_of.isoformat(),
         "sources": [],
         "confidence_score": None,
         "upgrade_notice": None,
     }
-    data_as_of = existing_data_as_of or now
+    if existing_payload is not None:
+        payload = dict(existing_payload)
+        payload["verified"] = False
+        payload["data_as_of"] = data_as_of.isoformat()
     try:
         await _upsert_cache_row(
             session,
@@ -314,6 +335,7 @@ async def get_realtime_revenue_snapshot(
     """
     if not hasattr(session, "execute"):
         snapshot = await _default_fetcher(tenant_id)
+        snapshot = replace(snapshot, data_as_of=_utcnow(), verified=False)
         payload = snapshot.to_payload()
         return snapshot, _compute_etag(payload), False
 
@@ -329,8 +351,8 @@ async def get_realtime_revenue_snapshot(
         expires_at = row.get("expires_at")
         payload = row.get("payload") or {}
         if expires_at and expires_at > now and payload:
-            snapshot = RealtimeRevenueSnapshot.from_payload(payload)
-            etag = row.get("etag") or _compute_etag(payload)
+            snapshot = _snapshot_from_cache_row(row)
+            etag = _compute_etag(snapshot.to_payload())
             return snapshot, etag, True
 
     lock_key = _lock_key(tenant_id, cache_key)
@@ -345,8 +367,8 @@ async def get_realtime_revenue_snapshot(
             expires_at = row.get("expires_at")
             payload = row.get("payload") or {}
             if expires_at and expires_at > now and payload:
-                snapshot = RealtimeRevenueSnapshot.from_payload(payload)
-                etag = row.get("etag") or _compute_etag(payload)
+                snapshot = _snapshot_from_cache_row(row)
+                etag = _compute_etag(snapshot.to_payload())
                 return snapshot, etag, True
         try:
             snapshot, etag = await _refresh_snapshot(
@@ -393,8 +415,8 @@ async def get_realtime_revenue_snapshot(
             expires_at = row.get("expires_at")
             payload = row.get("payload") or {}
             if expires_at and expires_at > now and payload:
-                snapshot = RealtimeRevenueSnapshot.from_payload(payload)
-                etag = row.get("etag") or _compute_etag(payload)
+                snapshot = _snapshot_from_cache_row(row)
+                etag = _compute_etag(snapshot.to_payload())
                 return snapshot, etag, True
 
     raise RealtimeRevenueUnavailable(1, "refresh_timeout")
