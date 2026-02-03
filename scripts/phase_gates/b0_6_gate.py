@@ -52,6 +52,17 @@ def main() -> int:
             "b0_6_realtime_revenue_cache.log",
             env=env,
         )
+        run(
+            [
+                "python",
+                "-m",
+                "pytest",
+                "backend/tests/test_b060_phase5_realtime_revenue_response_semantics.py",
+                "-v",
+            ],
+            "b0_6_realtime_revenue_semantics.log",
+            env=env,
+        )
         summary = {
             "phase": "B0.6",
             "status": "success",

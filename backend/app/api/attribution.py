@@ -23,6 +23,9 @@ from app.services.realtime_revenue_cache import (
     get_realtime_revenue_snapshot,
 )
 from app.services.realtime_revenue_providers import build_realtime_revenue_fetcher
+from app.services.realtime_revenue_response import (
+    build_attribution_realtime_revenue_response,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
@@ -56,8 +59,6 @@ async def get_realtime_revenue(
         RealtimeRevenueResponse: Revenue data with verification status
     """
     # Phase B0.6: Cached interim data with unverified semantics.
-    
-    from datetime import datetime
 
     tenant_id = auth_context.tenant_id
     try:
@@ -82,21 +83,10 @@ async def get_realtime_revenue(
         error_response.headers["Cache-Control"] = "no-store"
         return error_response
 
-    now = datetime.now(tz=snapshot.data_as_of.tzinfo)
-    data_freshness_seconds = max(
-        0, int((now - snapshot.data_as_of).total_seconds())
+    response_data = build_attribution_realtime_revenue_response(
+        snapshot,
+        tenant_id,
     )
-
-    response_data = {
-        "total_revenue": snapshot.revenue_total_cents / 100.0,
-        "event_count": snapshot.event_count,
-        "last_updated": snapshot.data_as_of,
-        "data_freshness_seconds": data_freshness_seconds,
-        "verified": snapshot.verified,
-        "tenant_id": str(tenant_id),
-        "confidence_score": snapshot.confidence_score,
-        "upgrade_notice": snapshot.upgrade_notice,
-    }
 
     if if_none_match and if_none_match.strip() == etag:
         return Response(
