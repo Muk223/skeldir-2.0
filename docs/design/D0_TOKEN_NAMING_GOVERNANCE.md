@@ -489,7 +489,7 @@ Use this format to validate token names before committing:
 ## 9. RELATED DOCUMENTS
 
 - `D0_PHASE_CONTRACT.md` - References this governance doc, Section 3.3
-- `D0_P0_EVIDENCE.md` - Hypothesis H03 test demonstrates naming extensibility
+- `docs/forensics/D0_P0_EVIDENCE.md` - Hypothesis H03 test demonstrates naming extensibility
 - `frontend/.eslintrc.json` - ESLint rules enforce patterns
 - `frontend/scripts/validate-tokens.js` - Automated validation
 

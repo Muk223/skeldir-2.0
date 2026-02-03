@@ -172,7 +172,7 @@ docs/design/
 ├── EXECUTIVE_SUMMARY.md             # This document
 │
 ├── evidence/
-│   └── D0_P0_EVIDENCE.md            # Investigation findings
+│   └── docs/forensics/D0_P0_EVIDENCE.md            # Investigation findings
 │
 ├── tokens/
 │   └── .gitkeep                     # Ready for token exports
@@ -186,7 +186,7 @@ docs/design/
 ---
 
 #### 7. EVIDENCE PACK (774 lines)
-**File**: `docs/design/evidence/D0_P0_EVIDENCE.md`
+**File**: `docs/forensics/D0_P0_EVIDENCE.md`
 
 **Purpose**: Complete record of investigation and validation
 
@@ -404,7 +404,7 @@ No surprises. Clear expectations.
 
 ### For Project Leads
 
-1. Review: `docs/design/evidence/D0_P0_EVIDENCE.md` (investigation results)
+1. Review: `docs/forensics/D0_P0_EVIDENCE.md` (investigation results)
 2. Check: `docs/design/REMEDIATION_SUMMARY.md` (what was done and why)
 3. Enable: GitHub branch protection (require all CI checks pass)
 
@@ -419,7 +419,7 @@ docs/design/D0_PHASE_CONTRACT.md (697 lines)
 docs/design/D0_TOKEN_NAMING_GOVERNANCE.md (539 lines)
 docs/design/REMEDIATION_SUMMARY.md (808 lines)
 docs/design/EXECUTIVE_SUMMARY.md (this file)
-docs/design/evidence/D0_P0_EVIDENCE.md (774 lines)
+docs/forensics/D0_P0_EVIDENCE.md (774 lines)
 docs/design/tokens/.gitkeep
 frontend/.eslintrc.json (85 lines)
 frontend/scripts/validate-tokens.js (343 lines)
@@ -438,7 +438,7 @@ frontend/scripts/validate-tokens.js (343 lines)
 
 ```
 docs/design/
-docs/design/evidence/
+docs/forensics/
 docs/design/tokens/
 docs/design/specifications/
 docs/design/templates/
@@ -467,7 +467,7 @@ checkout → lint-frontend ──┐
 
 - [ ] Review this summary
 - [ ] Read contract (`D0_PHASE_CONTRACT.md`)
-- [ ] Review evidence (`D0_P0_EVIDENCE.md`)
+- [ ] Review evidence (`docs/forensics/D0_P0_EVIDENCE.md`)
 - [ ] Check all files are in place
 - [ ] Verify CI syntax is valid
 

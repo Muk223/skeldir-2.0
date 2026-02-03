@@ -662,7 +662,7 @@ docs/design/
 **Ready for Merge**: PR will include:
 1. `docs/design/D0_PHASE_CONTRACT.md`
 2. `docs/design/D0_TOKEN_NAMING_GOVERNANCE.md`
-3. `docs/design/evidence/D0_P0_EVIDENCE.md`
+3. `docs/forensics/D0_P0_EVIDENCE.md`
 4. `frontend/.eslintrc.json`
 5. `frontend/scripts/validate-tokens.js`
 6. Updated `.github/workflows/ci.yml`

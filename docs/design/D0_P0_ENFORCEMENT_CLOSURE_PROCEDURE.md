@@ -32,8 +32,8 @@ docs/design/D0_PHASE_CONTRACT.md
 docs/design/D0_TOKEN_NAMING_GOVERNANCE.md
 docs/design/REMEDIATION_SUMMARY.md
 docs/design/INDEX.md
-docs/design/evidence/D0_P0_EVIDENCE.md
-docs/design/evidence/D0_P0_ENFORCEMENT_EVIDENCE.md
+docs/forensics/D0_P0_EVIDENCE.md
+docs/forensics/D0_P0_ENFORCEMENT_EVIDENCE.md
 docs/design/tokens/.gitkeep
 ```
 
@@ -70,8 +70,8 @@ Convert D0-P0 design system foundation from documented to enforced:
 
 - Add canonical contract (D0_PHASE_CONTRACT.md)
 - Add naming governance (D0_TOKEN_NAMING_GOVERNANCE.md)
-- Add investigation evidence (D0_P0_EVIDENCE.md)
-- Add enforcement evidence (D0_P0_ENFORCEMENT_EVIDENCE.md)
+- Add investigation evidence (docs/forensics/D0_P0_EVIDENCE.md)
+- Add enforcement evidence (docs/forensics/D0_P0_ENFORCEMENT_EVIDENCE.md)
 - Add ESLint configuration (.eslintrc.json)
 - Add token validation script (validate-tokens.js)
 - Update CI workflow with required design checks
@@ -140,7 +140,7 @@ In the "Require status checks to pass before merging" section:
 
 Take a screenshot of the configured required checks and save to:
 ```
-docs/design/evidence/github-branch-protection-screenshot-[date].png
+docs/forensics/github-branch-protection-screenshot-[date].png
 ```
 
 ---
@@ -184,7 +184,7 @@ git push origin main
 
 ### Record Merge Details
 
-Update `docs/design/evidence/D0_P0_ENFORCEMENT_EVIDENCE.md` with:
+Update `docs/forensics/D0_P0_ENFORCEMENT_EVIDENCE.md` with:
 
 ```markdown
 ## Merge Evidence
@@ -226,7 +226,7 @@ git pull origin main
 
 # Verify all artifacts exist
 ls -la docs/design/*.md
-ls -la docs/design/evidence/*.md
+ls -la docs/forensics/*.md
 ls -la frontend/.eslintrc.json
 ls -la frontend/scripts/validate-tokens.js
 
@@ -344,7 +344,7 @@ When all steps are complete:
 → See: docs/design/D0_PHASE_CONTRACT.md
 
 **Questions about enforcement?**
-→ See: docs/design/evidence/D0_P0_ENFORCEMENT_EVIDENCE.md
+→ See: docs/forensics/D0_P0_ENFORCEMENT_EVIDENCE.md
 
 **Questions about naming?**
 → See: docs/design/D0_TOKEN_NAMING_GOVERNANCE.md

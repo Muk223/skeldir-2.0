@@ -106,7 +106,7 @@
 
 ---
 
-### 5. evidence/D0_P0_EVIDENCE.md
+### 5. docs/forensics/D0_P0_EVIDENCE.md
 **Purpose**: Complete empirical investigation record
 **Length**: 774 lines
 **Time**: 45 minutes
@@ -140,7 +140,7 @@ docs/design/                          ← Design system home
 ├── 📊 REMEDIATION RECORDS (Historical reference)
 │   ├── REMEDIATION_SUMMARY.md       (What was done and why)
 │   └── evidence/
-│       └── D0_P0_EVIDENCE.md        (Investigation findings)
+│       └── docs/forensics/D0_P0_EVIDENCE.md        (Investigation findings)
 │
 ├── 💾 TOKEN EXPORTS (Will be populated in D0-P1 through D0-P5)
 │   └── tokens/
@@ -197,7 +197,7 @@ docs/design/                          ← Design system home
 
 1. [EXECUTIVE_SUMMARY.md](EXECUTIVE_SUMMARY.md) - Full document
 2. [REMEDIATION_SUMMARY.md](REMEDIATION_SUMMARY.md) - Part 5 (Key decisions)
-3. Share: [evidence/D0_P0_EVIDENCE.md](evidence/D0_P0_EVIDENCE.md) as appendix
+3. Share: [docs/forensics/D0_P0_EVIDENCE.md](docs/forensics/D0_P0_EVIDENCE.md) as appendix
 
 ---
 
@@ -220,7 +220,7 @@ docs/design/                          ← Design system home
 ### For Project Leads
 - [ ] Read EXECUTIVE_SUMMARY.md (full)
 - [ ] Skim REMEDIATION_SUMMARY.md (Parts 5-7)
-- [ ] Review evidence/D0_P0_EVIDENCE.md (Sections 5-7)
+- [ ] Review docs/forensics/D0_P0_EVIDENCE.md (Sections 5-7)
 - [ ] Enable GitHub branch protection for CI checks
 - [ ] Schedule D0-P1 kickoff meeting
 
@@ -239,7 +239,7 @@ docs/design/                          ← Design system home
 | [D0_PHASE_CONTRACT.md](D0_PHASE_CONTRACT.md) | Binding contract | 697 lines | All implementers | Before starting work |
 | [D0_TOKEN_NAMING_GOVERNANCE.md](D0_TOKEN_NAMING_GOVERNANCE.md) | Naming & extensions | 539 lines | Design & Engineering | Before creating tokens |
 | [REMEDIATION_SUMMARY.md](REMEDIATION_SUMMARY.md) | What was done | 808 lines | Technical leads | For context |
-| [evidence/D0_P0_EVIDENCE.md](evidence/D0_P0_EVIDENCE.md) | Investigation record | 774 lines | Auditors & reviewers | For verification |
+| [docs/forensics/D0_P0_EVIDENCE.md](docs/forensics/D0_P0_EVIDENCE.md) | Investigation record | 774 lines | Auditors & reviewers | For verification |
 
 ---
 
@@ -252,7 +252,7 @@ docs/design/                          ← Design system home
 
 ### D0_TOKEN_NAMING_GOVERNANCE.md References
 - References: D0_PHASE_CONTRACT.md (Sections 3.1, 3.3)
-- References: D0_P0_EVIDENCE.md (Hypothesis H03 test)
+- References: docs/forensics/D0_P0_EVIDENCE.md (Hypothesis H03 test)
 - Referenced by: ESLint rules and validation script
 
 ### REMEDIATION_SUMMARY.md References
@@ -304,7 +304,7 @@ Use this to verify you have everything:
 - [ ] D0_PHASE_CONTRACT.md exists
 - [ ] D0_TOKEN_NAMING_GOVERNANCE.md exists
 - [ ] REMEDIATION_SUMMARY.md exists
-- [ ] evidence/D0_P0_EVIDENCE.md exists
+- [ ] docs/forensics/D0_P0_EVIDENCE.md exists
 - [ ] INDEX.md exists (this file)
 
 ### Configuration
@@ -314,7 +314,7 @@ Use this to verify you have everything:
 
 ### Directories
 - [ ] docs/design/ exists
-- [ ] docs/design/evidence/ exists
+- [ ] docs/forensics/ exists
 - [ ] docs/design/tokens/ exists (ready for exports)
 - [ ] docs/design/specifications/ exists (ready for specs)
 - [ ] docs/design/templates/ exists (ready for templates)
@@ -371,7 +371,7 @@ If all items above are checked, remediation is complete and ready for implementa
 → See: [REMEDIATION_SUMMARY.md](REMEDIATION_SUMMARY.md) Parts 5-7 (Decisions section)
 
 **Evidence Behind Decisions**?
-→ See: [evidence/D0_P0_EVIDENCE.md](evidence/D0_P0_EVIDENCE.md) with investigation steps
+→ See: [docs/forensics/D0_P0_EVIDENCE.md](docs/forensics/D0_P0_EVIDENCE.md) with investigation steps
 
 **Submitting Exception/Change**?
 → See: D0_PHASE_CONTRACT.md Section 5 (Change Protocol)
@@ -386,7 +386,7 @@ If all items above are checked, remediation is complete and ready for implementa
 | D0_PHASE_CONTRACT.md | 697 | 11 | 8 |
 | D0_TOKEN_NAMING_GOVERNANCE.md | 539 | 10 | 6 |
 | REMEDIATION_SUMMARY.md | 808 | 11 | 10 |
-| D0_P0_EVIDENCE.md | 774 | 12 | 7 |
+| docs/forensics/D0_P0_EVIDENCE.md | 774 | 12 | 7 |
 | **TOTAL** | **3,418** | **56** | **36** |
 
 ---
@@ -423,7 +423,7 @@ For someone new to the project:
 | D0_PHASE_CONTRACT.md | 1.0 | Feb 2, 2026 | Locked (pre-merge) |
 | D0_TOKEN_NAMING_GOVERNANCE.md | 1.0 | Feb 2, 2026 | Active |
 | REMEDIATION_SUMMARY.md | 1.0 | Feb 2, 2026 | Complete |
-| D0_P0_EVIDENCE.md | 1.0 | Feb 2, 2026 | Complete |
+| docs/forensics/D0_P0_EVIDENCE.md | 1.0 | Feb 2, 2026 | Complete |
 | INDEX.md | 1.0 | Feb 2, 2026 | Active |
 
 ---

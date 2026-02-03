@@ -116,7 +116,7 @@ This remediation followed the mandatory empirical validation protocol defined in
 
 ---
 
-#### C. `docs/design/evidence/D0_P0_EVIDENCE.md` (Authoritative)
+#### C. `docs/forensics/D0_P0_EVIDENCE.md` (Authoritative)
 
 **Purpose**: Complete investigation findings and validation proof
 
@@ -251,7 +251,7 @@ docs/design/
 ├── REMEDIATION_SUMMARY.md           # This document
 │
 ├── evidence/
-│   └── D0_P0_EVIDENCE.md            # Investigation findings
+│   └── docs/forensics/D0_P0_EVIDENCE.md            # Investigation findings
 │
 ├── tokens/
 │   └── .gitkeep                     # Placeholder for token JSONs
@@ -276,7 +276,7 @@ docs/design/
 **Status**: **MET**
 
 **Evidence**:
-- `docs/design/evidence/D0_P0_EVIDENCE.md` - 1,200+ lines
+- `docs/forensics/D0_P0_EVIDENCE.md` - 1,200+ lines
 - Covers Steps A-D of validation protocol
 - Validates all 6 blockers and 5 root causes
 - Hypothesis testing documented with pass/fail conclusions
@@ -392,7 +392,7 @@ Before merging the remediation PR, verify:
 
 ## PART 5: VALIDATION PROOF BY COMPONENT
 
-### Component 1: Evidence Pack (D0_P0_EVIDENCE.md)
+### Component 1: Evidence Pack (docs/forensics/D0_P0_EVIDENCE.md)
 
 **Validation**: ✓ Complete
 
@@ -536,7 +536,7 @@ docs/design/
 ├── D0_TOKEN_NAMING_GOVERNANCE.md ✓ 450 lines
 ├── REMEDIATION_SUMMARY.md         ✓ This document
 ├── evidence/
-│   └── D0_P0_EVIDENCE.md         ✓ 1,200 lines
+│   └── docs/forensics/D0_P0_EVIDENCE.md         ✓ 1,200 lines
 ├── tokens/
 │   └── .gitkeep                  ✓ Ready for exports
 ├── specifications/               ✓ Ready for specs
@@ -553,7 +553,7 @@ docs/design/
 |------|----------|------|--------|
 | D0_PHASE_CONTRACT.md | docs/design/ | Markdown | ✓ Complete |
 | D0_TOKEN_NAMING_GOVERNANCE.md | docs/design/ | Markdown | ✓ Complete |
-| D0_P0_EVIDENCE.md | docs/design/evidence/ | Markdown | ✓ Complete |
+| docs/forensics/D0_P0_EVIDENCE.md | docs/forensics/ | Markdown | ✓ Complete |
 | REMEDIATION_SUMMARY.md | docs/design/ | Markdown | ✓ This file |
 | .eslintrc.json | frontend/ | JSON | ✓ Complete |
 | validate-tokens.js | frontend/scripts/ | JavaScript | ✓ Complete |
@@ -570,7 +570,7 @@ docs/design/
 | Directory | Purpose | Status |
 |-----------|---------|--------|
 | docs/design/ | Design system home | ✓ Complete |
-| docs/design/evidence/ | Investigation records | ✓ Complete |
+| docs/forensics/ | Investigation records | ✓ Complete |
 | docs/design/tokens/ | Token exports location | ✓ Ready |
 | docs/design/specifications/ | Component spec location | ✓ Ready |
 | docs/design/templates/ | Spec templates location | ✓ Ready |
@@ -690,7 +690,7 @@ The following are **intentionally deferred** to later phases:
 
 ### For Project Leads
 
-1. **Check evidence**: `docs/design/evidence/D0_P0_EVIDENCE.md`
+1. **Check evidence**: `docs/forensics/D0_P0_EVIDENCE.md`
    - Understand what was validated and how
    - Review hypothesis tests and conclusions
    - Verify no critical issues remain
@@ -711,7 +711,7 @@ The following are **intentionally deferred** to later phases:
 
 ### Delivered Artifacts
 
-- [x] D0_P0_EVIDENCE.md (1,200 lines, complete evidence)
+- [x] docs/forensics/D0_P0_EVIDENCE.md (1,200 lines, complete evidence)
 - [x] D0_PHASE_CONTRACT.md (600 lines, canonical contract)
 - [x] D0_TOKEN_NAMING_GOVERNANCE.md (450 lines, naming rules)
 - [x] REMEDIATION_SUMMARY.md (this document, 800+ lines)
@@ -754,7 +754,7 @@ The following are **intentionally deferred** to later phases:
 
 - **Contract**: `docs/design/D0_PHASE_CONTRACT.md`
 - **Governance**: `docs/design/D0_TOKEN_NAMING_GOVERNANCE.md`
-- **Evidence**: `docs/design/evidence/D0_P0_EVIDENCE.md`
+- **Evidence**: `docs/forensics/D0_P0_EVIDENCE.md`
 
 ### Referenced Design Plans
 

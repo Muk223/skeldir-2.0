@@ -83,7 +83,7 @@ docs/design/
 │   ├── skeldir-tokens-typography.json
 │   └── skeldir-tokens-effects.json
 └── evidence/
-    └── D0_P0_EVIDENCE.md
+    └── docs/forensics/D0_P0_EVIDENCE.md
 ```
 
 ---
@@ -291,7 +291,7 @@ docs/design/
 ├── D0_TOKEN_NAMING_GOVERNANCE.md          # Naming rules and extensions
 │
 ├── evidence/
-│   └── D0_P0_EVIDENCE.md                  # Investigation findings & validation
+│   └── docs/forensics/D0_P0_EVIDENCE.md                  # Investigation findings & validation
 │
 ├── tokens/
 │   ├── skeldir-tokens-color.json          # 47 color tokens (D0-P4 output)
@@ -589,7 +589,7 @@ When multiple documents or constraints seem to conflict, resolve using this prec
   - Option A: "1440px container max-width, 1280px content region max-width"
   - Option B: "Single 1280px max-width for entire layout"
   - Option C: "Responsive: 100% on mobile, 1280px on desktop, 1440px on ultra-wide"
-- **Amendment process**: Update this contract, add evidence to `D0_P0_EVIDENCE.md`, get sign-off from leads
+- **Amendment process**: Update this contract, add evidence to `docs/forensics/D0_P0_EVIDENCE.md`, get sign-off from leads
 
 ### 7.3 Known Ambiguities Requiring Resolution
 
@@ -648,7 +648,7 @@ When multiple documents or constraints seem to conflict, resolve using this prec
 ### 9.1 Referenced Documents
 
 - `docs/design/D0_TOKEN_NAMING_GOVERNANCE.md` - Naming rules (required read)
-- `docs/design/evidence/D0_P0_EVIDENCE.md` - Investigation findings (evidence record)
+- `docs/forensics/D0_P0_EVIDENCE.md` - Investigation findings (evidence record)
 - `frontend/SCAFFOLD.md` - Current scaffold description (reference only)
 - `frontend/.eslintrc.json` - ESLint validation configuration (enforcement)
 - `frontend/scripts/validate-tokens.js` - Token validation script (enforcement)

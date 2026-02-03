@@ -94,8 +94,8 @@ test-frontend:
 | Naming Governance | docs/design/D0_TOKEN_NAMING_GOVERNANCE.md | ⏳ Staged for merge |
 | Remediation Summary | docs/design/REMEDIATION_SUMMARY.md | ⏳ Staged for merge |
 | Index | docs/design/INDEX.md | ⏳ Staged for merge |
-| Evidence Pack (D0-P0) | docs/design/evidence/D0_P0_EVIDENCE.md | ⏳ Staged for merge |
-| Enforcement Evidence | docs/design/evidence/D0_P0_ENFORCEMENT_EVIDENCE.md | ⏳ Staged for merge |
+| Evidence Pack (D0-P0) | docs/forensics/D0_P0_EVIDENCE.md | ⏳ Staged for merge |
+| Enforcement Evidence | docs/forensics/D0_P0_ENFORCEMENT_EVIDENCE.md | ⏳ Staged for merge |
 | ESLint Config | frontend/.eslintrc.json | ⏳ Staged for merge |
 | Token Validation Script | frontend/scripts/validate-tokens.js | ⏳ Staged for merge |
 | CI Workflow Updates | .github/workflows/ci.yml | ⏳ Staged for merge |
@@ -259,8 +259,8 @@ Staged Changes:
   + docs/design/D0_TOKEN_NAMING_GOVERNANCE.md
   + docs/design/REMEDIATION_SUMMARY.md
   + docs/design/INDEX.md
-  + docs/design/evidence/D0_P0_EVIDENCE.md
-  + docs/design/evidence/D0_P0_ENFORCEMENT_EVIDENCE.md
+  + docs/forensics/D0_P0_EVIDENCE.md
+  + docs/forensics/D0_P0_ENFORCEMENT_EVIDENCE.md
   + frontend/.eslintrc.json
   + frontend/scripts/validate-tokens.js
   M .github/workflows/ci.yml
@@ -290,8 +290,8 @@ Files Merged to main:
 - docs/design/D0_TOKEN_NAMING_GOVERNANCE.md
 - docs/design/REMEDIATION_SUMMARY.md
 - docs/design/INDEX.md
-- docs/design/evidence/D0_P0_EVIDENCE.md
-- docs/design/evidence/D0_P0_ENFORCEMENT_EVIDENCE.md
+- docs/forensics/D0_P0_EVIDENCE.md
+- docs/forensics/D0_P0_ENFORCEMENT_EVIDENCE.md
 - frontend/.eslintrc.json
 - frontend/scripts/validate-tokens.js
 - .github/workflows/ci.yml (with new CI jobs)
@@ -324,7 +324,7 @@ Files Merged to main:
 **Classification**: Enforcement Record
 
 **Related Documents**:
-- docs/design/D0_P0_EVIDENCE.md (investigation findings)
+- docs/forensics/D0_P0_EVIDENCE.md (investigation findings)
 - docs/design/D0_PHASE_CONTRACT.md (binding contract)
 - docs/design/D0_TOKEN_NAMING_GOVERNANCE.md (governance rules)
 
