@@ -7,8 +7,8 @@
 ## Provenance
 - Branch: b060-phase5-semantics
 - PR: pending
-- Head SHA (CI adjudicated): 5e1b26c58bcd7dfb6b7c9bc0f6e6efc9f32a2a7d
-- Commit checks URL: https://github.com/Muk223/skeldir-2.0/commit/5e1b26c58bcd7dfb6b7c9bc0f6e6efc9f32a2a7d/checks
+- Head SHA (CI adjudicated): 5e1b26c86f941c97d11a9c905fa1efc224af4cce
+- Commit checks URL: https://github.com/Muk223/skeldir-2.0/commit/5e1b26c86f941c97d11a9c905fa1efc224af4cce/checks
 - CI run (reference): https://github.com/Muk223/skeldir-2.0/actions/runs/21637080575
 
 ## CI execution proof (Phase 5 semantics)
