@@ -2,11 +2,8 @@ name: b057-p3-webhook-ingestion-least-privilege
 
 on:
   pull_request:
-    paths:
-      - ".github/workflows/b057-p3-webhook-ingestion-least-privilege.yml"
-      - "backend/**"
-      - "alembic/**"
-      - "scripts/**"
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:

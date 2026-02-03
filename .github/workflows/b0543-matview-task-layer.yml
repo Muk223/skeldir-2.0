@@ -1,12 +1,10 @@
 name: B0.5.4.3 Matview Task Layer Gates
 
 on:
+  push:
+    branches: [main, develop]
   pull_request:
-    paths:
-      - ".github/workflows/b0543-matview-task-layer.yml"
-      - "backend/**"
-      - "alembic/**"
-      - "scripts/**"
+    branches: [main, develop]
   workflow_dispatch:
 
 jobs:

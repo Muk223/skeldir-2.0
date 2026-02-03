@@ -2,11 +2,8 @@ name: b057-p5-full-chain
 
 on:
   pull_request:
-    paths:
-      - ".github/workflows/b057-p5-full-chain.yml"
-      - "backend/**"
-      - "alembic/**"
-      - "scripts/**"
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:

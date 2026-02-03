@@ -2,11 +2,8 @@ name: b057-p4-llm-audit-persistence
 
 on:
   pull_request:
-    paths:
-      - ".github/workflows/b057-p4-llm-audit-persistence.yml"
-      - "backend/**"
-      - "alembic/**"
-      - "scripts/**"
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:

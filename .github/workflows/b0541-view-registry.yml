@@ -1,12 +1,10 @@
 name: B0.5.4.1 View Registry Gates
 
 on:
+  push:
+    branches: [main, develop]
   pull_request:
-    paths:
-      - ".github/workflows/b0541-view-registry.yml"
-      - "backend/**"
-      - "alembic/**"
-      - "scripts/**"
+    branches: [main, develop]
   workflow_dispatch:
 
 jobs:
