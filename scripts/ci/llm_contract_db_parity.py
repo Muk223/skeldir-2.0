@@ -8,9 +8,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlparse
 
 import psycopg2
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 
 class ContractTarget(BaseModel):
@@ -42,6 +43,13 @@ class LLMWriteContract(BaseModel):
     targets: list[ContractTarget]
     current_row_shape: RowShape
     target_row_shape: RowShape
+
+    @field_validator("targets")
+    @classmethod
+    def _targets_non_empty(cls, value: list[ContractTarget]) -> list[ContractTarget]:
+        if not value:
+            raise ValueError("targets must not be empty")
+        return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,9 +125,25 @@ def _normalize_db_url(db_url: str) -> str:
     return db_url
 
 
+def _redact_db_url(db_url: str) -> str:
+    parsed = urlparse(db_url)
+    if not parsed.password and not parsed.username:
+        return db_url
+    user = parsed.username or ""
+    netloc = parsed.hostname or ""
+    if parsed.port:
+        netloc = f"{netloc}:{parsed.port}"
+    if user:
+        netloc = f"{user}:***@{netloc}"
+    return parsed._replace(netloc=netloc).geturl()
+
+
 def _fetch_schema_from_db(db_url: str, schema: str, table: str) -> SchemaSnapshot:
     db_url = _normalize_db_url(db_url)
-    conn = psycopg2.connect(db_url)
+    try:
+        conn = psycopg2.connect(db_url)
+    except psycopg2.OperationalError as exc:
+        raise RuntimeError(f"db connection failed for { _redact_db_url(db_url) }: {exc}") from exc
     try:
         with conn.cursor() as cursor:
             cursor.execute(
@@ -294,10 +318,14 @@ def main(argv: Sequence[str]) -> int:
     target = contract.targets[0]
     shape = getattr(contract, args.shape)
 
-    if args.schema_snapshot:
-        snapshot = _load_schema_snapshot(Path(args.schema_snapshot))
-    else:
-        snapshot = _fetch_schema_from_db(args.db_url, target.schema_name, target.table)
+    try:
+        if args.schema_snapshot:
+            snapshot = _load_schema_snapshot(Path(args.schema_snapshot))
+        else:
+            snapshot = _fetch_schema_from_db(args.db_url, target.schema_name, target.table)
+    except RuntimeError as exc:
+        print(f"schema fetch failed: {exc}")
+        return 2
 
     diff = _compare_schema(shape, snapshot)
     report = _render_report(

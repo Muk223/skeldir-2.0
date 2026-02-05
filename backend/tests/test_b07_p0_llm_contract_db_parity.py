@@ -12,7 +12,7 @@ FIXTURES = ROOT / "backend/tests/fixtures"
 
 
 def _run_parity(snapshot: str, shape: str, mode: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    return subprocess.run(  # noqa: S603
         [
             sys.executable,
             str(SCRIPT),
