@@ -15,8 +15,9 @@ from uuid import UUID
 
 from sqlalchemy import text
 
-from app.db.session import engine, set_tenant_guc
-from app.observability.context import set_request_correlation_id, set_tenant_id
+from app.core.identity import resolve_user_id
+from app.db.session import engine, set_tenant_guc, set_user_guc
+from app.observability.context import set_request_correlation_id, set_tenant_id, set_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,7 @@ def _normalize_tenant_id(value: Any) -> UUID:
     return UUID(str(value))
 
 
-async def _set_tenant_guc_global(tenant_id: UUID) -> None:
+async def _set_tenant_guc_global(tenant_id: UUID, user_id: UUID) -> None:
     loop = asyncio.get_running_loop()
     logger.info(
         "tenant_guc_async_entry",
@@ -85,6 +86,7 @@ async def _set_tenant_guc_global(tenant_id: UUID) -> None:
             "loop_id": id(loop),
             "loop_running": loop.is_running(),
             "tenant_id": str(tenant_id),
+            "user_id": str(user_id),
         },
     )
     async with engine.begin() as conn:
@@ -92,6 +94,7 @@ async def _set_tenant_guc_global(tenant_id: UUID) -> None:
         # This prevents connection pool reuse from leaking a previous tenant_id into
         # a subsequent task when the same connection is returned to the pool.
         await set_tenant_guc(conn, tenant_id, local=True)
+        await set_user_guc(conn, user_id, local=True)
         # Explicitly mark execution context as worker so DB guardrails can distinguish
         # worker traffic from ingestion/API traffic (B0.5.3.5).
         await conn.execute(
@@ -99,6 +102,7 @@ async def _set_tenant_guc_global(tenant_id: UUID) -> None:
         )
         # Guardrail: read back to prove the GUC is set for this transaction
         await conn.execute(text("SELECT current_setting('app.current_tenant_id', true)"))
+        await conn.execute(text("SELECT current_setting('app.current_user_id', true)"))
 
 
 def tenant_task(task_fn: Callable) -> Callable:
@@ -116,11 +120,14 @@ def tenant_task(task_fn: Callable) -> Callable:
             raise ValueError("tenant_id is required for tenant-scoped tasks")
 
         tenant_uuid = _normalize_tenant_id(tenant_id_value)
+        user_uuid = resolve_user_id(kwargs.get("user_id"))
         correlation_id = kwargs.get("correlation_id") or getattr(self.request, "id", None) or "unknown"
 
         set_tenant_id(tenant_uuid)
+        set_user_id(user_uuid)
         set_request_correlation_id(correlation_id)
         kwargs["tenant_id"] = tenant_uuid
+        kwargs["user_id"] = user_uuid
         kwargs["correlation_id"] = correlation_id
 
         # B0.5.3.1: Skip GUC setting in eager mode (already in event loop)
@@ -129,7 +136,7 @@ def tenant_task(task_fn: Callable) -> Callable:
 
         if not is_eager:
             try:
-                run_in_worker_loop(_set_tenant_guc_global(tenant_uuid))
+                run_in_worker_loop(_set_tenant_guc_global(tenant_uuid, user_uuid))
             except RuntimeError as exc:
                 # If already in event loop (shouldn't happen in worker mode), log and continue
                 if "cannot be called from a running event loop" in str(exc):
@@ -143,7 +150,11 @@ def tenant_task(task_fn: Callable) -> Callable:
                 logger.error(
                     "celery_tenant_guc_failed",
                     exc_info=exc,
-                    extra={"tenant_id": str(tenant_uuid), "task_name": getattr(self, "name", None)},
+                    extra={
+                        "tenant_id": str(tenant_uuid),
+                        "user_id": str(user_uuid),
+                        "task_name": getattr(self, "name", None),
+                    },
                 )
                 raise
 
@@ -152,6 +163,7 @@ def tenant_task(task_fn: Callable) -> Callable:
         finally:
             # Reset contextvars to avoid leaking across reused worker threads
             set_tenant_id(None)
+            set_user_id(None)
             set_request_correlation_id(None)
 
     return _wrapped

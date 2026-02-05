@@ -80,12 +80,16 @@ def _seed_tenant(admin_db_url: str, label: str) -> _TenantFixture:
     )
 
 
-def _count_llm_api_calls(runtime_db_url: str, tenant_id: UUID) -> int:
+def _count_llm_api_calls(runtime_db_url: str, tenant_id: UUID, user_id: UUID) -> int:
     engine = create_engine(runtime_db_url)
     with engine.begin() as conn:
         conn.execute(
             text("SELECT set_config('app.current_tenant_id', :tenant_id, false)"),
             {"tenant_id": str(tenant_id)},
+        )
+        conn.execute(
+            text("SELECT set_config('app.current_user_id', :user_id, false)"),
+            {"user_id": str(user_id)},
         )
         count = conn.execute(text("SELECT COUNT(*) FROM public.llm_api_calls")).scalar_one()
         return int(count)
@@ -176,6 +180,7 @@ def test_b057_p4_llm_stub_persists_under_runtime_identity():
 
     tenant_a = _seed_tenant(admin_db_url, "A")
     tenant_b = _seed_tenant(admin_db_url, "B")
+    user_id = uuid4()
 
     runtime_async_db_url = runtime_db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
     env = os.environ.copy()
@@ -188,12 +193,13 @@ def test_b057_p4_llm_stub_persists_under_runtime_identity():
     try:
         from app.celery_app import celery_app
 
-        before = _count_llm_api_calls(runtime_db_url, tenant_a.tenant_id)
+        before = _count_llm_api_calls(runtime_db_url, tenant_a.tenant_id, user_id)
         result = celery_app.send_task(
             "app.tasks.llm.route",
             kwargs={
                 "payload": {"stub": True},
                 "tenant_id": str(tenant_a.tenant_id),
+                "user_id": str(user_id),
                 "correlation_id": str(uuid4()),
                 "request_id": str(uuid4()),
                 "max_cost_cents": 0,
@@ -202,10 +208,10 @@ def test_b057_p4_llm_stub_persists_under_runtime_identity():
             routing_key="llm.task",
         )
         result.get(timeout=30)
-        after = _count_llm_api_calls(runtime_db_url, tenant_a.tenant_id)
+        after = _count_llm_api_calls(runtime_db_url, tenant_a.tenant_id, user_id)
         assert after == before + 1
 
-        cross_tenant = _count_llm_api_calls(runtime_db_url, tenant_b.tenant_id)
+        cross_tenant = _count_llm_api_calls(runtime_db_url, tenant_b.tenant_id, user_id)
         assert cross_tenant == 0, "RLS failed: tenant B can see tenant A audit rows"
     finally:
         _stop_worker(proc)
@@ -215,6 +221,7 @@ def test_b057_p4_audit_failure_persists_to_worker_failed_jobs():
     runtime_db_url = _runtime_sync_db_url()
 
     bad_tenant_id = uuid4()
+    user_id = uuid4()
     runtime_async_db_url = runtime_db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
     env = os.environ.copy()
     env["DATABASE_URL"] = runtime_async_db_url
@@ -231,6 +238,7 @@ def test_b057_p4_audit_failure_persists_to_worker_failed_jobs():
             kwargs={
                 "payload": {"stub": True},
                 "tenant_id": str(bad_tenant_id),
+                "user_id": str(user_id),
                 "correlation_id": str(uuid4()),
                 "request_id": str(uuid4()),
                 "max_cost_cents": 0,

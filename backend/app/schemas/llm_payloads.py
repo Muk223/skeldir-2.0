@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 class LLMTaskPayload(BaseModel):
     tenant_id: UUID = Field(..., description="Tenant context for RLS")
+    user_id: UUID = Field(..., description="User context for per-user caps and RLS")
     correlation_id: Optional[str] = Field(None, description="Correlation for observability")
     request_id: Optional[str] = Field(
         None,

@@ -16,28 +16,43 @@
         "name": "tenant_id",
         "type": "uuid",
         "nullable": false,
-        "notes": "Tenant boundary for RLS (current runtime schema)."
+        "notes": "Tenant boundary for RLS."
+      },
+      {
+        "name": "user_id",
+        "type": "uuid",
+        "nullable": false,
+        "notes": "User boundary for per-user monthly caps (B0.7 invariant)."
       },
       {
         "name": "created_at",
         "type": "timestamptz",
         "nullable": false,
-        "notes": "Write timestamp (current runtime schema)."
+        "notes": "Write timestamp (source of truth for rollups)."
       },
       {
         "name": "endpoint",
         "type": "text",
-        "nullable": false
+        "nullable": false,
+        "notes": "Logical callsite (task/route) for attribution and audit."
       },
       {
         "name": "request_id",
         "type": "text",
-        "nullable": false
+        "nullable": false,
+        "notes": "Idempotency key; must be unique within (tenant_id, endpoint)."
+      },
+      {
+        "name": "provider",
+        "type": "text",
+        "nullable": false,
+        "notes": "Provider label (normalized by aisuite via Skeldir provider boundary)."
       },
       {
         "name": "model",
         "type": "text",
-        "nullable": false
+        "nullable": false,
+        "notes": "Resolved model label (post-policy)."
       },
       {
         "name": "input_tokens",
@@ -75,13 +90,32 @@
       {
         "name": "was_cached",
         "type": "bool",
-        "nullable": true,
-        "notes": "Nullable in current runtime schema."
+        "nullable": false,
+        "notes": "True when semantic cache served response without provider dispatch."
       },
       {
-        "name": "request_metadata",
-        "type": "jsonb",
-        "nullable": true
+        "name": "distillation_eligible",
+        "type": "bool",
+        "nullable": false,
+        "notes": "Explicit training-signal eligibility gate (must not be inferred)."
+      },
+      {
+        "name": "request_metadata_ref",
+        "type": "jsonb_ref",
+        "nullable": true,
+        "notes": "Pointer/reference to request metadata (separate from training signal)."
+      },
+      {
+        "name": "response_metadata_ref",
+        "type": "jsonb_ref",
+        "nullable": true,
+        "notes": "Pointer/reference to response metadata (operational telemetry)."
+      },
+      {
+        "name": "reasoning_trace_ref",
+        "type": "jsonb_ref",
+        "nullable": true,
+        "notes": "Pointer/reference to reasoning trace where available; must be demarcated from user output."
       }
     ],
     "required_uniques": [

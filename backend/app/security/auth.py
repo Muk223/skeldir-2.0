@@ -9,7 +9,8 @@ import jwt
 from jwt import InvalidTokenError, PyJWKClient
 
 from app.core.config import settings
-from app.observability.context import set_tenant_id
+from app.core.identity import resolve_user_id
+from app.observability.context import set_tenant_id, set_user_id
 
 
 class AuthError(Exception):
@@ -24,6 +25,7 @@ class AuthError(Exception):
 @dataclass(frozen=True)
 class AuthContext:
     tenant_id: UUID
+    user_id: UUID
     subject: Optional[str]
     issuer: Optional[str]
     audience: Optional[str | list[str]]
@@ -113,6 +115,11 @@ def _require_tenant_id(claims: dict[str, Any]) -> UUID:
         ) from exc
 
 
+def _resolve_user_id(claims: dict[str, Any]) -> UUID:
+    candidate = claims.get("user_id") or claims.get("sub")
+    return resolve_user_id(candidate)
+
+
 def get_auth_context(
     request: Request,
     authorization: str | None = Header(default=None, alias="Authorization"),
@@ -129,8 +136,10 @@ def get_auth_context(
         ) from exc
 
     tenant_id = _require_tenant_id(claims)
+    user_id = _resolve_user_id(claims)
     auth_context = AuthContext(
         tenant_id=tenant_id,
+        user_id=user_id,
         subject=claims.get("sub"),
         issuer=claims.get("iss"),
         audience=claims.get("aud"),
@@ -138,4 +147,5 @@ def get_auth_context(
     )
     request.state.auth_context = auth_context
     set_tenant_id(tenant_id)
+    set_user_id(user_id)
     return auth_context

@@ -18,6 +18,9 @@ async def get_db_session(
         request.state.db_session = object()
         yield request.state.db_session
         return
-    async with db_session.get_session(auth_context.tenant_id) as session:
+    async with db_session.get_session(
+        auth_context.tenant_id,
+        user_id=auth_context.user_id,
+    ) as session:
         request.state.db_session = session
         yield session

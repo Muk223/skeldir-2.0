@@ -597,10 +597,10 @@ jobs:
       - name: Enforce LLM contract DB parity (current row shape)
         run: |
           python scripts/ci/llm_contract_db_parity.py \
-            --contract contracts-internal/llm/b07_llm_api_calls_write_contract.json \
-            --shape current_row_shape \
-            --mode enforce \
-            --db-url "${MIGRATION_DATABASE_URL}"
+              --contract contracts-internal/llm/b07_llm_api_calls_write_contract.json \
+              --shape target_row_shape \
+              --mode enforce \
+              --db-url "${MIGRATION_DATABASE_URL}"
 
       - name: Report LLM contract DB parity (target row shape)
         run: |

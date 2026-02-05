@@ -22,6 +22,7 @@ def test_llm_payload_json_roundtrip_fidelity():
     request_id = str(uuid4())
     payload = LLMTaskPayload(
         tenant_id=uuid4(),
+        user_id=uuid4(),
         correlation_id=str(uuid4()),
         request_id=request_id,
         prompt={"question": "explain deterministic pipeline"},
@@ -53,6 +54,7 @@ def test_llm_enqueue_payload_mapping(monkeypatch):
 
     payload = LLMTaskPayload(
         tenant_id=uuid4(),
+        user_id=uuid4(),
         correlation_id=str(uuid4()),
         request_id=str(uuid4()),
         prompt={"prompt": "payload fidelity"},
@@ -63,6 +65,7 @@ def test_llm_enqueue_payload_mapping(monkeypatch):
     assert result.id == "test-task-id"
     assert captured["kwargs"]["payload"] == payload.prompt
     assert captured["kwargs"]["tenant_id"] == payload.tenant_id
+    assert captured["kwargs"]["user_id"] == payload.user_id
     assert captured["kwargs"]["correlation_id"] == payload.correlation_id
     assert captured["kwargs"]["request_id"] == payload.request_id
     assert captured["kwargs"]["max_cost_cents"] == payload.max_cost_cents

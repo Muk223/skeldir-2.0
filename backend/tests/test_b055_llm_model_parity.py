@@ -5,7 +5,14 @@ from sqlalchemy import Boolean, Date, DateTime, Integer, String, Text, inspect
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID as PGUUID
 
 from app.db.session import engine
-from app.models.llm import BudgetOptimizationJob, Investigation, LLMApiCall, LLMMonthlyCost
+from app.models.llm import (
+    BudgetOptimizationJob,
+    Investigation,
+    LLMApiCall,
+    LLMBreakerState,
+    LLMHourlyShutoffState,
+    LLMMonthlyCost,
+)
 
 
 def _normalize_type(sa_type) -> str:
@@ -36,6 +43,8 @@ async def test_llm_models_reflection_parity():
         "llm_monthly_costs": LLMMonthlyCost,
         "investigations": Investigation,
         "budget_optimization_jobs": BudgetOptimizationJob,
+        "llm_breaker_state": LLMBreakerState,
+        "llm_hourly_shutoff_state": LLMHourlyShutoffState,
     }
 
     async with engine.connect() as conn:

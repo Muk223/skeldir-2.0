@@ -9,7 +9,7 @@ os.environ.setdefault(
     "postgresql+asyncpg://app_user:Sk3ld1r_App_Pr0d_2025!@ep-lucky-base-aedv3gwo-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require",
 )
 
-from app.db.session import engine, set_tenant_guc  # noqa: E402
+from app.db.session import engine, set_tenant_guc, set_user_guc  # noqa: E402
 
 
 @pytest.mark.asyncio
@@ -22,3 +22,15 @@ async def test_set_tenant_guc_sets_current_setting():
         )
         val = res.scalar()
     assert val == str(tenant_id)
+
+
+@pytest.mark.asyncio
+async def test_set_user_guc_sets_current_setting():
+    user_id = uuid.uuid4()
+    async with engine.begin() as conn:
+        await set_user_guc(conn, user_id, local=True)
+        res = await conn.execute(
+            text("SELECT current_setting('app.current_user_id', true)")
+        )
+        val = res.scalar()
+    assert val == str(user_id)

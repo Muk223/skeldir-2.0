@@ -262,6 +262,7 @@ class BudgetPolicyEngine:
         self,
         conn: AsyncConnection,
         tenant_id: UUID,
+        user_id: UUID,
         requested_model: str,
         input_tokens: int,
         output_tokens: int,
@@ -275,6 +276,7 @@ class BudgetPolicyEngine:
         Args:
             conn: Database connection.
             tenant_id: Tenant UUID for RLS.
+            user_id: User UUID for per-user isolation.
             requested_model: The model requested.
             input_tokens: Estimated input tokens.
             output_tokens: Estimated output tokens.
@@ -293,6 +295,7 @@ class BudgetPolicyEngine:
         await self._record_audit(
             conn=conn,
             tenant_id=tenant_id,
+            user_id=user_id,
             decision=decision,
             requested_model=requested_model,
             input_tokens=input_tokens,
@@ -319,6 +322,7 @@ class BudgetPolicyEngine:
         self,
         conn: AsyncConnection,
         tenant_id: UUID,
+        user_id: UUID,
         decision: BudgetDecision,
         requested_model: str,
         input_tokens: int,
@@ -330,13 +334,13 @@ class BudgetPolicyEngine:
         await conn.execute(
             text("""
                 INSERT INTO llm_call_audit (
-                    tenant_id, request_id, correlation_id,
+                    tenant_id, user_id, request_id, correlation_id,
                     requested_model, resolved_model,
                     estimated_cost_cents, cap_cents,
                     decision, reason,
                     input_tokens, output_tokens
                 ) VALUES (
-                    :tenant_id, :request_id, :correlation_id,
+                    :tenant_id, :user_id, :request_id, :correlation_id,
                     :requested_model, :resolved_model,
                     :estimated_cost_cents, :cap_cents,
                     :decision, :reason,
@@ -345,6 +349,7 @@ class BudgetPolicyEngine:
             """),
             {
                 "tenant_id": str(tenant_id),
+                "user_id": str(user_id),
                 "request_id": decision.request_id,
                 "correlation_id": correlation_id,
                 "requested_model": requested_model,

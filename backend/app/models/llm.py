@@ -21,6 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.identity import SYSTEM_USER_ID
 from app.models.base import Base
 
 
@@ -36,6 +37,11 @@ class LLMApiCall(Base):
         server_default=func.gen_random_uuid(),
     )
     tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        nullable=False,
+        server_default=str(SYSTEM_USER_ID),
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=func.now(),
@@ -44,6 +50,11 @@ class LLMApiCall(Base):
     )
     endpoint: Mapped[str] = mapped_column(Text, nullable=False)
     request_id: Mapped[str] = mapped_column(Text, nullable=False)
+    provider: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        server_default="stub",
+    )
     model: Mapped[str] = mapped_column(Text, nullable=False)
     input_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     output_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -53,8 +64,17 @@ class LLMApiCall(Base):
         Boolean,
         default=False,
         server_default="false",
-        nullable=True,
+        nullable=False,
     )
+    distillation_eligible: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default="false",
+        nullable=False,
+    )
+    request_metadata_ref: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    response_metadata_ref: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    reasoning_trace_ref: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     request_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
@@ -83,6 +103,11 @@ class LLMMonthlyCost(Base):
         server_default=func.gen_random_uuid(),
     )
     tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        nullable=False,
+        server_default=str(SYSTEM_USER_ID),
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=func.now(),
@@ -97,8 +122,9 @@ class LLMMonthlyCost(Base):
     __table_args__ = (
         UniqueConstraint(
             "tenant_id",
+            "user_id",
             "month",
-            name="uq_llm_monthly_costs_tenant_month",
+            name="uq_llm_monthly_costs_tenant_user_month",
         ),
         CheckConstraint("total_cost_cents >= 0", name="ck_llm_monthly_costs_cost_cents_positive"),
         CheckConstraint("total_calls >= 0", name="ck_llm_monthly_costs_total_calls_positive"),
@@ -187,4 +213,87 @@ class BudgetOptimizationJob(Base):
             name="ck_budget_optimization_jobs_status_valid",
         ),
         CheckConstraint("cost_cents >= 0", name="ck_budget_optimization_jobs_cost_cents_positive"),
+    )
+
+
+class LLMBreakerState(Base):
+    """Circuit breaker state for LLM budget enforcement."""
+
+    __tablename__ = "llm_breaker_state"
+
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    breaker_key: Mapped[str] = mapped_column(Text, nullable=False)
+    state: Mapped[str] = mapped_column(Text, nullable=False)
+    failure_count: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        server_default="0",
+        nullable=False,
+    )
+    opened_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_trip_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=func.now(),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "user_id",
+            "breaker_key",
+            name="uq_llm_breaker_state_tenant_user_key",
+        ),
+        CheckConstraint(
+            "state IN ('closed', 'open', 'half_open')",
+            name="ck_llm_breaker_state_state_valid",
+        ),
+        CheckConstraint("failure_count >= 0", name="ck_llm_breaker_state_failure_count_positive"),
+    )
+
+
+class LLMHourlyShutoffState(Base):
+    """Hourly shutoff guardrail state for LLM usage."""
+
+    __tablename__ = "llm_hourly_shutoff_state"
+
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    hour_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_shutoff: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        server_default="false",
+        nullable=False,
+    )
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=func.now(),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "user_id",
+            "hour_start",
+            name="uq_llm_hourly_shutoff_tenant_user_hour",
+        ),
     )

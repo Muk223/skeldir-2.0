@@ -104,6 +104,7 @@ async def test_value_trace_budget_enforcement_blocks_premium():
     # Part 2: Adversarial budget enforcement test
     tenant_record = await build_tenant(name="ValueTrace Budget Tenant")
     tenant_id = tenant_record["tenant_id"]
+    user_id = uuid4()
 
     # Configure policy with $0.30 cap
     policy = BudgetPolicy(
@@ -131,10 +132,15 @@ async def test_value_trace_budget_enforcement_blocks_premium():
             text("SELECT set_config('app.current_tenant_id', :tid, false)"),
             {"tid": str(tenant_id)},
         )
+        await conn.execute(
+            text("SELECT set_config('app.current_user_id', :uid, false)"),
+            {"uid": str(user_id)},
+        )
 
         decision = await engine_instance.evaluate_and_audit(
             conn=conn,
             tenant_id=tenant_id,
+            user_id=user_id,
             requested_model=requested_model,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
@@ -163,6 +169,10 @@ async def test_value_trace_budget_enforcement_blocks_premium():
             text("SELECT set_config('app.current_tenant_id', :tid, false)"),
             {"tid": str(tenant_id)},
         )
+        await conn.execute(
+            text("SELECT set_config('app.current_user_id', :uid, false)"),
+            {"uid": str(user_id)},
+        )
 
         audit_result = await conn.execute(
             text("""
@@ -170,11 +180,11 @@ async def test_value_trace_budget_enforcement_blocks_premium():
                     request_id, requested_model, resolved_model,
                     estimated_cost_cents, cap_cents, decision, reason
                 FROM llm_call_audit
-                WHERE tenant_id = :tenant_id
+                WHERE tenant_id = :tenant_id AND user_id = :user_id
                 ORDER BY created_at DESC
                 LIMIT 1
             """),
-            {"tenant_id": str(tenant_id)},
+            {"tenant_id": str(tenant_id), "user_id": str(user_id)},
         )
         audit_row = audit_result.mappings().first()
 
@@ -195,7 +205,7 @@ async def test_value_trace_budget_enforcement_blocks_premium():
         decision,
         reason
     FROM llm_call_audit
-    WHERE tenant_id = '{tenant_id}'
+    WHERE tenant_id = '{tenant_id}' AND user_id = '{user_id}'
     ORDER BY created_at DESC
     LIMIT 1;
 

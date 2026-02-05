@@ -29,12 +29,14 @@ from app.schemas.llm_payloads import LLMTaskPayload
 logger = logging.getLogger(__name__)
 
 _STUB_MODEL = "llm_stub"
+_STUB_PROVIDER = "stub"
 _PROVIDER_BOUNDARY = get_llm_provider_boundary()
 
 
 def _stable_fallback_id(model: LLMTaskPayload, endpoint: str, label: str) -> str:
     payload = {
         "tenant_id": str(model.tenant_id),
+        "user_id": str(model.user_id),
         "endpoint": endpoint,
         "correlation_id": model.correlation_id,
         "request_id": model.request_id,
@@ -75,26 +77,29 @@ async def _claim_api_call(
     endpoint: str,
     request_id: str,
     correlation_id: str,
-    ) -> tuple[UUID, datetime, bool]:
+) -> tuple[UUID, datetime, bool]:
     insert_stmt = (
         insert(LLMApiCall)
         .values(
             tenant_id=model.tenant_id,
+            user_id=model.user_id,
             endpoint=endpoint,
             request_id=request_id,
+            provider=_STUB_PROVIDER,
             model=_STUB_MODEL,
             input_tokens=0,
             output_tokens=0,
             cost_cents=0,
             latency_ms=0,
-             was_cached=False,
-             request_metadata={
-                 "stubbed": True,
-                 "request_id": request_id,
-                 "correlation_id": correlation_id,
-                 "provider_boundary": _PROVIDER_BOUNDARY.boundary_id,
-             },
-         )
+            was_cached=False,
+            distillation_eligible=False,
+            request_metadata_ref={
+                "stubbed": True,
+                "request_id": request_id,
+                "correlation_id": correlation_id,
+                "provider_boundary": _PROVIDER_BOUNDARY.boundary_id,
+            },
+        )
         .on_conflict_do_nothing(
             index_elements=["tenant_id", "request_id", "endpoint"]
         )
@@ -150,6 +155,7 @@ async def record_monthly_costs(
     session: AsyncSession,
     *,
     tenant_id: UUID,
+    user_id: UUID,
     model_label: str,
     cost_cents: int,
     calls: int,
@@ -160,6 +166,7 @@ async def record_monthly_costs(
         insert(LLMMonthlyCost)
         .values(
             tenant_id=tenant_id,
+            user_id=user_id,
             month=month,
             total_cost_cents=cost_cents,
             total_calls=calls,
@@ -168,7 +175,7 @@ async def record_monthly_costs(
     )
     excluded = insert_stmt.excluded
     stmt = insert_stmt.on_conflict_do_update(
-        index_elements=["tenant_id", "month"],
+        index_elements=["tenant_id", "user_id", "month"],
         set_={
             "total_cost_cents": LLMMonthlyCost.total_cost_cents + excluded.total_cost_cents,
             "total_calls": LLMMonthlyCost.total_calls + excluded.total_calls,
@@ -211,6 +218,7 @@ async def route_request(
         await record_monthly_costs(
             session,
             tenant_id=model.tenant_id,
+            user_id=model.user_id,
             model_label=_STUB_MODEL,
             cost_cents=0,
             calls=1,
@@ -265,6 +273,7 @@ async def generate_explanation(
         await record_monthly_costs(
             session,
             tenant_id=model.tenant_id,
+            user_id=model.user_id,
             model_label=_STUB_MODEL,
             cost_cents=0,
             calls=1,
@@ -337,6 +346,7 @@ async def run_investigation(
         await record_monthly_costs(
             session,
             tenant_id=model.tenant_id,
+            user_id=model.user_id,
             model_label=_STUB_MODEL,
             cost_cents=0,
             calls=1,
@@ -409,6 +419,7 @@ async def optimize_budget(
         await record_monthly_costs(
             session,
             tenant_id=model.tenant_id,
+            user_id=model.user_id,
             model_label=_STUB_MODEL,
             cost_cents=0,
             calls=1,

@@ -27,6 +27,7 @@ from sqlalchemy.pool import NullPool
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
+from app.core.identity import resolve_user_id
 
 
 # Normalize DSN to ensure asyncpg driver is used and map unsupported parameters to connect_args.
@@ -84,21 +85,32 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 @asynccontextmanager
-async def get_session(tenant_id: UUID) -> AsyncGenerator[AsyncSession, None]:
+async def get_session(
+    tenant_id: UUID,
+    user_id: UUID | None = None,
+) -> AsyncGenerator[AsyncSession, None]:
     """
     Yield an async session with tenant context set for RLS enforcement.
 
-    The session variable `app.current_tenant_id` is set before yielding the
-    session so all subsequent queries evaluate row-level policies correctly.
+    The session variables `app.current_tenant_id` and `app.current_user_id` are
+    set before yielding the session so all subsequent queries evaluate row-level
+    policies correctly.
     Session lifecycle is managed automatically with rollback on exception and
     closure on exit.
     """
     async with AsyncSessionLocal() as session:
+        resolved_user_id = resolve_user_id(user_id)
         await session.execute(
             text(
                 "SELECT set_config('app.current_tenant_id', :tenant_id, false)"
             ),
             {"tenant_id": str(tenant_id)},
+        )
+        await session.execute(
+            text(
+                "SELECT set_config('app.current_user_id', :user_id, false)"
+            ),
+            {"user_id": str(resolved_user_id)},
         )
         try:
             yield session
@@ -141,6 +153,18 @@ async def set_tenant_guc_async(
     )
 
 
+async def set_user_guc_async(
+    session: AsyncConnection | AsyncSession, user_id: UUID, local: bool = True
+) -> None:
+    """
+    Async helper to set user context (app.current_user_id) on an existing session/connection.
+    """
+    await session.execute(
+        text("SELECT set_config('app.current_user_id', :user_id, :is_local)"),
+        {"user_id": str(user_id), "is_local": local},
+    )
+
+
 def set_tenant_guc_sync(
     session: Connection, tenant_id: UUID, local: bool = True
 ) -> None:
@@ -156,6 +180,22 @@ def set_tenant_guc_sync(
     )
 
 
+def set_user_guc_sync(
+    session: Connection, user_id: UUID, local: bool = True
+) -> None:
+    """
+    Sync helper to set user context (app.current_user_id) on an existing sync connection.
+    """
+    session.execute(
+        text("SELECT set_config('app.current_user_id', :user_id, :is_local)"),
+        {"user_id": str(user_id), "is_local": local},
+    )
+
+
 # Backwards-compatible alias for existing async callers.
 async def set_tenant_guc(session: AsyncSession, tenant_id: UUID, local: bool = True) -> None:
     await set_tenant_guc_async(session, tenant_id, local)
+
+
+async def set_user_guc(session: AsyncSession, user_id: UUID, local: bool = True) -> None:
+    await set_user_guc_async(session, user_id, local)

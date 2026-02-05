@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy import select, text
 
+from app.core.identity import SYSTEM_USER_ID
 from app.db.session import engine, get_session
 from app.models.llm import BudgetOptimizationJob, Investigation, LLMApiCall, LLMMonthlyCost
 from app.schemas.llm_payloads import LLMTaskPayload
@@ -22,9 +23,10 @@ from app.workers.llm import (
 )
 
 
-def _build_payload(tenant_id: UUID) -> LLMTaskPayload:
+def _build_payload(tenant_id: UUID, user_id: UUID | None = None) -> LLMTaskPayload:
     return LLMTaskPayload(
         tenant_id=tenant_id,
+        user_id=user_id or SYSTEM_USER_ID,
         correlation_id=str(uuid4()),
         prompt={"stub": True},
         max_cost_cents=0,
@@ -43,6 +45,7 @@ def test_llm_fallback_id_ignores_prompt_variation():
     tenant_id = uuid4()
     payload_a = LLMTaskPayload(
         tenant_id=tenant_id,
+        user_id=SYSTEM_USER_ID,
         correlation_id=None,
         request_id=None,
         prompt={"question": "why deterministic?"},
@@ -50,6 +53,7 @@ def test_llm_fallback_id_ignores_prompt_variation():
     )
     payload_b = LLMTaskPayload(
         tenant_id=tenant_id,
+        user_id=SYSTEM_USER_ID,
         correlation_id=None,
         request_id=None,
         prompt={"question": "why  deterministic?", "whitespace": True},
@@ -83,6 +87,7 @@ async def test_monthly_costs_use_api_call_timestamp(test_tenant, monkeypatch):
         session,
         *,
         tenant_id,
+        user_id,
         model_label,
         cost_cents,
         calls,
@@ -94,16 +99,17 @@ async def test_monthly_costs_use_api_call_timestamp(test_tenant, monkeypatch):
 
     payload = LLMTaskPayload(
         tenant_id=test_tenant,
+        user_id=SYSTEM_USER_ID,
         correlation_id=str(uuid4()),
         request_id=str(uuid4()),
         prompt={"stub": True},
         max_cost_cents=0,
     )
 
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         result = await route_request(payload, session=session)
 
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         api_call = await session.get(LLMApiCall, UUID(result["api_call_id"]))
 
     assert captured.get("occurred_at") == api_call.created_at
@@ -143,6 +149,7 @@ async def test_llm_stub_atomic_writes_roll_back_on_failure(test_tenant):
     request_id = str(uuid4())
     payload = LLMTaskPayload(
         tenant_id=test_tenant,
+        user_id=SYSTEM_USER_ID,
         correlation_id=str(uuid4()),
         request_id=request_id,
         prompt={"stub": True},
@@ -150,10 +157,10 @@ async def test_llm_stub_atomic_writes_roll_back_on_failure(test_tenant):
     )
 
     with pytest.raises(RuntimeError, match="forced failure"):
-        async with get_session(tenant_id=test_tenant) as session:
+        async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
             await route_request(payload, session=session, force_failure=True)
 
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         api_calls = (
             await session.execute(
                 select(LLMApiCall).where(LLMApiCall.request_id == request_id)
@@ -163,7 +170,10 @@ async def test_llm_stub_atomic_writes_roll_back_on_failure(test_tenant):
 
         monthly = (
             await session.execute(
-                select(LLMMonthlyCost).where(LLMMonthlyCost.tenant_id == test_tenant)
+                select(LLMMonthlyCost).where(
+                    LLMMonthlyCost.tenant_id == test_tenant,
+                    LLMMonthlyCost.user_id == SYSTEM_USER_ID,
+                )
             )
         ).scalars().all()
         assert not monthly, "Atomicity failed: monthly costs persisted after failure"
@@ -172,22 +182,26 @@ async def test_llm_stub_atomic_writes_roll_back_on_failure(test_tenant):
 @pytest.mark.asyncio
 async def test_llm_route_stub_writes_audit_rows(test_tenant):
     payload = _build_payload(test_tenant)
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         result = await route_request(payload, session=session)
 
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         api_call = await session.get(LLMApiCall, UUID(result["api_call_id"]))
         assert api_call is not None
         assert api_call.tenant_id == test_tenant
+        assert api_call.user_id == SYSTEM_USER_ID
         assert api_call.endpoint == "app.tasks.llm.route"
         assert api_call.model == "llm_stub"
         assert api_call.cost_cents == 0
-        assert api_call.request_metadata is not None
-        assert api_call.request_metadata.get("stubbed") is True
+        assert api_call.request_metadata_ref is not None
+        assert api_call.request_metadata_ref.get("stubbed") is True
 
         monthly = (
             await session.execute(
-                select(LLMMonthlyCost).where(LLMMonthlyCost.tenant_id == test_tenant)
+                select(LLMMonthlyCost).where(
+                    LLMMonthlyCost.tenant_id == test_tenant,
+                    LLMMonthlyCost.user_id == SYSTEM_USER_ID,
+                )
             )
         ).scalars().all()
         assert monthly, "Expected llm_monthly_costs row for tenant"
@@ -197,10 +211,10 @@ async def test_llm_route_stub_writes_audit_rows(test_tenant):
 @pytest.mark.asyncio
 async def test_llm_investigation_stub_writes_job(test_tenant):
     payload = _build_payload(test_tenant)
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         result = await run_investigation(payload, session=session)
 
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         investigation = await session.get(Investigation, UUID(result["investigation_id"]))
         assert investigation is not None
         assert investigation.status == "completed"
@@ -213,20 +227,21 @@ async def test_llm_investigation_repeat_is_idempotent(test_tenant):
     request_id = str(uuid4())
     payload = LLMTaskPayload(
         tenant_id=test_tenant,
+        user_id=SYSTEM_USER_ID,
         correlation_id=str(uuid4()),
         request_id=request_id,
         prompt={"stub": True},
         max_cost_cents=0,
     )
 
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         first = await run_investigation(payload, session=session)
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         second = await run_investigation(payload, session=session)
 
     assert first["investigation_id"] == second["investigation_id"]
 
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         investigations = (
             await session.execute(
                 select(Investigation).where(
@@ -241,10 +256,10 @@ async def test_llm_investigation_repeat_is_idempotent(test_tenant):
 @pytest.mark.asyncio
 async def test_llm_budget_stub_writes_job(test_tenant):
     payload = _build_payload(test_tenant)
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         result = await optimize_budget(payload, session=session)
 
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         job = await session.get(BudgetOptimizationJob, UUID(result["budget_job_id"]))
         assert job is not None
         assert job.status == "completed"
@@ -256,7 +271,7 @@ async def test_llm_stub_rls_blocks_cross_tenant_reads(test_tenant_pair):
     _assert_postgres_engine()
     tenant_a, tenant_b = test_tenant_pair
     payload = _build_payload(tenant_a)
-    async with get_session(tenant_id=tenant_a) as session:
+    async with get_session(tenant_id=tenant_a, user_id=SYSTEM_USER_ID) as session:
         result = await run_investigation(payload, session=session)
     investigation_id = UUID(result["investigation_id"])
 
@@ -284,11 +299,11 @@ async def test_llm_stub_rls_blocks_cross_tenant_reads(test_tenant_pair):
             "budget_optimization_jobs",
         }, f"Missing RLS policies: {policy_tables}"
 
-    async with get_session(tenant_id=tenant_b) as session:
+    async with get_session(tenant_id=tenant_b, user_id=SYSTEM_USER_ID) as session:
         blocked = await session.get(Investigation, investigation_id)
         assert blocked is None, "RLS failed: tenant B read tenant A investigation"
 
-    async with get_session(tenant_id=tenant_a) as session:
+    async with get_session(tenant_id=tenant_a, user_id=SYSTEM_USER_ID) as session:
         allowed = await session.get(Investigation, investigation_id)
         assert allowed is not None
 
@@ -296,17 +311,18 @@ async def test_llm_stub_rls_blocks_cross_tenant_reads(test_tenant_pair):
 @pytest.mark.asyncio
 async def test_llm_explanation_stub_writes_api_call(test_tenant):
     payload = _build_payload(test_tenant)
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         result = await generate_explanation(payload, session=session)
 
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         api_call = await session.get(LLMApiCall, UUID(result["api_call_id"]))
         assert api_call is not None
         assert api_call.tenant_id == test_tenant
+        assert api_call.user_id == SYSTEM_USER_ID
         assert api_call.endpoint == "app.tasks.llm.explanation"
         assert api_call.model == "llm_stub"
-        assert api_call.request_metadata is not None
-        assert api_call.request_metadata.get("stubbed") is True
+        assert api_call.request_metadata_ref is not None
+        assert api_call.request_metadata_ref.get("stubbed") is True
 
 
 
@@ -316,22 +332,24 @@ async def test_llm_explanation_idempotency_prevents_duplicate_audit_rows(test_te
     request_id = str(uuid4())
     payload = LLMTaskPayload(
         tenant_id=test_tenant,
+        user_id=SYSTEM_USER_ID,
         correlation_id=str(uuid4()),
         request_id=request_id,
         prompt={"stub": True},
         max_cost_cents=0,
     )
 
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         await generate_explanation(payload, session=session)
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         await generate_explanation(payload, session=session)
 
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         api_calls = (
             await session.execute(
                 select(LLMApiCall).where(
                     LLMApiCall.tenant_id == test_tenant,
+                    LLMApiCall.user_id == SYSTEM_USER_ID,
                     LLMApiCall.request_id == request_id,
                     LLMApiCall.endpoint == "app.tasks.llm.explanation",
                 )
@@ -341,7 +359,10 @@ async def test_llm_explanation_idempotency_prevents_duplicate_audit_rows(test_te
 
         monthly = (
             await session.execute(
-                select(LLMMonthlyCost).where(LLMMonthlyCost.tenant_id == test_tenant)
+                select(LLMMonthlyCost).where(
+                    LLMMonthlyCost.tenant_id == test_tenant,
+                    LLMMonthlyCost.user_id == SYSTEM_USER_ID,
+                )
             )
         ).scalars().one()
         assert monthly.total_calls == 1, "Idempotency failed: monthly costs double-counted"
@@ -374,11 +395,12 @@ async def test_llm_explanation_retry_preserves_request_id_when_omitted(test_tena
     llm_explanation_worker.run(**retry_kwargs)
     llm_explanation_worker.run(**retry_kwargs)
 
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         api_calls = (
             await session.execute(
                 select(LLMApiCall).where(
                     LLMApiCall.tenant_id == test_tenant,
+                    LLMApiCall.user_id == SYSTEM_USER_ID,
                     LLMApiCall.request_id == retry_kwargs["request_id"],
                     LLMApiCall.endpoint == "app.tasks.llm.explanation",
                 )
@@ -388,7 +410,10 @@ async def test_llm_explanation_retry_preserves_request_id_when_omitted(test_tena
 
         monthly = (
             await session.execute(
-                select(LLMMonthlyCost).where(LLMMonthlyCost.tenant_id == test_tenant)
+                select(LLMMonthlyCost).where(
+                    LLMMonthlyCost.tenant_id == test_tenant,
+                    LLMMonthlyCost.user_id == SYSTEM_USER_ID,
+                )
             )
         ).scalars().one()
         assert monthly.total_calls == 1, "Retry idempotency failed: monthly costs double-counted"
@@ -401,11 +426,12 @@ async def test_llm_monthly_costs_concurrent_updates_are_atomic(test_tenant):
     calls = 8
 
     async def _apply_increment():
-        async with get_session(tenant_id=test_tenant) as session:
+        async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
             async with session.begin_nested():
                 await record_monthly_costs(
                     session,
                     tenant_id=test_tenant,
+                    user_id=SYSTEM_USER_ID,
                     model_label="concurrency",
                     cost_cents=increment,
                     calls=1,
@@ -414,10 +440,13 @@ async def test_llm_monthly_costs_concurrent_updates_are_atomic(test_tenant):
 
     await asyncio.gather(*[_apply_increment() for _ in range(calls)])
 
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         row = (
             await session.execute(
-                select(LLMMonthlyCost).where(LLMMonthlyCost.tenant_id == test_tenant)
+                select(LLMMonthlyCost).where(
+                    LLMMonthlyCost.tenant_id == test_tenant,
+                    LLMMonthlyCost.user_id == SYSTEM_USER_ID,
+                )
             )
         ).scalars().one()
         assert row.total_cost_cents == increment * calls
@@ -430,22 +459,24 @@ async def test_llm_route_idempotency_prevents_duplicate_audit_rows(test_tenant):
     request_id = str(uuid4())
     payload = LLMTaskPayload(
         tenant_id=test_tenant,
+        user_id=SYSTEM_USER_ID,
         correlation_id=str(uuid4()),
         request_id=request_id,
         prompt={"stub": True},
         max_cost_cents=0,
     )
 
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         await route_request(payload, session=session)
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         await route_request(payload, session=session)
 
-    async with get_session(tenant_id=test_tenant) as session:
+    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         api_calls = (
             await session.execute(
                 select(LLMApiCall).where(
                     LLMApiCall.tenant_id == test_tenant,
+                    LLMApiCall.user_id == SYSTEM_USER_ID,
                     LLMApiCall.request_id == request_id,
                     LLMApiCall.endpoint == "app.tasks.llm.route",
                 )
@@ -455,7 +486,10 @@ async def test_llm_route_idempotency_prevents_duplicate_audit_rows(test_tenant):
 
         monthly = (
             await session.execute(
-                select(LLMMonthlyCost).where(LLMMonthlyCost.tenant_id == test_tenant)
+                select(LLMMonthlyCost).where(
+                    LLMMonthlyCost.tenant_id == test_tenant,
+                    LLMMonthlyCost.user_id == SYSTEM_USER_ID,
+                )
             )
         ).scalars().one()
         assert monthly.total_calls == 1, "Idempotency failed: monthly costs double-counted"
