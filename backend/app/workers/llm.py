@@ -17,6 +17,7 @@ from sqlalchemy import Integer, Text, cast, func, literal, select
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.llm.provider_boundary import get_llm_provider_boundary
 from app.models.llm import (
     BudgetOptimizationJob,
     Investigation,
@@ -28,6 +29,7 @@ from app.schemas.llm_payloads import LLMTaskPayload
 logger = logging.getLogger(__name__)
 
 _STUB_MODEL = "llm_stub"
+_PROVIDER_BOUNDARY = get_llm_provider_boundary()
 
 
 def _stable_fallback_id(model: LLMTaskPayload, endpoint: str, label: str) -> str:
@@ -73,7 +75,7 @@ async def _claim_api_call(
     endpoint: str,
     request_id: str,
     correlation_id: str,
-) -> tuple[UUID, datetime, bool]:
+    ) -> tuple[UUID, datetime, bool]:
     insert_stmt = (
         insert(LLMApiCall)
         .values(
@@ -85,13 +87,14 @@ async def _claim_api_call(
             output_tokens=0,
             cost_cents=0,
             latency_ms=0,
-            was_cached=False,
-            request_metadata={
-                "stubbed": True,
-                "request_id": request_id,
-                "correlation_id": correlation_id,
-            },
-        )
+             was_cached=False,
+             request_metadata={
+                 "stubbed": True,
+                 "request_id": request_id,
+                 "correlation_id": correlation_id,
+                 "provider_boundary": _PROVIDER_BOUNDARY.boundary_id,
+             },
+         )
         .on_conflict_do_nothing(
             index_elements=["tenant_id", "request_id", "endpoint"]
         )

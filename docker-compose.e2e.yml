@@ -66,3 +66,33 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: skeldir-worker-e2e
+    environment:
+      CI: "true"
+      ENVIRONMENT: test
+      LOG_LEVEL: INFO
+      DATABASE_URL: postgresql+asyncpg://skeldir:skeldir_e2e@postgres:5432/skeldir_e2e
+      AUTH_JWT_SECRET: e2e-secret
+      AUTH_JWT_ALGORITHM: HS256
+      AUTH_JWT_ISSUER: https://issuer.skeldir.test
+      AUTH_JWT_AUDIENCE: skeldir-api
+      PLATFORM_TOKEN_ENCRYPTION_KEY: e2e-platform-key
+      PLATFORM_TOKEN_KEY_ID: e2e-key
+      STRIPE_BASE_URL: http://mock_platform:8080
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus_multiproc
+    command: >
+      celery -A app.celery_app worker
+      --loglevel=INFO
+      --pool=solo
+      --concurrency=1
+      --queues=housekeeping,maintenance,llm,attribution
+    depends_on:
+      postgres:
+        condition: service_healthy
+    tmpfs:
+      - /tmp/prometheus_multiproc
