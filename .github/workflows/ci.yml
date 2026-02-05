@@ -1333,7 +1333,7 @@ jobs:
 
   # Frontend tests (when frontend exists)
   lint-frontend:
-    name: Lint Frontend (Design System Compliance)
+    name: lint-frontend
     runs-on: ubuntu-latest
     needs: checkout
     steps:
@@ -1359,7 +1359,7 @@ jobs:
         continue-on-error: false
 
   validate-design-tokens:
-    name: Validate Design Tokens
+    name: validate-design-tokens
     runs-on: ubuntu-latest
     needs: checkout
     steps:
@@ -1385,7 +1385,7 @@ jobs:
         continue-on-error: false
 
   test-frontend:
-    name: Test Frontend
+    name: test-frontend
     runs-on: ubuntu-latest
     needs: [checkout, lint-frontend, validate-design-tokens]
     steps:
