@@ -418,6 +418,7 @@ jobs:
           pytest tests/test_b07_p0_provider_boundary_stub.py -q
           pytest tests/test_b07_p0_llm_write_contract_validation.py -q
           pytest tests/test_b07_p0_provider_boundary_enforcement.py -q
+          pytest tests/test_b07_p0_llm_contract_db_parity.py -q
           pytest tests/test_b052_queue_topology_and_dlq.py -q -k "QueueTopology"
 
   b057-p6-e2e:
@@ -592,6 +593,24 @@ jobs:
       - name: Apply migrations
         run: |
           alembic upgrade head
+
+      - name: Enforce LLM contract DB parity (current row shape)
+        run: |
+          python scripts/ci/llm_contract_db_parity.py \
+            --contract contracts-internal/llm/b07_llm_api_calls_write_contract.json \
+            --shape current_row_shape \
+            --mode enforce \
+            --db-url "${MIGRATION_DATABASE_URL}"
+
+      - name: Report LLM contract DB parity (target row shape)
+        run: |
+          mkdir -p artifacts/b060-phase6-e2e
+          python scripts/ci/llm_contract_db_parity.py \
+            --contract contracts-internal/llm/b07_llm_api_calls_write_contract.json \
+            --shape target_row_shape \
+            --mode report \
+            --db-url "${MIGRATION_DATABASE_URL}" \
+            --output artifacts/b060-phase6-e2e/llm_contract_target_report.txt
 
       - name: Start worker (Postgres broker/backend) + prove /health/worker
         run: |

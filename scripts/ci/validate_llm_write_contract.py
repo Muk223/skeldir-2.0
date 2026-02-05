@@ -27,7 +27,7 @@ class RequiredColumn(BaseModel):
     notes: str | None = None
 
 
-class B07TargetRowShape(BaseModel):
+class RowShape(BaseModel):
     required_columns: list[RequiredColumn]
     required_uniques: list[list[str]]
 
@@ -38,7 +38,8 @@ class LLMWriteContract(BaseModel):
     owner: Literal["llm"]
     purpose: str
     targets: list[ContractTarget]
-    b07_target_row_shape: B07TargetRowShape
+    current_row_shape: RowShape
+    target_row_shape: RowShape
 
 
 @dataclass(frozen=True, slots=True)
