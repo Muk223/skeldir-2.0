@@ -39,24 +39,24 @@ This phase adds **non-vacuous, falsifiable** guardrails so B0.7 provider work ca
 Repository: `https://github.com/Muk223/skeldir-2.0`
 
 - EG-P0-3 (provider boundary scanner non-vacuous):
-  - CI run: `https://github.com/Muk223/skeldir-2.0/actions/runs/21722925971/job/62657346360`
+  - CI run: `https://github.com/Muk223/skeldir-2.0/actions/runs/21723159851/job/62658173441`
   - Notes: `backend/tests/test_b07_p0_provider_boundary_enforcement.py` asserts scanner fails on a meaningful violation (temp file).
 
 - EG-P0-4 (compose substrate bring-up + worker proof):
-  - CI run: `https://github.com/Muk223/skeldir-2.0/actions/runs/21722925971/job/62657346403`
+  - CI run: `https://github.com/Muk223/skeldir-2.0/actions/runs/21723159851/job/62658173284`
   - Notes: `scripts/wait_for_e2e_worker.py` must pass (200 + `"worker":"ok"` from `/health/worker`).
   - Debug artifacts: `b060-phase6-e2e-artifacts` -> `compose.log`
 
 - EG-F1-4 (current schema parity enforced):
-  - CI run: `https://github.com/Muk223/skeldir-2.0/actions/runs/21722925971/job/62657346403`
+  - CI run: `https://github.com/Muk223/skeldir-2.0/actions/runs/21723159851/job/62658173284`
   - Notes: `scripts/ci/llm_contract_db_parity.py --shape current_row_shape --mode enforce`
 
 - EG-F1-5 (target schema drift reported):
-  - CI run: `https://github.com/Muk223/skeldir-2.0/actions/runs/21722925971/job/62657346403`
+  - CI run: `https://github.com/Muk223/skeldir-2.0/actions/runs/21723159851/job/62658173284`
   - Artifact: `b060-phase6-e2e-artifacts` -> `llm_contract_target_report.txt`
 
 - EG-F1-3 (non-vacuity / negative controls):
-  - CI run: `https://github.com/Muk223/skeldir-2.0/actions/runs/21722925971/job/62657346360`
+  - CI run: `https://github.com/Muk223/skeldir-2.0/actions/runs/21723159851/job/62658173441`
   - Notes: `backend/tests/test_b07_p0_llm_contract_db_parity.py` forces mismatch and asserts non-zero exit in enforce mode.
 
 ## Local reproduction (Linux / CI-equivalent)
