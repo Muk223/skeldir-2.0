@@ -1,0 +1,20 @@
+{
+  "schema": "public",
+  "table": "llm_api_calls",
+  "columns": [
+    { "name": "id", "type": "uuid", "nullable": false },
+    { "name": "tenant_id", "type": "uuid", "nullable": false },
+    { "name": "created_at", "type": "timestamp with time zone", "nullable": false },
+    { "name": "endpoint", "type": "text", "nullable": false },
+    { "name": "request_id", "type": "text", "nullable": false },
+    { "name": "input_tokens", "type": "integer", "nullable": false },
+    { "name": "output_tokens", "type": "integer", "nullable": false },
+    { "name": "cost_cents", "type": "integer", "nullable": false },
+    { "name": "latency_ms", "type": "integer", "nullable": false },
+    { "name": "was_cached", "type": "boolean", "nullable": true },
+    { "name": "request_metadata", "type": "jsonb", "nullable": true }
+  ],
+  "uniques": [
+    ["tenant_id", "request_id", "endpoint"]
+  ]
+}

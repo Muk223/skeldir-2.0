@@ -10,7 +10,89 @@
       "tenant_scoped": true
     }
   ],
-  "b07_target_row_shape": {
+  "current_row_shape": {
+    "required_columns": [
+      {
+        "name": "tenant_id",
+        "type": "uuid",
+        "nullable": false,
+        "notes": "Tenant boundary for RLS (current runtime schema)."
+      },
+      {
+        "name": "created_at",
+        "type": "timestamptz",
+        "nullable": false,
+        "notes": "Write timestamp (current runtime schema)."
+      },
+      {
+        "name": "endpoint",
+        "type": "text",
+        "nullable": false
+      },
+      {
+        "name": "request_id",
+        "type": "text",
+        "nullable": false
+      },
+      {
+        "name": "model",
+        "type": "text",
+        "nullable": false
+      },
+      {
+        "name": "input_tokens",
+        "type": "int",
+        "nullable": false,
+        "constraints": [
+          ">=0"
+        ]
+      },
+      {
+        "name": "output_tokens",
+        "type": "int",
+        "nullable": false,
+        "constraints": [
+          ">=0"
+        ]
+      },
+      {
+        "name": "cost_cents",
+        "type": "int",
+        "nullable": false,
+        "constraints": [
+          ">=0"
+        ],
+        "notes": "Monetary values must be stored as integer cents."
+      },
+      {
+        "name": "latency_ms",
+        "type": "int",
+        "nullable": false,
+        "constraints": [
+          ">=0"
+        ]
+      },
+      {
+        "name": "was_cached",
+        "type": "bool",
+        "nullable": true,
+        "notes": "Nullable in current runtime schema."
+      },
+      {
+        "name": "request_metadata",
+        "type": "jsonb",
+        "nullable": true
+      }
+    ],
+    "required_uniques": [
+      [
+        "tenant_id",
+        "request_id",
+        "endpoint"
+      ]
+    ]
+  },
+  "target_row_shape": {
     "required_columns": [
       {
         "name": "tenant_id",
@@ -127,4 +209,3 @@
     ]
   }
 }
-
