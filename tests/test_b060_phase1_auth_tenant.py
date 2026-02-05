@@ -94,7 +94,7 @@ async def test_valid_token_sets_tenant_and_calls_session(monkeypatch):
     calls: list[UUID] = []
 
     @asynccontextmanager
-    async def _patched_get_session(tid: UUID):
+    async def _patched_get_session(tid: UUID, user_id: UUID | None = None):
         async with _fake_session(tid, calls) as session:
             yield session
 
@@ -124,7 +124,7 @@ async def test_two_tokens_yield_distinct_tenants(monkeypatch):
     calls: list[UUID] = []
 
     @asynccontextmanager
-    async def _patched_get_session(tid: UUID):
+    async def _patched_get_session(tid: UUID, user_id: UUID | None = None):
         async with _fake_session(tid, calls) as session:
             yield session
 
