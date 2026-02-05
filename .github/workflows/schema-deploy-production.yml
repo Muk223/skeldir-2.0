@@ -22,20 +22,37 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'push' }}
     steps:
+      - name: Guard Neon secrets (skip deploy if missing)
+        id: neon-guard
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+        run: |
+          if [ -z "${NEON_API_KEY}" ] || [ -z "${NEON_PROJECT_ID}" ]; then
+            echo "Neon secrets missing; skipping production schema deployment."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+
       - name: Checkout code
+        if: steps.neon-guard.outputs.enabled == 'true'
         uses: actions/checkout@v4
       
       - name: Set up Python
+        if: steps.neon-guard.outputs.enabled == 'true'
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
       
       - name: Install dependencies
+        if: steps.neon-guard.outputs.enabled == 'true'
         run: |
           pip install --upgrade pip
           pip install alembic sqlalchemy psycopg2-binary
       
       - name: Initialize audit log
+        if: steps.neon-guard.outputs.enabled == 'true'
         run: |
           mkdir -p audit_logs
           echo "=== CI SCHEMA DEPLOYMENT AUDIT LOG ===" > audit_logs/deployment.log
@@ -47,6 +64,7 @@ jobs:
       
       - name: Get Neon connection string
         id: neon-connection
+        if: steps.neon-guard.outputs.enabled == 'true'
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
@@ -66,6 +84,7 @@ jobs:
           echo "Connected to Neon production branch: $PROD_BRANCH_ID" >> audit_logs/deployment.log
       
       - name: Capture pre-deployment state
+        if: steps.neon-guard.outputs.enabled == 'true'
         env:
           DATABASE_URL: ${{ steps.neon-connection.outputs.DATABASE_URL }}
         run: |
@@ -74,6 +93,7 @@ jobs:
           echo "Current Alembic head: $(alembic current 2>&1)" >> audit_logs/deployment.log
       
       - name: Apply migrations with DDL logging
+        if: steps.neon-guard.outputs.enabled == 'true'
         env:
           DATABASE_URL: ${{ steps.neon-connection.outputs.DATABASE_URL }}
         run: |
@@ -85,6 +105,7 @@ jobs:
           echo "\n✅ Migrations completed" | tee -a audit_logs/deployment.log
       
       - name: Capture post-deployment state
+        if: steps.neon-guard.outputs.enabled == 'true'
         env:
           DATABASE_URL: ${{ steps.neon-connection.outputs.DATABASE_URL }}
         run: |
@@ -93,6 +114,7 @@ jobs:
           echo "New Alembic head: $(alembic current 2>&1)" >> audit_logs/deployment.log
       
       - name: Verify deployment and log schema state
+        if: steps.neon-guard.outputs.enabled == 'true'
         env:
           DATABASE_URL: ${{ steps.neon-connection.outputs.DATABASE_URL }}
         run: |
@@ -107,6 +129,7 @@ jobs:
           psql "${DATABASE_URL}" -c "SELECT schemaname, tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;" >> audit_logs/deployment.log
       
       - name: Log DDL audit trail from PostgreSQL
+        if: steps.neon-guard.outputs.enabled == 'true'
         env:
           DATABASE_URL: ${{ steps.neon-connection.outputs.DATABASE_URL }}
         run: |
@@ -124,7 +147,7 @@ jobs:
           retention-days: 90
       
       - name: Update deployment documentation
-        if: success()
+        if: success() && steps.neon-guard.outputs.enabled == 'true'
         run: |
           echo "" >> docs/SCHEMA_DEPLOYMENT_COMPLETE.md
           echo "## Deployment $(date -u +\"%Y-%m-%d %H:%M:%S UTC\")" >> docs/SCHEMA_DEPLOYMENT_COMPLETE.md
