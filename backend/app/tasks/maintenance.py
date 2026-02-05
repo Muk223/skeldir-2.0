@@ -111,7 +111,13 @@ def refresh_all_matviews_global_legacy(self) -> Dict[str, str]:
     default_retry_delay=60,
 )
 @tenant_task
-def refresh_matview_for_tenant(self, tenant_id: UUID, view_name: str, correlation_id: Optional[str] = None) -> Dict[str, str]:
+def refresh_matview_for_tenant(
+    self,
+    tenant_id: UUID,
+    view_name: str,
+    user_id: Optional[UUID] = None,
+    correlation_id: Optional[str] = None,
+) -> Dict[str, str]:
     """
     Refresh a single materialized view for a specific tenant.
 
@@ -121,6 +127,7 @@ def refresh_matview_for_tenant(self, tenant_id: UUID, view_name: str, correlatio
     Args:
         tenant_id: UUID of tenant scope
         view_name: Name of materialized view to refresh (must be in registry)
+        user_id: Optional user context for RLS enforcement
         correlation_id: Optional correlation ID for tracing
 
     Returns:
@@ -182,7 +189,12 @@ async def _validate_db_connection_for_tenant(tenant_id: UUID) -> str:
     default_retry_delay=60,
 )
 @tenant_task
-def scan_for_pii_contamination_task(self, tenant_id: UUID, correlation_id: Optional[str] = None) -> Dict[str, str]:
+def scan_for_pii_contamination_task(
+    self,
+    tenant_id: UUID,
+    user_id: Optional[UUID] = None,
+    correlation_id: Optional[str] = None,
+) -> Dict[str, str]:
     """
     Stub PII scan task; validates connectivity and tenant context.
     """
@@ -245,7 +257,12 @@ async def _enforce_retention(tenant_id: UUID, cutoff_90: datetime, cutoff_30: da
     default_retry_delay=60,
 )
 @tenant_task
-def enforce_data_retention_task(self, tenant_id: UUID, correlation_id: Optional[str] = None) -> Dict[str, int]:
+def enforce_data_retention_task(
+    self,
+    tenant_id: UUID,
+    user_id: Optional[UUID] = None,
+    correlation_id: Optional[str] = None,
+) -> Dict[str, int]:
     """
     Tenant-scoped retention enforcement with RLS guardrails.
     """

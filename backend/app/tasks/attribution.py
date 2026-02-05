@@ -498,6 +498,7 @@ async def _compute_allocations_deterministic_baseline(
 def recompute_window(
     self,
     tenant_id: UUID,
+    user_id: Optional[UUID] = None,
     window_start: Optional[str] = None,
     window_end: Optional[str] = None,
     correlation_id: Optional[str] = None,
@@ -516,6 +517,7 @@ def recompute_window(
 
     Args:
         tenant_id: Tenant context for RLS enforcement
+        user_id: Optional user context for RLS enforcement
         window_start: Start of attribution window (ISO timestamp, inclusive)
         window_end: End of attribution window (ISO timestamp, exclusive)
         correlation_id: Request correlation for observability
