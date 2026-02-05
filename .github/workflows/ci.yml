@@ -415,6 +415,9 @@ jobs:
           else
             echo "Skipping test_llm_payload_contract.py (file not present)"
           fi
+          pytest tests/test_b07_p0_provider_boundary_stub.py -q
+          pytest tests/test_b07_p0_llm_write_contract_validation.py -q
+          pytest tests/test_b07_p0_provider_boundary_enforcement.py -q
           pytest tests/test_b052_queue_topology_and_dlq.py -q -k "QueueTopology"
 
   b057-p6-e2e:
@@ -566,7 +569,7 @@ jobs:
 
       - name: Start B0.6 Phase 6 E2E stack
         run: |
-          docker compose -f docker-compose.e2e.yml up -d --build
+          docker compose -f docker-compose.e2e.yml up -d --build postgres mock_platform api
 
       - name: Wait for DB port
         env:
@@ -590,6 +593,11 @@ jobs:
         run: |
           alembic upgrade head
 
+      - name: Start worker (Postgres broker/backend) + prove /health/worker
+        run: |
+          docker compose -f docker-compose.e2e.yml up -d worker
+          python scripts/wait_for_e2e_worker.py
+
       - name: Wait for API + mock readiness (before seed)
         run: |
           python scripts/wait_for_e2e_health.py
@@ -603,6 +611,19 @@ jobs:
       - name: Run B0.6 Phase 6 E2E tests
         run: |
           pytest -v --tb=short tests/test_b060_phase6_e2e.py
+
+      - name: Capture compose logs
+        if: always()
+        run: |
+          mkdir -p artifacts/b060-phase6-e2e
+          docker compose -f docker-compose.e2e.yml logs --no-color > artifacts/b060-phase6-e2e/compose.log || true
+
+      - name: Upload B0.6 Phase 6 E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b060-phase6-e2e-artifacts
+          path: artifacts/b060-phase6-e2e
 
       - name: Teardown E2E stack
         if: always()
