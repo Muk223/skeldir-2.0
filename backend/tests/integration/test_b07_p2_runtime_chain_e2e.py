@@ -178,6 +178,7 @@ def _seed_tenant(runtime_db_url: str, tenant_id: UUID) -> None:
         insert_cols.append("name")
 
     placeholders = ", ".join(f":{col}" for col in insert_cols)
+    # RAW_SQL_ALLOWLIST: deterministic test-only tenant seed for runtime-chain proof.
     sql = text(
         f"INSERT INTO tenants ({', '.join(insert_cols)}) VALUES ({placeholders})"
     )
