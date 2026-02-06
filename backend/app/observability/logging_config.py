@@ -75,10 +75,6 @@ def redact_text(text: str) -> str:
 class RedactionFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         try:
-            if isinstance(record.msg, str):
-                record.msg = redact_text(record.msg)
-            else:
-                record.msg = redact_text(str(record.msg))
             if record.args:
                 if isinstance(record.args, dict):
                     record.args = {
@@ -88,6 +84,11 @@ class RedactionFilter(logging.Filter):
                     record.args = tuple(redact_text(str(arg)) for arg in record.args)
                 else:
                     record.args = redact_text(str(record.args))
+            else:
+                if isinstance(record.msg, str):
+                    record.msg = redact_text(record.msg)
+                else:
+                    record.msg = redact_text(str(record.msg))
         except Exception:
             # Redaction must never block logging.
             return True
