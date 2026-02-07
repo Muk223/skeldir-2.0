@@ -9,9 +9,12 @@ from app.models.llm import (
     BudgetOptimizationJob,
     Investigation,
     LLMApiCall,
+    LLMBudgetReservation,
     LLMBreakerState,
     LLMHourlyShutoffState,
+    LLMMonthlyBudgetState,
     LLMMonthlyCost,
+    LLMSemanticCache,
 )
 
 
@@ -41,6 +44,9 @@ async def test_llm_models_reflection_parity():
     table_map = {
         "llm_api_calls": LLMApiCall,
         "llm_monthly_costs": LLMMonthlyCost,
+        "llm_monthly_budget_state": LLMMonthlyBudgetState,
+        "llm_budget_reservations": LLMBudgetReservation,
+        "llm_semantic_cache": LLMSemanticCache,
         "investigations": Investigation,
         "budget_optimization_jobs": BudgetOptimizationJob,
         "llm_breaker_state": LLMBreakerState,

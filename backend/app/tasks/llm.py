@@ -1,8 +1,8 @@
 """
-LLM worker stubs for B0.5.x foundation.
+LLM task entrypoints for the provider choke point.
 
-These tasks are deterministic, enforce tenant context, and record basic metadata
-for routing/explanation/investigation/budget workflows without invoking LLMs.
+Tasks enforce tenant/user context and delegate execution to app.workers.llm,
+which routes all provider work through app.llm.provider_boundary.
 """
 
 import hashlib
@@ -116,7 +116,7 @@ def llm_routing_worker(
     )
     correlation = _prepare_context(model)
     logger.info(
-        "llm_routing_stub",
+        "llm_routing_boundary",
         extra={"task_id": self.request.id, "tenant_id": str(model.tenant_id), "correlation_id": correlation, "max_cost_cents": model.max_cost_cents},
     )
     async def _execute():
@@ -175,7 +175,7 @@ def llm_explanation_worker(
     )
     correlation = _prepare_context(model)
     logger.info(
-        "llm_explanation_stub",
+        "llm_explanation_boundary",
         extra={"task_id": self.request.id, "tenant_id": str(model.tenant_id), "correlation_id": correlation, "max_cost_cents": model.max_cost_cents},
     )
     async def _execute():
@@ -238,7 +238,7 @@ def llm_investigation_worker(
     )
     correlation = _prepare_context(model)
     logger.info(
-        "llm_investigation_stub",
+        "llm_investigation_boundary",
         extra={"task_id": self.request.id, "tenant_id": str(model.tenant_id), "correlation_id": correlation, "max_cost_cents": model.max_cost_cents},
     )
     async def _execute():
@@ -301,7 +301,7 @@ def llm_budget_optimization_worker(
     )
     correlation = _prepare_context(model)
     logger.info(
-        "llm_budget_stub",
+        "llm_budget_boundary",
         extra={"task_id": self.request.id, "tenant_id": str(model.tenant_id), "correlation_id": correlation, "max_cost_cents": model.max_cost_cents},
     )
     async def _execute():

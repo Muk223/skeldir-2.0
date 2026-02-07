@@ -84,6 +84,30 @@ class Settings(BaseSettings):
     LLM_PROVIDER_API_KEY: Optional[str] = Field(
         None, description="API key for the configured LLM provider (required if enabled)."
     )
+    LLM_PROVIDER_MODEL: str = Field(
+        "openai:gpt-4o-mini",
+        description="Provider/model route in '<provider>:<model>' format for aisuite dispatch.",
+    )
+    LLM_MONTHLY_CAP_CENTS: int = Field(
+        2500,
+        description="Per-user monthly hard cap in cents for reservation gating ($25 default).",
+    )
+    LLM_HOURLY_SHUTOFF_CENTS: int = Field(
+        500,
+        description="Per-user hourly emergency shutoff threshold in cents.",
+    )
+    LLM_PROVIDER_TIMEOUT_MS: int = Field(
+        10000,
+        description="Hard timeout around provider invocation at choke point.",
+    )
+    LLM_BREAKER_FAILURE_THRESHOLD: int = Field(
+        3,
+        description="Consecutive failures required to open the provider breaker.",
+    )
+    LLM_BREAKER_OPEN_SECONDS: int = Field(
+        300,
+        description="Breaker open window in seconds before half-open probing.",
+    )
 
     # Ingestion
     IDEMPOTENCY_CACHE_TTL: int = Field(
@@ -233,6 +257,14 @@ class Settings(BaseSettings):
             raise ValueError("PLATFORM_SUPPORTED_PLATFORMS cannot be empty")
         return cleaned
 
+    @field_validator("LLM_PROVIDER_MODEL")
+    @classmethod
+    def validate_llm_provider_model(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("LLM_PROVIDER_MODEL cannot be empty")
+        return cleaned
+
     @field_validator("IDEMPOTENCY_CACHE_TTL")
     @classmethod
     def validate_idempotency_ttl(cls, value: int) -> int:
@@ -241,6 +273,19 @@ class Settings(BaseSettings):
         """
         if value <= 0:
             raise ValueError("IDEMPOTENCY_CACHE_TTL must be greater than zero")
+        return value
+
+    @field_validator(
+        "LLM_MONTHLY_CAP_CENTS",
+        "LLM_HOURLY_SHUTOFF_CENTS",
+        "LLM_PROVIDER_TIMEOUT_MS",
+        "LLM_BREAKER_FAILURE_THRESHOLD",
+        "LLM_BREAKER_OPEN_SECONDS",
+    )
+    @classmethod
+    def validate_llm_runtime_limits(cls, value: int, info) -> int:
+        if value < 0:
+            raise ValueError(f"{info.field_name} must be >= 0")
         return value
 
     @field_validator("CELERY_WORKER_PREFETCH_MULTIPLIER")

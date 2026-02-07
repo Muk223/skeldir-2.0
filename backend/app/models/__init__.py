@@ -32,7 +32,12 @@ from app.models.llm import (
     BudgetOptimizationJob,
     Investigation,
     LLMApiCall,
+    LLMBudgetReservation,
+    LLMBreakerState,
+    LLMHourlyShutoffState,
+    LLMMonthlyBudgetState,
     LLMMonthlyCost,
+    LLMSemanticCache,
 )
 from app.models.platform_connection import PlatformConnection
 from app.models.platform_credential import PlatformCredential
@@ -46,6 +51,11 @@ __all__ = [
     "ChannelTaxonomy",
     "LLMApiCall",
     "LLMMonthlyCost",
+    "LLMMonthlyBudgetState",
+    "LLMBudgetReservation",
+    "LLMSemanticCache",
+    "LLMBreakerState",
+    "LLMHourlyShutoffState",
     "Investigation",
     "BudgetOptimizationJob",
     "PlatformConnection",
