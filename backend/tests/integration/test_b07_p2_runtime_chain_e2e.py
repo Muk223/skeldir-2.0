@@ -210,7 +210,7 @@ def _fetch_llm_api_call(
         row = conn.execute(
             text(
                 """
-                SELECT tenant_id, user_id, provider, distillation_eligible, endpoint, request_id
+                SELECT tenant_id, user_id, provider, status, distillation_eligible, endpoint, request_id
                 FROM public.llm_api_calls
                 WHERE tenant_id = :tenant_id
                   AND request_id = :request_id
@@ -330,13 +330,21 @@ def test_b07_p2_runtime_llm_chain_with_redaction():
             description="llm_api_calls insert",
             timeout_s=60.0,
             interval_s=0.5,
-            probe=lambda: _fetch_llm_api_call(
-                config.runtime_sync_url,
-                tenant_id,
-                user_id,
-                request_id,
-                endpoint,
-            ),
+            probe=lambda: (
+                candidate
+                if candidate is not None and candidate.get("status") != "pending"
+                else None
+            )
+            if (
+                candidate := _fetch_llm_api_call(
+                    config.runtime_sync_url,
+                    tenant_id,
+                    user_id,
+                    request_id,
+                    endpoint,
+                )
+            )
+            else None,
         )
 
         assert row["provider"] == "stub"

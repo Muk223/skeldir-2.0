@@ -9,6 +9,7 @@ from typing import Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     Date,
@@ -75,6 +76,40 @@ class LLMApiCall(Base):
     request_metadata_ref: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     response_metadata_ref: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     reasoning_trace_ref: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    status: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default="pending",
+        server_default="pending",
+    )
+    block_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    failure_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    breaker_state: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        default="closed",
+        server_default="closed",
+    )
+    provider_attempted: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+    budget_reservation_cents: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    budget_settled_cents: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    cache_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    cache_watermark: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     request_metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
@@ -82,6 +117,22 @@ class LLMApiCall(Base):
         CheckConstraint("output_tokens >= 0", name="ck_llm_api_calls_output_tokens_positive"),
         CheckConstraint("cost_cents >= 0", name="ck_llm_api_calls_cost_cents_positive"),
         CheckConstraint("latency_ms >= 0", name="ck_llm_api_calls_latency_ms_positive"),
+        CheckConstraint(
+            "status IN ('pending', 'success', 'blocked', 'failed', 'idempotent_replay')",
+            name="ck_llm_api_calls_status_valid",
+        ),
+        CheckConstraint(
+            "breaker_state IN ('closed', 'open', 'half_open')",
+            name="ck_llm_api_calls_breaker_state_valid",
+        ),
+        CheckConstraint(
+            "budget_reservation_cents >= 0",
+            name="ck_llm_api_calls_budget_reservation_nonnegative",
+        ),
+        CheckConstraint(
+            "budget_settled_cents >= 0",
+            name="ck_llm_api_calls_budget_settled_nonnegative",
+        ),
         UniqueConstraint(
             "tenant_id",
             "request_id",
@@ -261,6 +312,188 @@ class LLMBreakerState(Base):
     )
 
 
+class LLMMonthlyBudgetState(Base):
+    """Per-user monthly budget state with reserved vs spent counters."""
+
+    __tablename__ = "llm_monthly_budget_state"
+
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    month: Mapped[date] = mapped_column(Date, nullable=False)
+    cap_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    spent_cents: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    reserved_cents: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=func.now(),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "user_id",
+            "month",
+            name="uq_llm_monthly_budget_state_tenant_user_month",
+        ),
+        CheckConstraint("cap_cents >= 0", name="ck_llm_monthly_budget_state_cap_nonnegative"),
+        CheckConstraint("spent_cents >= 0", name="ck_llm_monthly_budget_state_spent_nonnegative"),
+        CheckConstraint(
+            "reserved_cents >= 0",
+            name="ck_llm_monthly_budget_state_reserved_nonnegative",
+        ),
+    )
+
+
+class LLMBudgetReservation(Base):
+    """Request-scoped budget reservation rows for settlement/idempotency."""
+
+    __tablename__ = "llm_budget_reservations"
+
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    endpoint: Mapped[str] = mapped_column(Text, nullable=False)
+    request_id: Mapped[str] = mapped_column(Text, nullable=False)
+    month: Mapped[date] = mapped_column(Date, nullable=False)
+    reserved_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    settled_cents: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    state: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=func.now(),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=func.now(),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "user_id",
+            "endpoint",
+            "request_id",
+            name="uq_llm_budget_reservations_tenant_user_endpoint_request",
+        ),
+        CheckConstraint("reserved_cents >= 0", name="ck_llm_budget_reservations_reserved_nonnegative"),
+        CheckConstraint("settled_cents >= 0", name="ck_llm_budget_reservations_settled_nonnegative"),
+        CheckConstraint(
+            "state IN ('reserved', 'settled', 'released', 'blocked')",
+            name="ck_llm_budget_reservations_state_valid",
+        ),
+    )
+
+
+class LLMSemanticCache(Base):
+    """Tenant/user scoped semantic cache rows keyed by endpoint + cache_key."""
+
+    __tablename__ = "llm_semantic_cache"
+
+    id: Mapped[UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+        server_default=func.gen_random_uuid(),
+    )
+    tenant_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    user_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)
+    endpoint: Mapped[str] = mapped_column(Text, nullable=False)
+    cache_key: Mapped[str] = mapped_column(Text, nullable=False)
+    watermark: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    model: Mapped[str] = mapped_column(Text, nullable=False)
+    response_text: Mapped[str] = mapped_column(Text, nullable=False)
+    response_metadata_ref: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    reasoning_trace_ref: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    input_tokens: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    output_tokens: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    cost_cents: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    hit_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=func.now(),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=func.now(),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "user_id",
+            "endpoint",
+            "cache_key",
+            name="uq_llm_semantic_cache_tenant_user_endpoint_key",
+        ),
+        CheckConstraint("input_tokens >= 0", name="ck_llm_semantic_cache_input_tokens_nonnegative"),
+        CheckConstraint("output_tokens >= 0", name="ck_llm_semantic_cache_output_tokens_nonnegative"),
+        CheckConstraint("cost_cents >= 0", name="ck_llm_semantic_cache_cost_nonnegative"),
+        CheckConstraint("hit_count >= 0", name="ck_llm_semantic_cache_hit_count_nonnegative"),
+    )
+
+
 class LLMHourlyShutoffState(Base):
     """Hourly shutoff guardrail state for LLM usage."""
 
@@ -282,6 +515,25 @@ class LLMHourlyShutoffState(Base):
         nullable=False,
     )
     reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    threshold_cents: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        server_default="0",
+        nullable=False,
+    )
+    total_cost_cents: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        server_default="0",
+        nullable=False,
+    )
+    total_calls: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        server_default="0",
+        nullable=False,
+    )
+    disabled_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=func.now(),
@@ -296,4 +548,7 @@ class LLMHourlyShutoffState(Base):
             "hour_start",
             name="uq_llm_hourly_shutoff_tenant_user_hour",
         ),
+        CheckConstraint("threshold_cents >= 0", name="ck_llm_hourly_shutoff_threshold_nonnegative"),
+        CheckConstraint("total_cost_cents >= 0", name="ck_llm_hourly_shutoff_total_cost_nonnegative"),
+        CheckConstraint("total_calls >= 0", name="ck_llm_hourly_shutoff_total_calls_nonnegative"),
     )

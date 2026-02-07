@@ -610,11 +610,24 @@ jobs:
         run: |
           python -m alembic upgrade head
 
+      - name: Grant runtime test privileges on migrated tables
+        env:
+          PGPASSWORD: ${{ env.DB_SUPERPASS }}
+        run: |
+          psql -h "${DB_HOST}" -U "${DB_SUPERUSER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${RUNTIME_USER};"
+          psql -h "${DB_HOST}" -U "${DB_SUPERUSER}" -d "${DB_NAME}" -v ON_ERROR_STOP=1 -c "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO ${RUNTIME_USER};"
+
       - name: Run B0.7 P2 provider enablement unit gate
         env:
           LLM_PROVIDER_API_KEY: ""
         run: |
           pytest -q backend/tests/test_b07_p2_provider_enablement.py
+
+      - name: Run B0.7 P3 provider controls gate
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/b07-p2
+          pytest -q backend/tests/test_b07_p3_provider_controls.py | tee artifacts/b07-p2/p3_controls.log
 
       - name: Run B0.7 P2 runtime chain proof
         run: |

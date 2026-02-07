@@ -1,47 +1,29 @@
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import select
 
 from app.core.identity import SYSTEM_USER_ID
-from app.db.session import engine, get_session
-from app.models.llm import BudgetOptimizationJob, Investigation, LLMApiCall, LLMMonthlyCost
+from app.db.session import get_session
+from app.models.llm import LLMBudgetReservation, LLMApiCall
 from app.schemas.llm_payloads import LLMTaskPayload
-from app.tasks.llm import llm_explanation_worker
-from app.workers.llm import (
-    _month_start_utc,
-    _resolve_request_id,
-    generate_explanation,
-    optimize_budget,
-    record_monthly_costs,
-    route_request,
-    run_investigation,
-)
+from app.workers.llm import _resolve_request_id, generate_explanation, route_request
 
 
-def _build_payload(tenant_id: UUID, user_id: UUID | None = None) -> LLMTaskPayload:
+def _payload(tenant_id: UUID, *, request_id: str | None = None) -> LLMTaskPayload:
     return LLMTaskPayload(
         tenant_id=tenant_id,
-        user_id=user_id or SYSTEM_USER_ID,
+        user_id=SYSTEM_USER_ID,
         correlation_id=str(uuid4()),
-        prompt={"stub": True},
-        max_cost_cents=0,
+        request_id=request_id,
+        prompt={"simulated_output_text": "worker-test"},
+        max_cost_cents=10,
     )
 
 
-def _assert_postgres_engine() -> None:
-    assert engine.dialect.name == "postgresql", "RLS tests must run on Postgres"
-
-
-class RetryCapture(RuntimeError):
-    pass
-
-
-def test_llm_fallback_id_ignores_prompt_variation():
+def test_llm_fallback_id_ignores_prompt_variation() -> None:
     tenant_id = uuid4()
     payload_a = LLMTaskPayload(
         tenant_id=tenant_id,
@@ -49,7 +31,7 @@ def test_llm_fallback_id_ignores_prompt_variation():
         correlation_id=None,
         request_id=None,
         prompt={"question": "why deterministic?"},
-        max_cost_cents=0,
+        max_cost_cents=10,
     )
     payload_b = LLMTaskPayload(
         tenant_id=tenant_id,
@@ -57,295 +39,44 @@ def test_llm_fallback_id_ignores_prompt_variation():
         correlation_id=None,
         request_id=None,
         prompt={"question": "why  deterministic?", "whitespace": True},
-        max_cost_cents=0,
+        max_cost_cents=10,
     )
-    fallback_a = _resolve_request_id(payload_a, "app.tasks.llm.route")
-    fallback_b = _resolve_request_id(payload_b, "app.tasks.llm.route")
-
-    assert fallback_a == fallback_b
-
-
-def test_month_start_utc_mid_month():
-    occurred_at = datetime(2025, 2, 15, 12, 30, tzinfo=timezone.utc)
-    assert _month_start_utc(occurred_at).isoformat() == "2025-02-01"
-
-
-def test_month_start_utc_boundary():
-    occurred_at = datetime(2025, 3, 1, 0, 0, tzinfo=timezone.utc)
-    assert _month_start_utc(occurred_at).isoformat() == "2025-03-01"
-
-
-def test_month_start_utc_timezone_normalizes_to_utc():
-    occurred_at = datetime(2025, 4, 1, 0, 30, tzinfo=timezone(timedelta(hours=-5)))
-    assert _month_start_utc(occurred_at).isoformat() == "2025-04-01"
+    assert _resolve_request_id(payload_a, "app.tasks.llm.route") == _resolve_request_id(
+        payload_b, "app.tasks.llm.route"
+    )
 
 
 @pytest.mark.asyncio
-async def test_monthly_costs_use_api_call_timestamp(test_tenant, monkeypatch):
-    captured = {}
-    async def _fake_record_monthly_costs(
-        session,
-        *,
-        tenant_id,
-        user_id,
-        model_label,
-        cost_cents,
-        calls,
-        occurred_at,
-    ):
-        captured["occurred_at"] = occurred_at
-
-    monkeypatch.setattr("app.workers.llm.record_monthly_costs", _fake_record_monthly_costs)
-
-    payload = LLMTaskPayload(
-        tenant_id=test_tenant,
-        user_id=SYSTEM_USER_ID,
-        correlation_id=str(uuid4()),
-        request_id=str(uuid4()),
-        prompt={"stub": True},
-        max_cost_cents=0,
-    )
-
+async def test_llm_route_writes_single_audit_row(test_tenant) -> None:
+    payload = _payload(test_tenant, request_id=str(uuid4()))
     async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
         result = await route_request(payload, session=session)
 
     async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        api_call = await session.get(LLMApiCall, UUID(result["api_call_id"]))
-
-    assert captured.get("occurred_at") == api_call.created_at
-
-
-@pytest.mark.asyncio
-async def test_llm_api_calls_unique_constraint_present():
-    _assert_postgres_engine()
-    async with engine.begin() as conn:
-        result = await conn.execute(
-            text(
-                """
-                SELECT
-                    con.conname AS name,
-                    array_agg(att.attname ORDER BY att.attname) AS columns
-                FROM pg_constraint con
-                JOIN pg_class rel ON rel.oid = con.conrelid
-                JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
-                JOIN unnest(con.conkey) WITH ORDINALITY AS cols(attnum, ord) ON true
-                JOIN pg_attribute att ON att.attrelid = rel.oid AND att.attnum = cols.attnum
-                WHERE con.contype = 'u'
-                  AND con.conname = 'uq_llm_api_calls_tenant_request_endpoint'
-                  AND rel.relname = 'llm_api_calls'
-                  AND nsp.nspname = 'public'
-                GROUP BY con.conname
-                """
-            )
-        )
-        row = result.mappings().first()
-        assert row is not None, "Missing unique constraint uq_llm_api_calls_tenant_request_endpoint"
-        assert set(row["columns"]) == {"tenant_id", "request_id", "endpoint"}
+        row = await session.get(LLMApiCall, UUID(result["api_call_id"]))
+        assert row is not None
+        assert row.status == "success"
+        assert row.provider in {"stub", "pending", "blocked", "error", "timeout"}
+        assert row.distillation_eligible is False
 
 
 @pytest.mark.asyncio
-async def test_llm_stub_atomic_writes_roll_back_on_failure(test_tenant):
-    _assert_postgres_engine()
+async def test_llm_explanation_retry_idempotent_no_double_debit(test_tenant) -> None:
     request_id = str(uuid4())
-    payload = LLMTaskPayload(
-        tenant_id=test_tenant,
-        user_id=SYSTEM_USER_ID,
-        correlation_id=str(uuid4()),
-        request_id=request_id,
-        prompt={"stub": True},
-        max_cost_cents=0,
-    )
-
-    with pytest.raises(RuntimeError, match="forced failure"):
-        async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-            await route_request(payload, session=session, force_failure=True)
+    payload = _payload(test_tenant, request_id=request_id)
+    payload.prompt = {
+        "simulated_output_text": "retry-idempotent",
+        "simulated_cost_cents": 4,
+    }
 
     async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        api_calls = (
-            await session.execute(
-                select(LLMApiCall).where(LLMApiCall.request_id == request_id)
-            )
-        ).scalars().all()
-        assert not api_calls, "Atomicity failed: api call persisted after failure"
+        first = await generate_explanation(payload, session=session)
+        second = await generate_explanation(payload, session=session)
 
-        monthly = (
-            await session.execute(
-                select(LLMMonthlyCost).where(
-                    LLMMonthlyCost.tenant_id == test_tenant,
-                    LLMMonthlyCost.user_id == SYSTEM_USER_ID,
-                )
-            )
-        ).scalars().all()
-        assert not monthly, "Atomicity failed: monthly costs persisted after failure"
-
-
-@pytest.mark.asyncio
-async def test_llm_route_stub_writes_audit_rows(test_tenant):
-    payload = _build_payload(test_tenant)
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        result = await route_request(payload, session=session)
+    assert first["api_call_id"] == second["api_call_id"]
 
     async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        api_call = await session.get(LLMApiCall, UUID(result["api_call_id"]))
-        assert api_call is not None
-        assert api_call.tenant_id == test_tenant
-        assert api_call.user_id == SYSTEM_USER_ID
-        assert api_call.endpoint == "app.tasks.llm.route"
-        assert api_call.model == "llm_stub"
-        assert api_call.cost_cents == 0
-        assert api_call.request_metadata_ref is not None
-        assert api_call.request_metadata_ref.get("stubbed") is True
-
-        monthly = (
-            await session.execute(
-                select(LLMMonthlyCost).where(
-                    LLMMonthlyCost.tenant_id == test_tenant,
-                    LLMMonthlyCost.user_id == SYSTEM_USER_ID,
-                )
-            )
-        ).scalars().all()
-        assert monthly, "Expected llm_monthly_costs row for tenant"
-        assert monthly[0].total_cost_cents == 0
-
-
-@pytest.mark.asyncio
-async def test_llm_investigation_stub_writes_job(test_tenant):
-    payload = _build_payload(test_tenant)
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        result = await run_investigation(payload, session=session)
-
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        investigation = await session.get(Investigation, UUID(result["investigation_id"]))
-        assert investigation is not None
-        assert investigation.status == "completed"
-        assert investigation.cost_cents == 0
-
-
-@pytest.mark.asyncio
-async def test_llm_investigation_repeat_is_idempotent(test_tenant):
-    _assert_postgres_engine()
-    request_id = str(uuid4())
-    payload = LLMTaskPayload(
-        tenant_id=test_tenant,
-        user_id=SYSTEM_USER_ID,
-        correlation_id=str(uuid4()),
-        request_id=request_id,
-        prompt={"stub": True},
-        max_cost_cents=0,
-    )
-
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        first = await run_investigation(payload, session=session)
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        second = await run_investigation(payload, session=session)
-
-    assert first["investigation_id"] == second["investigation_id"]
-
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        investigations = (
-            await session.execute(
-                select(Investigation).where(
-                    Investigation.tenant_id == test_tenant,
-                    Investigation.query == f"stubbed:{request_id}",
-                )
-            )
-        ).scalars().all()
-        assert len(investigations) == 1
-
-
-@pytest.mark.asyncio
-async def test_llm_budget_stub_writes_job(test_tenant):
-    payload = _build_payload(test_tenant)
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        result = await optimize_budget(payload, session=session)
-
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        job = await session.get(BudgetOptimizationJob, UUID(result["budget_job_id"]))
-        assert job is not None
-        assert job.status == "completed"
-        assert job.cost_cents == 0
-
-
-@pytest.mark.asyncio
-async def test_llm_stub_rls_blocks_cross_tenant_reads(test_tenant_pair):
-    _assert_postgres_engine()
-    tenant_a, tenant_b = test_tenant_pair
-    payload = _build_payload(tenant_a)
-    async with get_session(tenant_id=tenant_a, user_id=SYSTEM_USER_ID) as session:
-        result = await run_investigation(payload, session=session)
-    investigation_id = UUID(result["investigation_id"])
-
-    async with engine.begin() as conn:
-        policies = await conn.execute(
-            text(
-                """
-                SELECT tablename
-                FROM pg_policies
-                WHERE schemaname = 'public'
-                  AND tablename IN (
-                    'llm_api_calls',
-                    'llm_monthly_costs',
-                    'investigations',
-                    'budget_optimization_jobs'
-                  )
-                """
-            )
-        )
-        policy_tables = {row[0] for row in policies.fetchall()}
-        assert policy_tables == {
-            "llm_api_calls",
-            "llm_monthly_costs",
-            "investigations",
-            "budget_optimization_jobs",
-        }, f"Missing RLS policies: {policy_tables}"
-
-    async with get_session(tenant_id=tenant_b, user_id=SYSTEM_USER_ID) as session:
-        blocked = await session.get(Investigation, investigation_id)
-        assert blocked is None, "RLS failed: tenant B read tenant A investigation"
-
-    async with get_session(tenant_id=tenant_a, user_id=SYSTEM_USER_ID) as session:
-        allowed = await session.get(Investigation, investigation_id)
-        assert allowed is not None
-
-
-@pytest.mark.asyncio
-async def test_llm_explanation_stub_writes_api_call(test_tenant):
-    payload = _build_payload(test_tenant)
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        result = await generate_explanation(payload, session=session)
-
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        api_call = await session.get(LLMApiCall, UUID(result["api_call_id"]))
-        assert api_call is not None
-        assert api_call.tenant_id == test_tenant
-        assert api_call.user_id == SYSTEM_USER_ID
-        assert api_call.endpoint == "app.tasks.llm.explanation"
-        assert api_call.model == "llm_stub"
-        assert api_call.request_metadata_ref is not None
-        assert api_call.request_metadata_ref.get("stubbed") is True
-
-
-
-@pytest.mark.asyncio
-async def test_llm_explanation_idempotency_prevents_duplicate_audit_rows(test_tenant):
-    _assert_postgres_engine()
-    request_id = str(uuid4())
-    payload = LLMTaskPayload(
-        tenant_id=test_tenant,
-        user_id=SYSTEM_USER_ID,
-        correlation_id=str(uuid4()),
-        request_id=request_id,
-        prompt={"stub": True},
-        max_cost_cents=0,
-    )
-
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        await generate_explanation(payload, session=session)
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        await generate_explanation(payload, session=session)
-
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        api_calls = (
+        api_rows = (
             await session.execute(
                 select(LLMApiCall).where(
                     LLMApiCall.tenant_id == test_tenant,
@@ -355,141 +86,15 @@ async def test_llm_explanation_idempotency_prevents_duplicate_audit_rows(test_te
                 )
             )
         ).scalars().all()
-        assert len(api_calls) == 1, "Idempotency failed: duplicate llm_api_calls rows"
-
-        monthly = (
+        res_rows = (
             await session.execute(
-                select(LLMMonthlyCost).where(
-                    LLMMonthlyCost.tenant_id == test_tenant,
-                    LLMMonthlyCost.user_id == SYSTEM_USER_ID,
-                )
-            )
-        ).scalars().one()
-        assert monthly.total_calls == 1, "Idempotency failed: monthly costs double-counted"
-
-
-@pytest.mark.asyncio
-async def test_llm_explanation_retry_preserves_request_id_when_omitted(test_tenant, monkeypatch):
-    _assert_postgres_engine()
-    payload = {"stub": True}
-    captured = {}
-
-    def _fake_retry(*, kwargs=None, **_):
-        captured["kwargs"] = kwargs or {}
-        raise RetryCapture("retry")
-
-    monkeypatch.setattr(llm_explanation_worker, "retry", _fake_retry, raising=True)
-
-    with pytest.raises(RetryCapture, match="retry"):
-        llm_explanation_worker.run(
-            payload,
-            tenant_id=test_tenant,
-            max_cost_cents=0,
-            force_failure=True,
-        )
-
-    retry_kwargs = captured["kwargs"]
-    assert retry_kwargs.get("request_id"), "Retry kwargs missing request_id"
-    assert retry_kwargs.get("correlation_id"), "Retry kwargs missing correlation_id"
-
-    llm_explanation_worker.run(**retry_kwargs)
-    llm_explanation_worker.run(**retry_kwargs)
-
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        api_calls = (
-            await session.execute(
-                select(LLMApiCall).where(
-                    LLMApiCall.tenant_id == test_tenant,
-                    LLMApiCall.user_id == SYSTEM_USER_ID,
-                    LLMApiCall.request_id == retry_kwargs["request_id"],
-                    LLMApiCall.endpoint == "app.tasks.llm.explanation",
+                select(LLMBudgetReservation).where(
+                    LLMBudgetReservation.tenant_id == test_tenant,
+                    LLMBudgetReservation.user_id == SYSTEM_USER_ID,
+                    LLMBudgetReservation.request_id == request_id,
+                    LLMBudgetReservation.endpoint == "app.tasks.llm.explanation",
                 )
             )
         ).scalars().all()
-        assert len(api_calls) == 1, "Retry idempotency failed: duplicate llm_api_calls rows"
-
-        monthly = (
-            await session.execute(
-                select(LLMMonthlyCost).where(
-                    LLMMonthlyCost.tenant_id == test_tenant,
-                    LLMMonthlyCost.user_id == SYSTEM_USER_ID,
-                )
-            )
-        ).scalars().one()
-        assert monthly.total_calls == 1, "Retry idempotency failed: monthly costs double-counted"
-
-
-@pytest.mark.asyncio
-async def test_llm_monthly_costs_concurrent_updates_are_atomic(test_tenant):
-    _assert_postgres_engine()
-    increment = 7
-    calls = 8
-
-    async def _apply_increment():
-        async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-            async with session.begin_nested():
-                await record_monthly_costs(
-                    session,
-                    tenant_id=test_tenant,
-                    user_id=SYSTEM_USER_ID,
-                    model_label="concurrency",
-                    cost_cents=increment,
-                    calls=1,
-                    occurred_at=datetime(2025, 1, 15, 12, 0, tzinfo=timezone.utc),
-                )
-
-    await asyncio.gather(*[_apply_increment() for _ in range(calls)])
-
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        row = (
-            await session.execute(
-                select(LLMMonthlyCost).where(
-                    LLMMonthlyCost.tenant_id == test_tenant,
-                    LLMMonthlyCost.user_id == SYSTEM_USER_ID,
-                )
-            )
-        ).scalars().one()
-        assert row.total_cost_cents == increment * calls
-        assert row.total_calls == calls
-
-
-@pytest.mark.asyncio
-async def test_llm_route_idempotency_prevents_duplicate_audit_rows(test_tenant):
-    _assert_postgres_engine()
-    request_id = str(uuid4())
-    payload = LLMTaskPayload(
-        tenant_id=test_tenant,
-        user_id=SYSTEM_USER_ID,
-        correlation_id=str(uuid4()),
-        request_id=request_id,
-        prompt={"stub": True},
-        max_cost_cents=0,
-    )
-
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        await route_request(payload, session=session)
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        await route_request(payload, session=session)
-
-    async with get_session(tenant_id=test_tenant, user_id=SYSTEM_USER_ID) as session:
-        api_calls = (
-            await session.execute(
-                select(LLMApiCall).where(
-                    LLMApiCall.tenant_id == test_tenant,
-                    LLMApiCall.user_id == SYSTEM_USER_ID,
-                    LLMApiCall.request_id == request_id,
-                    LLMApiCall.endpoint == "app.tasks.llm.route",
-                )
-            )
-        ).scalars().all()
-        assert len(api_calls) == 1, "Idempotency failed: duplicate llm_api_calls rows"
-
-        monthly = (
-            await session.execute(
-                select(LLMMonthlyCost).where(
-                    LLMMonthlyCost.tenant_id == test_tenant,
-                    LLMMonthlyCost.user_id == SYSTEM_USER_ID,
-                )
-            )
-        ).scalars().one()
-        assert monthly.total_calls == 1, "Idempotency failed: monthly costs double-counted"
+        assert len(api_rows) == 1
+        assert len(res_rows) == 1

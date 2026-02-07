@@ -1,35 +1,27 @@
 """
-Deterministic LLM worker stubs with audit writes.
+LLM workers routed through the provider choke point.
 
-These workers write tenant-scoped records with cost=0 and never call providers.
+All provider execution, budget controls, breaker/timeout/cache, and llm_api_calls
+persistence happen in app.llm.provider_boundary.
 """
 
 from __future__ import annotations
 
-import logging
-from datetime import date, datetime, timezone
 import hashlib
 import json
+import logging
 from typing import Any, Dict
 from uuid import UUID
 
-from sqlalchemy import Integer, Text, cast, func, literal, select
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, insert
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.llm.provider_boundary import get_llm_provider_boundary
-from app.models.llm import (
-    BudgetOptimizationJob,
-    Investigation,
-    LLMApiCall,
-    LLMMonthlyCost,
-)
+from app.models.llm import BudgetOptimizationJob, Investigation
 from app.schemas.llm_payloads import LLMTaskPayload
 
 logger = logging.getLogger(__name__)
 
-_STUB_MODEL = "llm_stub"
-_STUB_PROVIDER = "stub"
 _PROVIDER_BOUNDARY = get_llm_provider_boundary()
 
 
@@ -62,131 +54,17 @@ def _resolve_correlation_id(model: LLMTaskPayload, endpoint: str) -> str:
     return _stable_fallback_id(model, endpoint, "correlation_id")
 
 
-def _month_start_utc(occurred_at: datetime) -> date:
-    if occurred_at.tzinfo is None:
-        occurred_at = occurred_at.replace(tzinfo=timezone.utc)
-    else:
-        occurred_at = occurred_at.astimezone(timezone.utc)
-    return date(occurred_at.year, occurred_at.month, 1)
-
-
-async def _claim_api_call(
-    session: AsyncSession,
-    *,
-    model: LLMTaskPayload,
-    endpoint: str,
-    request_id: str,
-    correlation_id: str,
-) -> tuple[UUID, datetime, bool]:
-    insert_stmt = (
-        insert(LLMApiCall)
-        .values(
-            tenant_id=model.tenant_id,
-            user_id=model.user_id,
-            endpoint=endpoint,
-            request_id=request_id,
-            provider=_STUB_PROVIDER,
-            model=_STUB_MODEL,
-            input_tokens=0,
-            output_tokens=0,
-            cost_cents=0,
-            latency_ms=0,
-            was_cached=False,
-            distillation_eligible=False,
-            request_metadata_ref={
-                "stubbed": True,
-                "request_id": request_id,
-                "correlation_id": correlation_id,
-                "provider_boundary": _PROVIDER_BOUNDARY.boundary_id,
-            },
-        )
-        .on_conflict_do_nothing(
-            index_elements=["tenant_id", "request_id", "endpoint"]
-        )
-        .returning(LLMApiCall.id, LLMApiCall.created_at)
+def _normalize_payload_context(model: LLMTaskPayload, endpoint: str) -> LLMTaskPayload:
+    return LLMTaskPayload.model_validate(
+        {
+            "tenant_id": model.tenant_id,
+            "user_id": model.user_id,
+            "correlation_id": _resolve_correlation_id(model, endpoint),
+            "request_id": _resolve_request_id(model, endpoint),
+            "prompt": model.prompt,
+            "max_cost_cents": model.max_cost_cents,
+        }
     )
-    result = await session.execute(insert_stmt)
-    inserted_row = result.first()
-    if inserted_row is not None:
-        inserted_id, created_at = inserted_row
-        return inserted_id, created_at, True
-
-    existing_row = (
-        await session.execute(
-            select(LLMApiCall.id, LLMApiCall.created_at).where(
-                LLMApiCall.tenant_id == model.tenant_id,
-                LLMApiCall.request_id == request_id,
-                LLMApiCall.endpoint == endpoint,
-            )
-        )
-    ).first()
-    if existing_row is None:
-        raise RuntimeError("idempotency guard failed to locate existing llm_api_calls row")
-    existing_id, created_at = existing_row
-    return existing_id, created_at, False
-
-
-def _build_model_breakdown_update(
-    *,
-    model_label: str,
-    cost_cents: int,
-    calls: int,
-):
-    base_breakdown = func.coalesce(LLMMonthlyCost.model_breakdown, cast("{}", JSONB))
-    existing_calls = func.coalesce(
-        cast(func.jsonb_extract_path_text(base_breakdown, model_label, "calls"), Integer),
-        0,
-    )
-    existing_cost = func.coalesce(
-        cast(func.jsonb_extract_path_text(base_breakdown, model_label, "cost_cents"), Integer),
-        0,
-    )
-    new_entry = func.jsonb_build_object(
-        "calls",
-        existing_calls + literal(calls),
-        "cost_cents",
-        existing_cost + literal(cost_cents),
-    )
-    path = cast([model_label], ARRAY(Text))
-    return func.jsonb_set(base_breakdown, path, new_entry, True)
-
-
-async def record_monthly_costs(
-    session: AsyncSession,
-    *,
-    tenant_id: UUID,
-    user_id: UUID,
-    model_label: str,
-    cost_cents: int,
-    calls: int,
-    occurred_at: datetime,
-) -> None:
-    month = _month_start_utc(occurred_at)
-    insert_stmt = (
-        insert(LLMMonthlyCost)
-        .values(
-            tenant_id=tenant_id,
-            user_id=user_id,
-            month=month,
-            total_cost_cents=cost_cents,
-            total_calls=calls,
-            model_breakdown={model_label: {"calls": calls, "cost_cents": cost_cents}},
-        )
-    )
-    excluded = insert_stmt.excluded
-    stmt = insert_stmt.on_conflict_do_update(
-        index_elements=["tenant_id", "user_id", "month"],
-        set_={
-            "total_cost_cents": LLMMonthlyCost.total_cost_cents + excluded.total_cost_cents,
-            "total_calls": LLMMonthlyCost.total_calls + excluded.total_calls,
-            "model_breakdown": _build_model_breakdown_update(
-                model_label=model_label,
-                cost_cents=cost_cents,
-                calls=calls,
-            ),
-        },
-    )
-    await session.execute(stmt)
 
 
 async def route_request(
@@ -195,52 +73,33 @@ async def route_request(
     *,
     force_failure: bool = False,
 ) -> Dict[str, Any]:
-    request_id = _resolve_request_id(model, "app.tasks.llm.route")
-    correlation_id = _resolve_correlation_id(model, "app.tasks.llm.route")
-    async with session.begin_nested():
-        api_call_id, created_at, claimed = await _claim_api_call(
-            session,
-            model=model,
-            endpoint="app.tasks.llm.route",
-            request_id=request_id,
-            correlation_id=correlation_id,
-        )
-        if not claimed:
-            return {
-                "status": "accepted",
-                "route": "noop",
-                "request_id": request_id,
-                "correlation_id": correlation_id,
-                "api_call_id": str(api_call_id),
-            }
-        if force_failure:
-            raise RuntimeError("forced failure after api call")
-        await record_monthly_costs(
-            session,
-            tenant_id=model.tenant_id,
-            user_id=model.user_id,
-            model_label=_STUB_MODEL,
-            cost_cents=0,
-            calls=1,
-            occurred_at=created_at,
-        )
-
+    endpoint = "app.tasks.llm.route"
+    payload = _normalize_payload_context(model, endpoint)
+    result = await _PROVIDER_BOUNDARY.complete(
+        model=payload,
+        session=session,
+        endpoint=endpoint,
+        force_failure=force_failure,
+    )
     logger.info(
-        "llm_route_stubbed",
+        "llm_route_boundary",
         extra={
-            "tenant_id": str(model.tenant_id),
-            "correlation_id": correlation_id,
+            "tenant_id": str(payload.tenant_id),
+            "correlation_id": payload.correlation_id,
             "event_type": "llm.route",
-            "request_id": request_id,
+            "request_id": payload.request_id,
+            "status": result.status,
         },
     )
-
     return {
-        "status": "accepted",
+        "status": "accepted" if result.status == "success" else result.status,
         "route": "noop",
-        "request_id": request_id,
-        "correlation_id": correlation_id,
-        "api_call_id": str(api_call_id),
+        "request_id": payload.request_id,
+        "correlation_id": payload.correlation_id,
+        "api_call_id": str(result.api_call_id),
+        "blocked_reason": result.block_reason,
+        "failure_reason": result.failure_reason,
+        "was_cached": result.was_cached,
     }
 
 
@@ -250,52 +109,34 @@ async def generate_explanation(
     *,
     force_failure: bool = False,
 ) -> Dict[str, Any]:
-    request_id = _resolve_request_id(model, "app.tasks.llm.explanation")
-    correlation_id = _resolve_correlation_id(model, "app.tasks.llm.explanation")
-    async with session.begin_nested():
-        api_call_id, created_at, claimed = await _claim_api_call(
-            session,
-            model=model,
-            endpoint="app.tasks.llm.explanation",
-            request_id=request_id,
-            correlation_id=correlation_id,
-        )
-        if not claimed:
-            return {
-                "status": "accepted",
-                "explanation": "not-implemented",
-                "request_id": request_id,
-                "correlation_id": correlation_id,
-                "api_call_id": str(api_call_id),
-            }
-        if force_failure:
-            raise RuntimeError("forced failure after api call")
-        await record_monthly_costs(
-            session,
-            tenant_id=model.tenant_id,
-            user_id=model.user_id,
-            model_label=_STUB_MODEL,
-            cost_cents=0,
-            calls=1,
-            occurred_at=created_at,
-        )
-
+    endpoint = "app.tasks.llm.explanation"
+    payload = _normalize_payload_context(model, endpoint)
+    result = await _PROVIDER_BOUNDARY.complete(
+        model=payload,
+        session=session,
+        endpoint=endpoint,
+        force_failure=force_failure,
+    )
     logger.info(
-        "llm_explanation_stubbed",
+        "llm_explanation_boundary",
         extra={
-            "tenant_id": str(model.tenant_id),
-            "correlation_id": correlation_id,
+            "tenant_id": str(payload.tenant_id),
+            "correlation_id": payload.correlation_id,
             "event_type": "llm.explanation",
-            "request_id": request_id,
+            "request_id": payload.request_id,
+            "status": result.status,
         },
     )
-
+    explanation = result.output_text if result.status == "success" else "not-available"
     return {
-        "status": "accepted",
-        "explanation": "not-implemented",
-        "request_id": request_id,
-        "correlation_id": correlation_id,
-        "api_call_id": str(api_call_id),
+        "status": "accepted" if result.status == "success" else result.status,
+        "explanation": explanation,
+        "request_id": payload.request_id,
+        "correlation_id": payload.correlation_id,
+        "api_call_id": str(result.api_call_id),
+        "blocked_reason": result.block_reason,
+        "failure_reason": result.failure_reason,
+        "was_cached": result.was_cached,
     }
 
 
@@ -305,71 +146,60 @@ async def run_investigation(
     *,
     force_failure: bool = False,
 ) -> Dict[str, Any]:
-    request_id = _resolve_request_id(model, "app.tasks.llm.investigation")
-    correlation_id = _resolve_correlation_id(model, "app.tasks.llm.investigation")
-    async with session.begin_nested():
-        api_call_id, created_at, claimed = await _claim_api_call(
-            session,
-            model=model,
-            endpoint="app.tasks.llm.investigation",
-            request_id=request_id,
-            correlation_id=correlation_id,
+    endpoint = "app.tasks.llm.investigation"
+    payload = _normalize_payload_context(model, endpoint)
+    result = await _PROVIDER_BOUNDARY.complete(
+        model=payload,
+        session=session,
+        endpoint=endpoint,
+        force_failure=force_failure,
+    )
+    query = f"provider:{payload.request_id}"
+    existing = (
+        await session.execute(
+            select(Investigation.id).where(
+                Investigation.tenant_id == payload.tenant_id,
+                Investigation.query == query,
+            )
         )
-        if not claimed:
-            existing_id = (
-                await session.execute(
-                    select(Investigation.id).where(
-                        Investigation.tenant_id == model.tenant_id,
-                        Investigation.query == f"stubbed:{request_id}",
-                    )
-                )
-            ).scalar_one_or_none()
-            return {
-                "status": "accepted",
-                "investigation": "queued",
-                "request_id": request_id,
-                "correlation_id": correlation_id,
-                "api_call_id": str(api_call_id),
-                "investigation_id": str(existing_id) if existing_id else None,
-            }
-        if force_failure:
-            raise RuntimeError("forced failure after api call")
+    ).scalar_one_or_none()
+    investigation_id = existing
+    if result.status == "success" and existing is None:
         investigation = Investigation(
-            tenant_id=model.tenant_id,
-            query=f"stubbed:{request_id}",
+            tenant_id=payload.tenant_id,
+            query=query,
             status="completed",
-            result={"status": "stubbed", "request_id": request_id},
-            cost_cents=0,
+            result={
+                "status": "completed",
+                "request_id": payload.request_id,
+                "summary": result.output_text,
+            },
+            cost_cents=int(result.usage.get("cost_cents", 0)),
         )
         session.add(investigation)
         await session.flush()
-        await record_monthly_costs(
-            session,
-            tenant_id=model.tenant_id,
-            user_id=model.user_id,
-            model_label=_STUB_MODEL,
-            cost_cents=0,
-            calls=1,
-            occurred_at=created_at,
-        )
+        investigation_id = investigation.id
 
     logger.info(
-        "llm_investigation_stubbed",
+        "llm_investigation_boundary",
         extra={
-            "tenant_id": str(model.tenant_id),
-            "correlation_id": correlation_id,
+            "tenant_id": str(payload.tenant_id),
+            "correlation_id": payload.correlation_id,
             "event_type": "llm.investigation",
-            "request_id": request_id,
+            "request_id": payload.request_id,
+            "status": result.status,
         },
     )
-
     return {
-        "status": "accepted",
-        "investigation": "queued",
-        "request_id": request_id,
-        "correlation_id": correlation_id,
-        "api_call_id": str(api_call_id),
-        "investigation_id": str(investigation.id),
+        "status": "accepted" if result.status == "success" else result.status,
+        "investigation": "queued" if result.status == "success" else "blocked",
+        "request_id": payload.request_id,
+        "correlation_id": payload.correlation_id,
+        "api_call_id": str(result.api_call_id),
+        "investigation_id": str(investigation_id) if investigation_id else None,
+        "blocked_reason": result.block_reason,
+        "failure_reason": result.failure_reason,
+        "was_cached": result.was_cached,
     }
 
 
@@ -379,68 +209,56 @@ async def optimize_budget(
     *,
     force_failure: bool = False,
 ) -> Dict[str, Any]:
-    request_id = _resolve_request_id(model, "app.tasks.llm.budget_optimization")
-    correlation_id = _resolve_correlation_id(model, "app.tasks.llm.budget_optimization")
-    async with session.begin_nested():
-        api_call_id, created_at, claimed = await _claim_api_call(
-            session,
-            model=model,
-            endpoint="app.tasks.llm.budget_optimization",
-            request_id=request_id,
-            correlation_id=correlation_id,
+    endpoint = "app.tasks.llm.budget_optimization"
+    payload = _normalize_payload_context(model, endpoint)
+    result = await _PROVIDER_BOUNDARY.complete(
+        model=payload,
+        session=session,
+        endpoint=endpoint,
+        force_failure=force_failure,
+    )
+    existing = (
+        await session.execute(
+            select(BudgetOptimizationJob.id).where(
+                BudgetOptimizationJob.tenant_id == payload.tenant_id,
+                BudgetOptimizationJob.recommendations["request_id"].astext == payload.request_id,
+            )
         )
-        if not claimed:
-            existing_id = (
-                await session.execute(
-                    select(BudgetOptimizationJob.id).where(
-                        BudgetOptimizationJob.tenant_id == model.tenant_id,
-                        BudgetOptimizationJob.recommendations["request_id"].astext == request_id,
-                    )
-                )
-            ).scalar_one_or_none()
-            return {
-                "status": "accepted",
-                "budget_action": "noop",
-                "request_id": request_id,
-                "correlation_id": correlation_id,
-                "api_call_id": str(api_call_id),
-                "budget_job_id": str(existing_id) if existing_id else None,
-            }
-        if force_failure:
-            raise RuntimeError("forced failure after api call")
+    ).scalar_one_or_none()
+    job_id = existing
+    if result.status == "success" and existing is None:
         job = BudgetOptimizationJob(
-            tenant_id=model.tenant_id,
+            tenant_id=payload.tenant_id,
             status="completed",
-            recommendations={"status": "stubbed", "request_id": request_id},
-            cost_cents=0,
+            recommendations={
+                "request_id": payload.request_id,
+                "provider_summary": result.output_text,
+                "status": "completed",
+            },
+            cost_cents=int(result.usage.get("cost_cents", 0)),
         )
         session.add(job)
         await session.flush()
-        await record_monthly_costs(
-            session,
-            tenant_id=model.tenant_id,
-            user_id=model.user_id,
-            model_label=_STUB_MODEL,
-            cost_cents=0,
-            calls=1,
-            occurred_at=created_at,
-        )
+        job_id = job.id
 
     logger.info(
-        "llm_budget_stubbed",
+        "llm_budget_boundary",
         extra={
-            "tenant_id": str(model.tenant_id),
-            "correlation_id": correlation_id,
+            "tenant_id": str(payload.tenant_id),
+            "correlation_id": payload.correlation_id,
             "event_type": "llm.budget_optimization",
-            "request_id": request_id,
+            "request_id": payload.request_id,
+            "status": result.status,
         },
     )
-
     return {
-        "status": "accepted",
-        "budget_action": "noop",
-        "request_id": request_id,
-        "correlation_id": correlation_id,
-        "api_call_id": str(api_call_id),
-        "budget_job_id": str(job.id),
+        "status": "accepted" if result.status == "success" else result.status,
+        "budget_action": "noop" if result.status == "success" else "blocked",
+        "request_id": payload.request_id,
+        "correlation_id": payload.correlation_id,
+        "api_call_id": str(result.api_call_id),
+        "budget_job_id": str(job_id) if job_id else None,
+        "blocked_reason": result.block_reason,
+        "failure_reason": result.failure_reason,
+        "was_cached": result.was_cached,
     }
