@@ -616,6 +616,12 @@ jobs:
         run: |
           pytest -q backend/tests/test_b07_p2_provider_enablement.py
 
+      - name: Run B0.7 P3 provider controls gate
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/b07-p2
+          pytest -q backend/tests/test_b07_p3_provider_controls.py | tee artifacts/b07-p2/p3_controls.log
+
       - name: Run B0.7 P2 runtime chain proof
         run: |
           set -euo pipefail
