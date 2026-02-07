@@ -9,7 +9,7 @@ fi
 DB_URL="$1"
 PROBE_JSON="$2"
 OUT_DIR="$3"
-SQL_DIR="docs/ops/b07_p4/sql"
+SQL_DIR="docs/ops/llm_p4/sql"
 
 mkdir -p "$OUT_DIR"
 

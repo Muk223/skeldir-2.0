@@ -6,7 +6,7 @@
 4. Verify one `llm_api_calls` row per request id/endpoint and `status != pending`.
 5. Verify investigation and budget job materialization tables have one row each.
 6. Verify RLS by querying same request_id under wrong tenant/user GUC and getting `0` rows.
-7. Run all SQL dashboards in `docs/ops/b07_p4/sql` and store outputs with timestamp.
+7. Run all SQL dashboards in `docs/ops/llm_p4/sql` and store outputs with timestamp.
 8. Verify cache hit rate dashboard shows at least one cache hit after replaying identical request with same watermark.
 9. Verify breaker/shutoff dashboard shows state transitions after induced failures and shutoff seed.
 10. Verify provider distribution dashboard includes success and blocked/failed statuses.

@@ -29,14 +29,14 @@ Runtime evidence emitted:
 - `artifacts/b07-p4/runtime_db_probe.json`
 
 ## Operational Closure Pack
-- `docs/ops/b07_p4/README.md`
-- `docs/ops/b07_p4/runbooks/first_traffic_checklist.md`
-- `docs/ops/b07_p4/runbooks/kill_switch_runbook.md`
-- `docs/ops/b07_p4/runbooks/incident_response_runbook.md`
-- `docs/ops/b07_p4/sql/01_monthly_spend.sql`
-- `docs/ops/b07_p4/sql/02_cache_hit_rate.sql`
-- `docs/ops/b07_p4/sql/03_breaker_shutoff_state.sql`
-- `docs/ops/b07_p4/sql/04_provider_cost_latency_distribution.sql`
+- `docs/ops/llm_p4/README.md`
+- `docs/ops/llm_p4/runbooks/first_traffic_checklist.md`
+- `docs/ops/llm_p4/runbooks/kill_switch_runbook.md`
+- `docs/ops/llm_p4/runbooks/incident_response_runbook.md`
+- `docs/ops/llm_p4/sql/01_monthly_spend.sql`
+- `docs/ops/llm_p4/sql/02_cache_hit_rate.sql`
+- `docs/ops/llm_p4/sql/03_breaker_shutoff_state.sql`
+- `docs/ops/llm_p4/sql/04_provider_cost_latency_distribution.sql`
 
 CI-executed SQL outputs:
 - `artifacts/b07-p4/sql/01_monthly_spend.csv`
