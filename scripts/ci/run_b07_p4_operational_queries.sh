@@ -41,7 +41,7 @@ SQL
     -v tenant_id="$TENANT_ID" \
     -v user_id="$user_id" \
     -f "$wrapper_file" \
-    --csv > "$out_file"
+    --csv | awk '$0 != "SET"' > "$out_file"
 
   rm -f "$wrapper_file"
 }
