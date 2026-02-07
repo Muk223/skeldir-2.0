@@ -91,6 +91,12 @@ class SkeldirLLMProvider:
     boundary_id = "b07_p3_aisuite_chokepoint"
     breaker_key = "llm-provider"
 
+    async def _db_now(self, session: AsyncSession) -> datetime:
+        now = (await session.execute(text("SELECT now()"))).scalar_one()
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        return now.astimezone(timezone.utc)
+
     async def complete(
         self,
         *,
@@ -129,7 +135,7 @@ class SkeldirLLMProvider:
             )
 
         month = _month_start_utc(created_at)
-        now = datetime.now(timezone.utc)
+        now = await self._db_now(session)
         shutoff_reason = await self._hourly_block_reason(
             session=session,
             tenant_id=model.tenant_id,
@@ -222,7 +228,7 @@ class SkeldirLLMProvider:
             usage.setdefault("cost_cents", 0)
             usage["latency_ms"] = max(1, int((time.perf_counter() - started) * 1000))
             settled = min(max(0, int(usage["cost_cents"])), reservation)
-            settled_at = datetime.now(timezone.utc)
+            settled_at = await self._db_now(session)
             await self._ensure_rls_context(session, model.tenant_id, model.user_id)
             await self._settle(session, model.tenant_id, model.user_id, endpoint, request_id, month, reservation, settled)
             await self._breaker_success(session, model.tenant_id, model.user_id)
@@ -261,7 +267,7 @@ class SkeldirLLMProvider:
                 response_metadata=metadata,
             )
         except TimeoutError:
-            failed_at = datetime.now(timezone.utc)
+            failed_at = await self._db_now(session)
             await self._ensure_rls_context(session, model.tenant_id, model.user_id)
             await self._release(session, model.tenant_id, model.user_id, endpoint, request_id, month, reservation)
             await self._breaker_failure(session, model.tenant_id, model.user_id, failed_at)
@@ -281,7 +287,7 @@ class SkeldirLLMProvider:
                 failure_reason="provider_timeout",
             )
         except Exception as exc:
-            failed_at = datetime.now(timezone.utc)
+            failed_at = await self._db_now(session)
             await self._ensure_rls_context(session, model.tenant_id, model.user_id)
             await self._release(session, model.tenant_id, model.user_id, endpoint, request_id, month, reservation)
             await self._breaker_failure(session, model.tenant_id, model.user_id, failed_at)
@@ -610,7 +616,7 @@ class SkeldirLLMProvider:
         return False
 
     async def _breaker_success(self, session: AsyncSession, tenant_id: UUID, user_id: UUID) -> None:
-        now = datetime.now(timezone.utc)
+        now = await self._db_now(session)
         row = (
             await session.execute(
                 select(LLMBreakerState).where(
@@ -702,7 +708,7 @@ class SkeldirLLMProvider:
         if row is None or int(row.watermark) != int(watermark):
             return None
         row.hit_count = int(row.hit_count) + 1
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = await self._db_now(session)
         return row
 
     async def _cache_write(
@@ -716,6 +722,7 @@ class SkeldirLLMProvider:
         payload: Mapping[str, Any],
         usage: Mapping[str, int],
     ) -> None:
+        now = await self._db_now(session)
         stmt = (
             insert(LLMSemanticCache)
             .values(
@@ -746,7 +753,7 @@ class SkeldirLLMProvider:
                     "input_tokens": max(0, int(usage.get("input_tokens", 0))),
                     "output_tokens": max(0, int(usage.get("output_tokens", 0))),
                     "cost_cents": max(0, int(usage.get("cost_cents", 0))),
-                    "updated_at": datetime.now(timezone.utc),
+                    "updated_at": now,
                 },
             )
         )
