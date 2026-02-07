@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import importlib
 import json
 import time
 from collections.abc import Mapping
@@ -21,6 +20,11 @@ from uuid import UUID
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+
+try:
+    import aisuite
+except ModuleNotFoundError:
+    aisuite = None
 
 from app.core.config import settings
 from app.db.session import set_tenant_guc_async, set_user_guc_async
@@ -788,7 +792,8 @@ class SkeldirLLMProvider:
 
     async def _call_aisuite(self, *, requested_model: str, prompt: Mapping[str, Any]) -> Mapping[str, Any]:
         def _invoke_sync() -> Any:
-            aisuite = importlib.import_module("aisuite")
+            if aisuite is None:
+                raise RuntimeError("aisuite_not_installed")
             client = aisuite.Client()
             messages = prompt.get("messages")
             if not isinstance(messages, list):
