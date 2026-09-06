@@ -832,6 +832,28 @@ def test_c19_context_robust_production_topology() -> None:
             continue
         assert carried == [], custody_map
 
+    # Printed, not only recorded: the evidence JSON lands in an ephemeral runtime
+    # directory the workflow does not upload, and these are the facts an auditor
+    # reading the log needs about the P14 boundary.
+    print(f"c19_p14_boundary_outcome={p14_outcome['outcome']}")
+    print(
+        "c19_p14_refusing_conjunct="
+        f"{p14_source_binding.get('refusing_conjunct', '-')}"
+    )
+    print(f"c19_p14_source_policy_state={conducted_policy_state}")
+    print(
+        "c19_p14_source_binding_matches="
+        f"envelope_hash:{p14_source_binding['matched_by_envelope_hash']}"
+        f",semantic_truth:{p14_source_binding['matched_by_semantic_truth']}"
+        f",issuance_rows:{p14_source_binding['issuance_log_rows']}"
+    )
+    print(
+        "c19_p14_durable_side_effects="
+        f"requests:{durable_requests},results:{durable_results}"
+        f",proposals:{durable_proposals},witnesses:{durable_witnesses}"
+    )
+    print(f"c19_p14_custody_delivery={json.dumps(custody_map, sort_keys=True)}")
+
     containers = _compose("ps", "--format", "json").stdout.strip().splitlines()
     assert len(containers) >= 8
     evidence = {
