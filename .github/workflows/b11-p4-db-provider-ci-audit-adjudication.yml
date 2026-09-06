@@ -116,7 +116,12 @@ jobs:
 
   b11-p4-ci-audit-gate:
     name: b11-p4-ci-audit-gate
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    # merge_group arm required for Required-Check Totality (Law CI-C2): this job
+    # publishes a merge-blocking context, so a merge-queue entry would wait for a
+    # status that can never arrive without it (observed as checks_timed_out on the
+    # CI-throughput-remediation entry). The merge-group run proves the speculative
+    # merge commit itself (github.sha), strictly stronger than re-reporting the PR.
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -147,8 +152,10 @@ jobs:
         run: |
           python scripts/security/b11_p4_update_proof_index.py --out-dir docs/forensics/evidence/b11_p4
 
-      - name: Generate pre-merge policy evidence (PR)
-        if: github.event_name == 'pull_request'
+      - name: Generate pre-merge policy evidence (PR / merge queue)
+        # Identical policy-context evidence on merge_group as on pull_request:
+        # static notes only, no credentials, no OIDC, no PR-only context reads.
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         run: |
           cat > docs/forensics/evidence/b11_p4/ci_oidc_assume_role_log.txt <<'EOF'
           status=premerge_policy_context

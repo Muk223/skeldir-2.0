@@ -62,7 +62,14 @@ Model validation: before/docs-only static 38 + 4 `pull_request_target` doubles =
 - **Structural, pending live re-measurement**: C-04/C-05/C-06 and Gates 1/2/9. Merge-queue burst −60% and PR burst −31…−42% are source-declared and guard-enforced; queue/wall deltas must be measured on post-merge disposable PRs (pre/post distributions per §4.6). The 15-min wall budget remains aspirational while the 69-job `ci.yml` monolith and 14-min Phase Chain dominate the critical path — Phase 2 (required-lane consolidation with monotonic context migration) is proposed, explicitly NOT smuggled into this phase.
 - **Landing**: via `main-merge-queue` ALLGREEN (C-01), no admin bypass.
 
-## 6. Residual debt (Phase 2 proposal, not executed)
+## 6. Landing record
+
+- **Merge-group burst live: 21 runs same-minute** (first entry, speculative SHA `55869baf`) vs 53 pre-remediation → **−60% confirmed live**, matching the static model exactly.
+- **Incident 1 — R6 celery timeout (flake, adjudicated):** `R6 … _probe_recycle result.get(timeout=10)` red on the merge commit while identical code passed 4/4 on PR events. Verdict: shared-quota contention (21-run entry + ~40-run B2.5-P14 burst within 4 min). Re-ran failed job with no code change → SUCCESS (FAIL→RERUN→PASS). Companion 21:05 failures: B1.7-P4 p95 benchmark assertion (load-coupled by construction) and P13-adv `refused: R6=…failure` (wrapper semantics working, RC-H5). Full record staged in evidence JSON (`landing.r6_incident`).
+- **Incident 2 — b11-p4-ci-audit-gate dead zone (genuine, fixed):** job `if:` admitted PR/push/dispatch but not `merge_group`; required context skipped on the speculative SHA (`6256a4a7`: 133 success + 4 skipped, sole unresolved required) → entry `checks_timed_out` after 60 min despite a fully-green tree. Fix: `merge_group` arm on the job and its evidence step with byte-identical policy-context evidence (no credentials/OIDC/PR-only reads) + guard **rule 8** (`required-job-if`) with 2 NCs (now 24/24). Sweep of all required lanes found no further dead zones (b2_4 P11 steps are correctly event-partitioned; `ci.yml` test-backend is advisory).
+- Required totality on PR head `22044b58`: 191 check-runs completed, 0 missing, sole mixed duplicate `b11-p4-ci-audit-gate` skipped+success adjudicated CLEAN/MERGEABLE by branch protection (pre-existing PRT-double pattern, fork-context design).
+
+## 7. Residual debt (Phase 2 proposal, not executed)
 
 1. Required-lane consolidation (`ci.yml` decomposition) with new lane contexts + branch-protection migration + 10-run paired corpus (directive §4.6).
 2. Nightly forensic NC sweep (lane F; today only the weekly benchmark is scheduled).

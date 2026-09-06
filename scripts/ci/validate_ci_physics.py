@@ -17,7 +17,7 @@ A workflow opts out by carrying, anywhere in the file:
 
 The exemption lives in the workflow it applies to, so it is visible in review
 and travels with the file. Valid rules: concurrency, merge_group, cache, fanout,
-advisory-merge-group, advisory-pr-paths.
+advisory-merge-group, advisory-pr-paths, required-job-if.
 
 Rules merge_group/advisory-merge-group/advisory-pr-paths distinguish REQUIRED
 lanes (produce >=1 context from the required-status-checks contract, matrix
@@ -237,6 +237,44 @@ def check_workflow(path: Path, contexts: set[str] | None = None) -> list[str]:
                 f"still exercise it) or "
                 f"`# physics-exempt: advisory-pr-paths - <reason>`."
             )
+
+    # --- rule: required-job-if (REQUIRED jobs) -------------------------------
+    # A job that publishes a merge-blocking context must not skip on merge_group:
+    # a skipped required check never reports, and the queue waits for it until
+    # check_response_timeout (observed live as checks_timed_out on a fully-green
+    # entry whose only defect was b11-p4-ci-audit-gate skipping). Only a job-level
+    # `if:` that positively enumerates allowed events WITHOUT merge_group fails;
+    # `!=` guards, ref checks and `always()` admit the queue and pass. Steps are
+    # out of scope: event-partitioned steps inside an always-running job (b2_4
+    # P11) are the correct pattern, not the pathology.
+    if exempt(src, "required-job-if") is None and contexts is not None:
+        jobs = doc.get("jobs") or {}
+        for jid, body in jobs.items():
+            if not isinstance(body, dict):
+                continue
+            names = {str(jid)}
+            if body.get("name"):
+                names.add(str(body["name"]))
+            matched = [c for c in contexts if c in names]
+            if not matched:
+                stems = {c.split(" (")[0] for c in contexts if " (" in c}
+                hit_stems = [s for s in stems if s in names]
+                matched = [c for c in contexts for s in hit_stems if c == s or c.startswith(s + " (")]
+            if not matched:
+                continue
+            cond = body.get("if")
+            if not isinstance(cond, str) or "github.event_name" not in cond:
+                continue
+            enumerated = set(re.findall(r"github\.event_name\s*==\s*['\"]([^'\"]+)['\"]", cond))
+            if enumerated and "merge_group" not in enumerated:
+                fails.append(
+                    f"{path.name}: job `{jid}` publishes required context(s) "
+                    f"{sorted(set(matched))[:3]} but its `if:` admits only "
+                    f"{sorted(enumerated)} - merge_group would skip it and the "
+                    f"queue would wait for a status that can never arrive. Admit "
+                    f"`merge_group` with identical evidence or "
+                    f"`# physics-exempt: required-job-if - <reason>`."
+                )
 
     # --- rule: cache -------------------------------------------------------
     # Only jobs that actually install dependencies need a cache key. Adding one

@@ -42,7 +42,7 @@
   ],
   "pip_cache": "setup-python pip cache retained (50 files); Playwright browser cache added to 3 jobs (B1.5-P7, phase-gates, phase-chain)",
   "guard": "validate_ci_physics.py GREEN (64 workflows)",
-  "nc": "22/22",
+  "nc": "24/24",
   "p13_governance": "validator GREEN; NC suite GREEN",
   "coverage": "80/80 required contexts produced by merge_group-firing workflows",
   "yaml": "all 33 edited workflow files parse"
@@ -117,5 +117,44 @@
    "PR717 after-branch docs-only": 55,
    "PR717_note": "methodology invalid for steady-state: branch carries the 41-file remediation commit, so self-included advisory paths match by construction; valid post-merge re-measurement defined as residual Phase-2 step 3"
   }
+ },
+ "landing": {
+  "merge_group_burst_live": {
+   "runs_same_minute": 21,
+   "pre": 53,
+   "delta_pct": -60,
+   "speculative_sha_first_entry": "55869baf2ffd4f5608e4198804384089a9ac677e"
+  },
+  "queue_entries": [
+   {
+    "entry": 1,
+    "result": "removed failed_checks (R6 celery-timeout flake)"
+   },
+   {
+    "entry": 2,
+    "result": "removed failed_checks (reused red verdict on same speculative SHA)"
+   },
+   {
+    "entry": 3,
+    "result": "removed checks_timed_out after 60min (b11-p4-ci-audit-gate skipped on speculative SHA 6256a4a7)"
+   }
+  ],
+  "r6_incident": {
+   "see": "report section 6 and fault corpus method"
+  },
+  "r6_rerun": "FAIL -> no-change RERUN -> SUCCESS (flake confirmed)",
+  "dead_zone": {
+   "job": "b11-p4-ci-audit-gate",
+   "cause": "job if: admitted pull_request/push/dispatch but not merge_group",
+   "fix": "merge_group arm with identical evidence + guard rule required-job-if",
+   "sweep": "all required lanes clean (b2_4 steps partitioned; test-backend advisory)"
+  },
+  "pr_head_totality": {
+   "head": "22044b58",
+   "check_runs": 191,
+   "completed": 191,
+   "required_missing": 0
+  },
+  "nc_suite": "24/24"
  }
 }

@@ -187,6 +187,32 @@ PIN_CONTRACT = json.dumps(
 # an (empty) contract and classify Example as advisory. Using a context produced
 # by nothing would trip merge-queue coverage instead of the rule under test.
 ADVISORY_CONTRACT = json.dumps({"contract_id": "example.empty"})
+
+# A required job whose `if:` admits pull_request but not merge_group skips on
+# the speculative commit and stalls the queue (observed live: b11-p4-ci-audit-gate
+# checks_timed_out on a fully-green entry). The fixed form admits merge_group
+# with identical evidence.
+REQUIRED_JOB_PR_ONLY = """\
+name: Example
+on:
+  merge_group:
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  r-lane:
+    name: R Lane Physics
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
+"""
+
+REQUIRED_JOB_WITH_MG = REQUIRED_JOB_PR_ONLY.replace(
+    "if: github.event_name == 'pull_request'",
+    "if: github.event_name == 'pull_request' || github.event_name == 'merge_group'",
+)
 REQUIRED_CONTRACT = json.dumps({"required_contexts": ["Example"]})
 
 ADVISORY_WITH_MG = CONFORMING
@@ -364,6 +390,20 @@ EXTRA_CONTROLS: list[tuple[str, str, bool, str, str | None]] = [
         False,
         "merge_group",
         REQUIRED_CONTRACT,
+    ),
+    (
+        "required job whose if: excludes merge_group",
+        REQUIRED_JOB_PR_ONLY,
+        False,
+        "required-job-if",
+        json.dumps({"required_contexts": ["R Lane Physics"]}),
+    ),
+    (
+        "same required job, once merge_group is admitted",
+        REQUIRED_JOB_WITH_MG,
+        True,
+        "",
+        json.dumps({"required_contexts": ["R Lane Physics"]}),
     ),
 ]
 

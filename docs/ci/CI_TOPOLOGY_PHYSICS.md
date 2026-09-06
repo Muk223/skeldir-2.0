@@ -2,7 +2,7 @@
 
 **Audience:** any agent or engineer who adds a workflow, adds a phase, or changes `.github/workflows/`.
 **Enforced by:** `.github/workflows/ci-physics-guard.yml` → `scripts/ci/validate_ci_physics.py`
-**Non-vacuity:** `scripts/ci/test_ci_physics_negative_controls.py` (22 controls)
+**Non-vacuity:** `scripts/ci/test_ci_physics_negative_controls.py` (24 controls)
 
 If you only read one section, read [§5 Adding a phase](#5-adding-a-phase).
 
@@ -255,6 +255,19 @@ check that never reports blocks its PR forever (the P12 precedent rule 2 cites).
 directive-compliance validator that runs on every PR by design
 (`# physics-exempt: advisory-pr-paths`), advisory-only so merge authority is
 unaffected.
+
+### Rule 8 — required jobs must not skip on merge_group
+
+**A job that publishes a merge-blocking context must not carry a job-level
+`if:` that admits `pull_request` but not `merge_group`.** A skipped required
+check never reports, and the queue waits for it until `check_response_timeout`
+— observed live as `checks_timed_out` on a fully-green entry whose only defect
+was `b11-p4-ci-audit-gate` skipping (its `if:` admitted PR/push/dispatch but
+not the queue). The fix admits `merge_group` with byte-identical evidence; the
+merge-queue run then proves the speculative commit itself. Only positively
+enumerated event lists are checked: `!=` guards, ref checks and `always()`
+pass, and event-partitioned *steps* inside an always-running job (B2.4 P11's
+PR-safe/main pair) are the correct pattern, not the pathology.
 
 ## 5. Adding a phase
 
