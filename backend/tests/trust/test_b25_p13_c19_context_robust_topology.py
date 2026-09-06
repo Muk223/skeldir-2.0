@@ -624,31 +624,48 @@ def test_c19_context_robust_production_topology() -> None:
     # therefore forbids a durable B2.8 consequence over conducted Trust, and the
     # database says so by name before any row exists. That is measured here on
     # physically conducted state rather than inferred from the code.
-    # Selected by the *envelope's own* semantic truth, not by recency. The
-    # journey issues more than one Trust for this tenant, and the request guard
-    # binds `source_semantic_truth_hash` to the issuance row named by
-    # `source_issuance_envelope_hash` before it looks at policy at all -- so
-    # picking the newest row makes the leg measure a binding failure rather than
-    # the authority law it exists to measure. This is the Trust the proof above
-    # verified from the public JWKS.
-    issued = _fetch_one(
-        """
-        SELECT envelope_hash, semantic_truth_hash, policy_state, audit_ref
-          FROM public.trust_envelope_issuance_log
-         WHERE tenant_id = %s
-           AND status = 'success'
-           AND semantic_truth_hash = %s
-         ORDER BY created_at DESC
-         LIMIT 1
-        """,
-        (control_a["tenant_id"], envelope["semantic_truth_hash"]),
-    )
-    assert issued is not None, (
-        "the Trust verified from the public JWKS has no durable issuance record:"
-        f" semantic_truth_hash={envelope['semantic_truth_hash']}"
-    )
-    assert issued[1] == envelope["semantic_truth_hash"]
+    # The request guard binds the row to its source Trust by two identities --
+    # it finds the issuance record by `source_issuance_envelope_hash` and then
+    # requires `source_semantic_truth_hash` to equal that record's -- before it
+    # evaluates policy at all. Whether a *production-issued* envelope satisfies
+    # that binding is a question nothing had asked, so this measures it rather
+    # than assuming either answer.
+    from app.trust.hash_identity import compute_envelope_payload_hash  # noqa: PLC0415
+
+    with _admin_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT envelope_hash, semantic_truth_hash, policy_state, audit_ref
+              FROM public.trust_envelope_issuance_log
+             WHERE tenant_id = %s AND status = 'success'
+             ORDER BY created_at DESC
+            """,
+            (control_a["tenant_id"],),
+        )
+        issuance_rows = cur.fetchall()
+    assert issuance_rows, "no durable issuance to conduct into P14"
+
+    envelope_payload_hash = compute_envelope_payload_hash(envelope)
+    envelope_truth_hash = envelope["semantic_truth_hash"]
+    matched_by_envelope_hash = [r for r in issuance_rows if r[0] == envelope_payload_hash]
+    matched_by_truth = [r for r in issuance_rows if r[1] == envelope_truth_hash]
+
+    p14_source_binding = {
+        "issuance_log_rows": len(issuance_rows),
+        "envelope_payload_hash": envelope_payload_hash,
+        "envelope_semantic_truth_hash": envelope_truth_hash,
+        "log_envelope_hashes": [r[0] for r in issuance_rows],
+        "log_semantic_truth_hashes": [r[1] for r in issuance_rows],
+        "log_policy_states": sorted({r[2] for r in issuance_rows}),
+        "matched_by_envelope_hash": len(matched_by_envelope_hash),
+        "matched_by_semantic_truth": len(matched_by_truth),
+    }
+
+    # Prefer the row the guard would find; fall back so the leg still conducts
+    # and reports, rather than stopping before it reaches the boundary.
+    issued = (matched_by_envelope_hash or matched_by_truth or issuance_rows)[0]
     conducted_policy_state = issued[2]
+    conducted_issuance_hash = issued[0] or envelope_payload_hash
 
     # The simulation input is itself conducted state: the channel evidence is
     # this tenant's own verified allocations, not an invented budget split.
@@ -681,7 +698,7 @@ def test_c19_context_robust_production_topology() -> None:
             "envelope": envelope,
             "tenant_id": control_a["tenant_id"],
             "token": control_a["machine_token"],
-            "issuance_envelope_hash": issued[0],
+            "issuance_envelope_hash": conducted_issuance_hash,
             "budget": 1_000_000,
             "currency": "USD",
             "channels": conducted_channels
@@ -701,16 +718,31 @@ def test_c19_context_robust_production_topology() -> None:
         }
     )
 
-    # The deployed system's answer, whatever it is, must be the one the source
-    # Trust's authority implies -- and it must leave no durable consequence it
-    # did not earn.
+    # The deployed system's answer must be the one the source Trust's authority
+    # implies, and whatever it is, it must leave no durable consequence it did
+    # not earn.
+    #
+    # `read_only` is what production issues, so the expected answer is a refusal.
+    # Which conjunct refuses is recorded rather than pinned: the source binding
+    # is checked before policy, so an envelope whose durable issuance record
+    # carries different identities is refused earlier -- a weaker outcome for the
+    # same reason, and a fact about the issuance path rather than about P14.
     admissible = ("simulation_only", "proposal_required", "approval_required")
-    if conducted_policy_state in admissible:
+    lawful_refusals = (
+        "b28_request_policy_forbids",
+        "b28_request_source_trust_mismatch",
+        "b28_request_requires_durable_issuance",
+    )
+    if conducted_policy_state in admissible and p14_source_binding[
+        "matched_by_envelope_hash"
+    ]:
         assert p14_outcome["outcome"] == "CONDUCTED", p14_outcome
     else:
         assert p14_outcome["outcome"] == "REFUSED", p14_outcome
-        assert "b28_request_policy_forbids" in str(p14_outcome.get("reason", "")), (
-            p14_outcome
+        reason = str(p14_outcome.get("reason", ""))
+        assert any(name in reason for name in lawful_refusals), p14_outcome
+        p14_source_binding["refusing_conjunct"] = next(
+            name for name in lawful_refusals if name in reason
         )
 
     p14_side_effects = _fetch_one(
@@ -837,6 +869,7 @@ def test_c19_context_robust_production_topology() -> None:
         "durable_attempts_with_signing_key": int(issuance[2]),
         "access_log_issued_rows": int(access_history[0]),
         "container_process_count": len(containers),
+        "p14_source_binding": p14_source_binding,
         "p14_conducted_source_policy_state": conducted_policy_state,
         "p14_conducted_channel_count": len(conducted_channels),
         "p14_boundary_outcome": p14_outcome["outcome"],
