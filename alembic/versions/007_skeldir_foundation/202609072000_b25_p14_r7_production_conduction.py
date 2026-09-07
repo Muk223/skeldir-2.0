@@ -126,4 +126,29 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    raise RuntimeError("P14 VII authority mapping is forward-only; restore the database backup and matching application together")
+    """Restore the ``202609071200`` contract exactly (C16/C17 reversibility).
+
+    VII-3 requires the chain to remain round-trippable as the non-superuser
+    owner: ``downgrade 202608291200`` traverses this revision, so a
+    forward-only stub strands every reversibility lane. Each step below
+    reverses the corresponding upgrade step; destructive drops carry the
+    CI:DESTRUCTIVE_OK marker per repository convention.
+    """
+    # CI:DESTRUCTIVE_OK - downgrade rollback; this revision created the trigger.
+    op.execute("DROP TRIGGER IF EXISTS trg_b28_final_source_identity ON public.b28_simulation_requests")
+    # CI:DESTRUCTIVE_OK - downgrade rollback; this revision created the function.
+    op.execute("DROP FUNCTION IF EXISTS public.b28_enforce_final_source_identity()")
+    # CI:DESTRUCTIVE_OK - downgrade rollback; this revision created the trigger.
+    op.execute("DROP TRIGGER IF EXISTS trg_trust_policy_append_only ON public.trust_tenant_policy_events")
+    # CI:DESTRUCTIVE_OK - downgrade rollback; this revision created the function.
+    op.execute("DROP FUNCTION IF EXISTS public.trust_tenant_policy_append_only()")
+    # CI:DESTRUCTIVE_OK - downgrade rollback; this revision created the table.
+    op.execute("DROP TABLE IF EXISTS public.trust_tenant_policy_events")
+    # CI:DESTRUCTIVE_OK - downgrade rollback; this revision created the view.
+    op.execute("DROP VIEW IF EXISTS public.trust_final_issuance_identity")
+    for name in ("b27_enforce_explanation_consequence", "b28_enforce_request_consequence", "b28_enforce_result_consequence"):
+        _replace_function(name, "FROM public.trust_final_issuance_identity", "FROM public.trust_envelope_issuance_log")
+    for name in ("b28_authenticate_request_possession", "b28_enforce_request_possession"):
+        _replace_function(name, "clock_timestamp()", "now()")
+    for table, column in (("b28_request_authentications", "authenticated_at"), ("b28_simulation_requests", "requested_at"), ("b28_simulation_results", "created_at"), ("b28_proposals", "created_at")):
+        op.execute(f"ALTER TABLE public.{table} ALTER COLUMN {column} SET DEFAULT now()")
