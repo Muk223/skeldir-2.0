@@ -22,6 +22,13 @@ refuses every unlawful intermediate state; run it before AND after each step.
 Files (one PR, through merge queue, no bypass):
 - `contracts-internal/governance/b03_phase2_required_status_checks.main.json`:
   v1.21.0 -> v1.22.0-dual, ADD `B1.4 Privacy Consolidated Plane` (keep all 80).
+- `ci.yml` job `b14-p6-proof-plane-binding`: ADD `DATABASE_URL` +
+  `MIGRATION_DATABASE_URL` env (same localhost values as sibling B14 jobs).
+  Rationale: conftest B0.5.3.3 Gate C crashes the p6 pytest at import without
+  it (masked by `| tee`, job green-vacuous since PR #713; evidence 816-byte
+  artifact). This makes the existing suite execute; no test, threshold, or
+  topology change. Required so DUAL pairs are junit-to-junit comparable
+  (pair #1 comparator RED is otherwise uncloseable).
 - `contracts-internal/governance/ci_proof_conservation.v1.json`: v1.0.2 ->
   v1.0.3, add I-1 successor mapping (8 predecessors -> new context) + corpus ref.
 - `.github/workflows/b14-privacy-consolidated.yml`: remove the two

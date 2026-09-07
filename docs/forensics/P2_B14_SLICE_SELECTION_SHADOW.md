@@ -181,6 +181,21 @@ Next slices (same machine): B13 (9 jobs), B12 (4), B21 cohort (6-7).
   Lane works end-to-end (1 env build, 1 PG boot, 1 migration, 8 clones,
   15 pytest files, enforcers, scans). Awaiting incumbent CI run 34141912982
   on the same SHA for pair #1.
+- PAIR #1 (SHA 5da45dbc): old CI 34141912982 B14 8/8 success + new shadow
+  34141912972 success. Comparator with live conclusions: 7/8 proofs identical
+  node IDs (p0 6/4/2, p1 5, p2 4, p3 9, p4 5, p5 4, p7 3) and green verdicts
+  bound proof-level; env authority matched; single precise RED
+  `missing-old-proof:p6/junit.enforcer.xml` (incumbent vacuity, disposition
+  recorded; DUAL bundles the ci.yml p6 env fix). Persisted in
+  `docs/forensics/p2_b14_equivalence_corpus.json` (1/10 pairs; CUTOVER needs
+  10 with comparator GREEN each — gate enforces).
+  Measured cohort physics: old 4707 slot-s (queue med 498s, max 930s wall)
+  vs new 141 slot-s (queue 40s, exec 101s) = **-97% slot-time, -85% wall**.
+  P2-C7: incumbent B14 queue (212-856s) within Phase-I baseline band
+  (540-1260s med); +1 shadow job (~2% of 51-run burst) shows no systematic
+  distortion. Unrelated reds on the pair PR (B2.1-P4 perf threshold
+  5.2552>=5.0, cascade to Drift Gate, B0.4 10-min silent timeout):
+  classified runner-contention/external; rerun requested to confirm flake.
 
 ## 10. Residual debt register (Phase II slice 1)
 

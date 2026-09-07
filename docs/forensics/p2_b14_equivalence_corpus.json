@@ -1,0 +1,91 @@
+{
+  "pairs": [
+    {
+      "id": "pull_request-5da45dbc8777",
+      "class": "ordinary",
+      "event": "pull_request",
+      "sha": "5da45dbc8777822a6c43b2c0271c08a3aeb40d67",
+      "old_sha": "5da45dbc8777822a6c43b2c0271c08a3aeb40d67",
+      "new_sha": "5da45dbc8777822a6c43b2c0271c08a3aeb40d67",
+      "old_run": "34141912982",
+      "new_run": "34141912972",
+      "old_conclusions": {
+        "B1.4 P0 Privacy Authority Lock": "success",
+        "B1.4 P1 Ingress Contract Sanitization": "success",
+        "B1.4 P2 Session Authority Proofs": "success",
+        "B1.4 P3 Attribution Locality Proofs": "success",
+        "B1.4 P4 Retention + Deterministic Deletion Proofs": "success",
+        "B1.4 P5 Export Log Artifact No-Leak": "success",
+        "B1.4 P6 Merge-Blocking Privacy Proof Plane Binding": "success",
+        "B1.4 P7 E2E Privacy System Proofs": "success"
+      },
+      "new_conclusion": "success",
+      "old_job_timing": {
+        "B1.4 P0 Privacy Authority Lock": {
+          "job_id": "101813856956",
+          "conclusion": "success",
+          "queue_s": 398.0,
+          "exec_s": 62.0
+        },
+        "B1.4 P1 Ingress Contract Sanitization": {
+          "job_id": "101813857042",
+          "conclusion": "success",
+          "queue_s": 365.0,
+          "exec_s": 69.0
+        },
+        "B1.4 P6 Merge-Blocking Privacy Proof Plane Binding": {
+          "job_id": "101813860327",
+          "conclusion": "success",
+          "queue_s": 811.0,
+          "exec_s": 42.0
+        },
+        "B1.4 P7 E2E Privacy System Proofs": {
+          "job_id": "101813861276",
+          "conclusion": "success",
+          "queue_s": 856.0,
+          "exec_s": 74.0
+        },
+        "B1.4 P3 Attribution Locality Proofs": {
+          "job_id": "101813875898",
+          "conclusion": "success",
+          "queue_s": 498.0,
+          "exec_s": 65.0
+        },
+        "B1.4 P5 Export Log Artifact No-Leak": {
+          "job_id": "101813880407",
+          "conclusion": "success",
+          "queue_s": 665.0,
+          "exec_s": 65.0
+        },
+        "B1.4 P4 Retention + Deterministic Deletion Proofs": {
+          "job_id": "101813881781",
+          "conclusion": "success",
+          "queue_s": 379.0,
+          "exec_s": 67.0
+        },
+        "B1.4 P2 Session Authority Proofs": {
+          "job_id": "101813888404",
+          "conclusion": "success",
+          "queue_s": 212.0,
+          "exec_s": 79.0
+        }
+      },
+      "new_job_timing": {
+        "B1.4 Privacy Consolidated Plane": {
+          "job_id": "101805552856",
+          "conclusion": "success",
+          "queue_s": 40.0,
+          "exec_s": 101.0
+        }
+      },
+      "verdict": "GREEN",
+      "comparator": "RED:missing-old-proof:p6/junit.enforcer.xml",
+      "disposition": "7/8 proofs identical node IDs + green verdicts, proof-level bound to live conclusions, same SHA, env authority matched. p6: incumbent vacuous (conftest Gate C crash masked by tee; 816-byte artifact, no JUnit) vs new real suite (4 passed). Lawful path: ci.yml p6 DATABASE_URL fix bundled in DUAL, then re-pair. Pair does NOT satisfy CUTOVER (gate requires comparator GREEN per pair).",
+      "evidence": {
+        "old_run": "https://github.com/Synergyscape-V1/skeldir-2.0/actions/runs/34141912982",
+        "new_run": "https://github.com/Synergyscape-V1/skeldir-2.0/actions/runs/34141912972",
+        "pr": "https://github.com/Synergyscape-V1/skeldir-2.0/pull/721"
+      }
+    }
+  ]
+}

@@ -26,6 +26,7 @@ import json
 import subprocess
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 OLD_CONTEXTS = [
     "B1.4 P0 Privacy Authority Lock",
@@ -56,7 +57,12 @@ def gh_api(*args: str) -> object:
     proc = subprocess.run(["gh", "api", *args], capture_output=True, text=True)
     if proc.returncode != 0:
         raise RuntimeError(f"gh api failed: {' '.join(args)}: {proc.stderr[:300]}")
-    return json.loads(proc.stdout or "null")
+    out = (proc.stdout or "").strip()
+    # gh --jq on a scalar emits raw text (unquoted); parse JSON when possible.
+    try:
+        return json.loads(out or "null")
+    except json.JSONDecodeError:
+        return out
 
 
 def iso(s: str) -> datetime:
@@ -68,33 +74,47 @@ def run_created_at(run_id: str) -> datetime:
     return iso(str(data))
 
 
-def run_jobs(run_id: str) -> list[dict]:
-    jobs: list[dict] = []
-    page = 1
-    while True:
-        data = gh_api(f"repos/:owner/:repo/actions/runs/{run_id}/jobs",
-                      "-f", "per_page=100", "-f", f"page={page}")
-        assert isinstance(data, dict)
-        jobs.extend(data.get("jobs", []))
-        if len(data.get("jobs", [])) < 100:
+def _iter_pages(proc: subprocess.CompletedProcess[str]) -> Any:
+    """Yield decoded JSON docs from possibly-concatenated gh --paginate output."""
+    text = proc.stdout or ""
+    decoder = json.JSONDecoder()
+    idx, n = 0, len(text)
+    while idx < n:
+        while idx < n and text[idx].isspace():
+            idx += 1
+        if idx >= n:
             break
-        page += 1
+        doc, idx = decoder.raw_decode(text, idx)
+        yield doc
+
+
+def run_jobs(run_id: str) -> list[dict]:
+    proc = subprocess.run(
+        ["gh", "api", f"repos/:owner/:repo/actions/runs/{run_id}/jobs",
+         "--paginate"],
+        capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(f"gh jobs failed for run {run_id}: {proc.stderr[:300]}")
+    jobs: list[dict] = []
+    for data in _iter_pages(proc):
+        if isinstance(data, dict):
+            jobs.extend(data.get("jobs", []))
     return jobs
 
 
 def check_conclusions(sha: str) -> dict[str, str]:
     """Map check-run name -> conclusion for the candidate SHA (all pages)."""
+    proc = subprocess.run(
+        ["gh", "api", f"repos/:owner/:repo/commits/{sha}/check-runs",
+         "--paginate"],
+        capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(f"gh check-runs failed for {sha[:12]}: {proc.stderr[:300]}")
     out: dict[str, str] = {}
-    page = 1
-    while True:
-        data = gh_api(f"repos/:owner/:repo/commits/{sha}/check-runs",
-                      "-f", "per_page=100", "-f", f"page={page}")
-        assert isinstance(data, dict)
-        for cr in data.get("check_runs", []):
-            out.setdefault(str(cr.get("name")), str(cr.get("conclusion")))
-        if len(data.get("check_runs", [])) < 100:
-            break
-        page += 1
+    for data in _iter_pages(proc):
+        if isinstance(data, dict):
+            for cr in data.get("check_runs", []):
+                out.setdefault(str(cr.get("name")), str(cr.get("conclusion")))
     return out
 
 
@@ -139,8 +159,9 @@ def main() -> int:
     new_created = run_created_at(args.new_run)
     old_jobs = run_jobs(args.old_run)
     new_jobs = run_jobs(args.new_run)
-    old_t = job_timing(old_jobs, OLD_JOB_IDS, old_created)
-    new_t = job_timing(new_jobs, [NEW_JOB_ID], new_created)
+    # The jobs API reports display names (job `name:`), not YAML job ids.
+    old_t = job_timing(old_jobs, OLD_CONTEXTS, old_created)
+    new_t = job_timing(new_jobs, [NEW_CONTEXT], new_created)
     conclusions = check_conclusions(args.sha)
 
     missing_old = [c for c in OLD_CONTEXTS if conclusions.get(c) != "success"]

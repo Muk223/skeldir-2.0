@@ -193,9 +193,11 @@ def compare(old_dir: Path, new_dir: Path, sha: str,
         # Live conclusions, when supplied, must agree with artifacts.
         # Proof-level verdict binds enforcer/negative-control steps that emit
         # no JUnit: new_green requires ledger rc==0 AND clean JUnit.
+        # (Skipped when no comparable file survived: the missing-* REDs above
+        # already adjudicate that case; an extra divergence would double-count.)
         new_green = (new_rc[proof] == 0) and all(
             r["new"]["green"] for r in file_rows) and bool(file_rows)
-        if old_conclusions and proof in old_conclusions:
+        if old_conclusions and proof in old_conclusions and file_rows:
             live_green = old_conclusions[proof] == "success"
             art_green = all(r["old"]["green"] for r in file_rows)
             if live_green != art_green and file_rows:
@@ -226,11 +228,13 @@ def compare(old_dir: Path, new_dir: Path, sha: str,
         fail("missing-new-proof:env_signature.json")
     else:
         try:
+            from b14_env_signature import AUTHORITY_FIELDS
             recorded = json.loads(sig_path.read_text(encoding="utf-8"))
             fresh = compute_signature()
-            if recorded.get("digest") != fresh.get("digest") and recorded.get("lane_version") == fresh.get("lane_version"):
-                # Same lane version but different digest = foreign/stale substrate.
-                fail("stale-artifact: env_signature digest != recomputed")
+            if any(recorded.get(k) != fresh.get(k) for k in AUTHORITY_FIELDS):
+                # Same lane version but different authority = foreign/stale
+                # substrate. (os/arch excluded: execution facts, see module.)
+                fail("stale-artifact: env_signature authority != recomputed")
             else:
                 past(f"env-authority:{recorded.get('digest', '?')[:12]}")
         except Exception as exc:
@@ -255,7 +259,12 @@ def main() -> int:
     if not all([args.old_dir, args.new_dir, args.sha, args.old_sha, args.new_sha]):
         print("need --old-dir --new-dir --sha --old-sha --new-sha", flush=True)
         return 2
-    conc = json.loads(args.old_conclusions) if args.old_conclusions else None
+    conc = None
+    if args.old_conclusions:
+        raw = args.old_conclusions
+        if Path(raw).exists():
+            raw = Path(raw).read_text(encoding="utf-8")
+        conc = json.loads(raw)
     ok, checks, _ = compare(Path(args.old_dir), Path(args.new_dir),
                             args.sha, args.old_sha, args.new_sha, conc)
     print(f"B14 equivalence {'GREEN' if ok else 'RED'} sha={args.sha[:12]}", flush=True)

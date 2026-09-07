@@ -56,11 +56,28 @@ DEPENDENCY_FILES = [
 ]
 
 
+# Environment-authority fields: machine-independent content bindings compared
+# by --check and the equivalence comparator. `os`/`arch` are execution facts
+# (recorded, not compared): the runner label is pinned by the workflow.
+AUTHORITY_FIELDS = (
+    "lane_id",
+    "python_version",
+    "dependency_authority",
+    "db_image",
+    "db_schema_authority",
+    "predecessor_proofs",
+)
+
+
 def _sha256_file(path: Path) -> str:
+    # Content-addressed across platforms: normalize CRLF to LF before
+    # hashing, so a Windows CRLF working copy and a Linux LF runner checkout
+    # of identical content share one digest (measured live: runner vs local
+    # digests diverged on line endings alone, run 34141912972).
     h = hashlib.sha256()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(65536), b""):
-            h.update(chunk)
+            h.update(chunk.replace(b"\r\n", b"\n"))
     return h.hexdigest()
 
 
@@ -157,17 +174,16 @@ def main() -> int:
         recorded = json.loads(Path(args.check).read_text(encoding="utf-8"))
         recorded_digest = recorded.get("digest", "?")
         fresh = compute_signature()
-        # Lane version is deployment metadata, not environment physics: a
-        # version bump with identical substrate must not read as foreign env.
-        for key in ("lane_version", "digest"):
-            recorded.pop(key, None)
-            fresh.pop(key, None)
-        if recorded != fresh:
+        # Compare authority fields only: os/arch are execution facts of the
+        # recording machine, lane_version is deployment metadata.
+        fresh_auth = {k: fresh.get(k) for k in AUTHORITY_FIELDS}
+        recorded_auth = {k: recorded.get(k) for k in AUTHORITY_FIELDS}
+        if recorded_auth != fresh_auth:
             print("B14 EnvSig MISMATCH: effective environment differs", flush=True)
-            for k in sorted(set(recorded) | set(fresh)):
-                if recorded.get(k) != fresh.get(k):
-                    print(f"  field {k}: recorded={json.dumps(recorded.get(k))[:160]}", flush=True)
-                    print(f"  field {k}: fresh   ={json.dumps(fresh.get(k))[:160]}", flush=True)
+            for k in AUTHORITY_FIELDS:
+                if recorded_auth.get(k) != fresh_auth.get(k):
+                    print(f"  field {k}: recorded={json.dumps(recorded_auth.get(k))[:160]}", flush=True)
+                    print(f"  field {k}: fresh   ={json.dumps(fresh_auth.get(k))[:160]}", flush=True)
             return 1
         print(f"B14 EnvSig MATCH digest={recorded_digest}")
         return 0

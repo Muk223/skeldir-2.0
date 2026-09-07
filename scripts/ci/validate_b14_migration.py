@@ -92,6 +92,10 @@ def check_corpus(corpus: dict) -> list[str]:
             problems.append(f"corpus-wrong-sha:{p.get('id', '?')}")
         if p.get("verdict") != "GREEN":
             problems.append(f"corpus-not-green:{p.get('id', '?')}")
+        # Verdict-only GREEN is inadmissible (H-P2-07): the comparator must
+        # have bound test identities, failure class, NC evidence, and env.
+        if p.get("comparator") != "GREEN":
+            problems.append(f"corpus-comparator-not-green:{p.get('id', '?')}")
     return problems
 
 
@@ -174,7 +178,8 @@ def _corpus(n: int = 10) -> dict:
     for i in range(n):
         sha = f"{i:040d}"
         pairs.append({"id": f"p{i}", "class": classes[i], "sha": sha,
-                      "old_sha": sha, "new_sha": sha, "verdict": "GREEN"})
+                      "old_sha": sha, "new_sha": sha, "verdict": "GREEN",
+                      "comparator": "GREEN"})
     return {"pairs": pairs}
 
 
@@ -204,6 +209,9 @@ def self_test() -> int:
     # Active falsifier: remove OLD before NEW is live/equivalent.
     run_case("premature-retirement-no-corpus", False, [NEW_CONTEXT], [], True, None)
     run_case("premature-retirement-thin-corpus", False, [NEW_CONTEXT], [], True, _corpus(4))
+    thin = _corpus()
+    thin["pairs"][0] = dict(thin["pairs"][0], comparator="RED:missing-old-proof:p6")
+    run_case("cutover-comparator-not-green", False, [NEW_CONTEXT], [], True, thin)
     run_case("severed", False, [], [], True, None)
     run_case("duplication", False, [NEW_CONTEXT], OLD_JOBS, True, _corpus())
     run_case("dual-impl-deleted", False, OLD_CONTEXTS + [NEW_CONTEXT], [], True, None)

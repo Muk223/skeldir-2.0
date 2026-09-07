@@ -135,6 +135,15 @@ def main() -> int:
         fp.write_text(json.dumps(foreign), encoding="utf-8")
         rc, _ = run_script("b14_env_signature.py", "--check", str(fp))
         check("envsig-foreign-state-RED", rc != 0, f"rc={rc}")
+        # Execution facts (arch/os of the recording machine) must NOT trip
+        # the authority check: same content on another machine is same env.
+        plat = json.loads(sp.read_text(encoding="utf-8"))
+        plat["arch"] = "other-arch"
+        plat["os"] = "other-os"
+        pp = Path(tmp) / "platform.json"
+        pp.write_text(json.dumps(plat), encoding="utf-8")
+        rc, _ = run_script("b14_env_signature.py", "--check", str(pp))
+        check("envsig-platform-facts-ignored", rc == 0, f"rc={rc}")
 
     # --- provisioner DSN addressing (P2-C6) ---
     from b14_provision_template_dbs import PROOF_DBS, dsn_for
