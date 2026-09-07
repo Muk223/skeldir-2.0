@@ -66,9 +66,12 @@ already holds -- which is what an authenticated requester is.
 Physical containment is still real at the layer that can enforce it: only the
 ``api`` service receives ``B28_REQUEST_DATABASE_URL`` and
 ``B28_SOLVER_DATABASE_URL``. The workers, the beat scheduler, the publisher and
-the trust signer do not, which is a container-level fact the custody-manifest
-check verifies against ``docker-compose.c19.yml`` rather than inferring from
-Python imports (Directive VI H-ART-VI-01).
+the trust signer do not. That is a deployment-topology fact rather than a
+language one, so it is checked where it lives:
+``scripts/ci/assert_b25_p14_custody_manifest.py`` reads the deployed composition
+and compares it to ``CUSTODY_TRUSTED_SERVICES`` below, and the C19 production
+proof probes the running services themselves. Directive VI H-ART-VI-01 asks for
+exactly that -- observed composition, not inferred imports.
 """
 
 from __future__ import annotations
@@ -97,10 +100,10 @@ B28_SOLVER_PRINCIPAL = "app_b28_solver"
 #: requires the declared boundary to match reality.
 CUSTODY_TRUST_BOUNDARY = "process"
 
-#: The container that receives the two DSNs in the production topology. Verified
-#: against `docker-compose.c19.yml` by
-#: `scripts/ci/assert_b25_p14_custody_manifest.py`, so widening it silently is
-#: merge-blocking.
+#: The service that receives the two DSNs in the production topology. Verified
+#: against the deployed composition by
+#: `scripts/ci/assert_b25_p14_custody_manifest.py`, and probed inside the running
+#: services by the C19 proof, so widening it silently is merge-blocking.
 CUSTODY_TRUSTED_SERVICES: tuple[str, ...] = ("api",)
 
 #: Claims this module used to make and no longer makes, kept as data rather than
