@@ -86,6 +86,93 @@
         "new_run": "https://github.com/Synergyscape-V1/skeldir-2.0/actions/runs/34141912972",
         "pr": "https://github.com/Synergyscape-V1/skeldir-2.0/pull/721"
       }
+    },
+    {
+      "id": "pull_request-ffc37f5bfc3e",
+      "class": "ordinary",
+      "event": "pull_request",
+      "sha": "ffc37f5bfc3e4a6af83affd7b096d4f212fe438c",
+      "old_sha": "ffc37f5bfc3e4a6af83affd7b096d4f212fe438c",
+      "new_sha": "ffc37f5bfc3e4a6af83affd7b096d4f212fe438c",
+      "old_run": "34145746955",
+      "new_run": "34145747172",
+      "old_conclusions": {
+        "B1.4 P0 Privacy Authority Lock": "success",
+        "B1.4 P1 Ingress Contract Sanitization": "success",
+        "B1.4 P2 Session Authority Proofs": "success",
+        "B1.4 P3 Attribution Locality Proofs": "success",
+        "B1.4 P4 Retention + Deterministic Deletion Proofs": "success",
+        "B1.4 P5 Export Log Artifact No-Leak": "success",
+        "B1.4 P6 Merge-Blocking Privacy Proof Plane Binding": "success",
+        "B1.4 P7 E2E Privacy System Proofs": "success"
+      },
+      "new_conclusion": "success",
+      "old_job_timing": {
+        "B1.4 P2 Session Authority Proofs": {
+          "job_id": "101817306721",
+          "conclusion": "success",
+          "queue_s": 410.0,
+          "exec_s": 62.0
+        },
+        "B1.4 P0 Privacy Authority Lock": {
+          "job_id": "101817306745",
+          "conclusion": "success",
+          "queue_s": 448.0,
+          "exec_s": 69.0
+        },
+        "B1.4 P1 Ingress Contract Sanitization": {
+          "job_id": "101817306750",
+          "conclusion": "success",
+          "queue_s": 448.0,
+          "exec_s": 63.0
+        },
+        "B1.4 P3 Attribution Locality Proofs": {
+          "job_id": "101817306834",
+          "conclusion": "success",
+          "queue_s": 520.0,
+          "exec_s": 68.0
+        },
+        "B1.4 P5 Export Log Artifact No-Leak": {
+          "job_id": "101817307053",
+          "conclusion": "success",
+          "queue_s": 518.0,
+          "exec_s": 67.0
+        },
+        "B1.4 P4 Retention + Deterministic Deletion Proofs": {
+          "job_id": "101817307240",
+          "conclusion": "success",
+          "queue_s": 634.0,
+          "exec_s": 62.0
+        },
+        "B1.4 P6 Merge-Blocking Privacy Proof Plane Binding": {
+          "job_id": "101819818810",
+          "conclusion": "success",
+          "queue_s": 795.0,
+          "exec_s": 51.0
+        },
+        "B1.4 P7 E2E Privacy System Proofs": {
+          "job_id": "101820357040",
+          "conclusion": "success",
+          "queue_s": 849.0,
+          "exec_s": 72.0
+        }
+      },
+      "new_job_timing": {
+        "B1.4 Privacy Consolidated Plane": {
+          "job_id": "101817305954",
+          "conclusion": "success",
+          "queue_s": 108.0,
+          "exec_s": 101.0
+        }
+      },
+      "verdict": "GREEN",
+      "comparator": "RED:missing-old-proof:p6/junit.enforcer.xml",
+      "disposition": "Replicates pair #1 exactly: 7/8 identical node IDs + green verdicts bound proof-level to live conclusions, same SHA, env authority matched. p6 incumbent vacuity deterministic across SHAs (DUAL p6 env fix queued).",
+      "evidence": {
+        "old_run": "https://github.com/Synergyscape-V1/skeldir-2.0/actions/runs/34145746955",
+        "new_run": "https://github.com/Synergyscape-V1/skeldir-2.0/actions/runs/34145747172",
+        "pr": "https://github.com/Synergyscape-V1/skeldir-2.0/pull/721"
+      }
     }
   ]
 }

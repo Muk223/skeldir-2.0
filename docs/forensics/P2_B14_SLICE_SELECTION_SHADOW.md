@@ -187,8 +187,8 @@ Next slices (same machine): B13 (9 jobs), B12 (4), B21 cohort (6-7).
   bound proof-level; env authority matched; single precise RED
   `missing-old-proof:p6/junit.enforcer.xml` (incumbent vacuity, disposition
   recorded; DUAL bundles the ci.yml p6 env fix). Persisted in
-  `docs/forensics/p2_b14_equivalence_corpus.json` (1/10 pairs; CUTOVER needs
-  10 with comparator GREEN each — gate enforces).
+  `docs/forensics/p2_b14_equivalence_corpus.json` (2/10 pairs after pair #2;
+  CUTOVER needs 10 with comparator GREEN each — gate enforces).
   Measured cohort physics: old 4707 slot-s (queue med 498s, max 930s wall)
   vs new 141 slot-s (queue 40s, exec 101s) = **-97% slot-time, -85% wall**.
   P2-C7: incumbent B14 queue (212-856s) within Phase-I baseline band
@@ -196,6 +196,11 @@ Next slices (same machine): B13 (9 jobs), B12 (4), B21 cohort (6-7).
   distortion. Unrelated reds on the pair PR (B2.1-P4 perf threshold
   5.2552>=5.0, cascade to Drift Gate, B0.4 10-min silent timeout):
   classified runner-contention/external; rerun requested to confirm flake.
+- PAIR #2 (SHA ffc37f5b): old CI 34145746955 (full SUCCESS incl. former flakes)
+  + new shadow 34145747172 success. Comparator replicates pair #1 exactly:
+  7/8 identical, same single p6 RED, env matched. Cohort: old 5136 slot-s
+  (queue 410-849s) vs new 209 slot-s = **-95.9%**. Equivalence stabilizing
+  across SHAs modulo the known p6 disposition.
 - RERUN (same SHA 5da45dbc, `--failed`, no code change): B2.1-P4, Phase Gates
   B0.4, Drift Gate all GREEN (FAIL->RERUN->PASS confirms contention flake,
   same class as Phase I s5.4). B2.1-P6 closure then RED with the IDENTICAL
@@ -209,7 +214,7 @@ Next slices (same machine): B13 (9 jobs), B12 (4), B21 cohort (6-7).
 
 ## 10. Residual debt register (Phase II slice 1)
 
-R-P2-01: live paired corpus 1/10 (needs ordinary + merge_group + red-team events over days; vehicle PR #721).
+R-P2-01: live paired corpus 2/10 (needs ordinary + merge_group + red-team events over days; vehicle PR #721).
 R-P2-02: DUAL/CUTOVER unexecuted (needs corpus GREEN + owner admin; runbook ready).
 R-P2-03: runtime-log construction counts (cache misses, PG boots, setup
 slot-minutes) pending first shadow runs.
