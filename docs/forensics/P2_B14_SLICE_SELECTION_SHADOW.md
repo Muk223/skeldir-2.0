@@ -100,11 +100,25 @@ unconditional); H-09 DB overreach tested by corpus, not asserted; H-10 graph
 shape unchanged (needs: edges inside ci.yml untouched); H-11 wrapper severance
 falsified by ledger NC (7/8 RED, rc-laundering RED, stale-SHA RED).
 
-Pipefail note (residual hygiene, OUT OF SCOPE): incumbent sections pipe
-`pytest | tee` without `pipefail`, so a pytest failure masked by tee exit 0
-behaves identically old and new by verbatim construction. Changing it would
-alter verdict semantics (forbidden); flagged for a future governance-owned
-hygiene pass, NOT this slice.
+Pipefail note (MEASURED 2026-09-07, shadow run 34140659251): GHA `run` steps
+execute under `/usr/bin/bash -e {0}` with NO pipefail, identically in both
+lanes. `pytest ... | tee` therefore reports tee's exit code. Verbatim
+construction keeps verdict functions identical by design; the ledger +
+JUnit-presence + aggregate layers fail closed on masked crashes (proven
+live: p6 crash -> missing junit -> aggregate RED). Changing pipes would
+alter verdict semantics (forbidden in-slice); a governance-owned pipefail
+hygiene pass is deferred as R-P2-06.
+
+Incumbent p6 vacuity (MEASURED): backend conftest B0.5.3.3 Gate C (from PR
+#713) requires DATABASE_URL in CI, but ci.yml job b14-p6-proof-plane-binding
+sets none (static job, no PG service). Its pytest crashes at conftest import
+on every run, masked by `| tee`, job GREEN. Evidence: run 34047052521
+artifact b14-p6-runtime-artifacts = 816 bytes, no JUnit. The consolidated
+lane provisions p6 an empty migrated clone (strictly stronger witness; same
+invariant, executed suite) and the identical ci.yml p6 env fix is queued for
+the DUAL change. Comparator verdicts on green SHAs still match (green/green);
+a p6-test red-team fault will correctly diverge old-green(vacuous)/new-red
+with this diagnosis attached.
 
 ## 6. Non-vacuity (all green on this branch)
 
@@ -145,9 +159,17 @@ Next slices (same machine): B13 (9 jobs), B12 (4), B21 cohort (6-7).
   by audit-count cross-check (169 expected) -> fixed, re-verified 169/169.
 - aggregator NC initially RED-on-legitimate-enforcer-failure (rc=1/junit-green
   treated as mismatch) -> root-caused (enforcers emit no JUnit) -> narrowed to
-  wrapper-green direction only, re-verified 13/13.
+  wrapper-green direction only, re-verified 13/13 (now 14/14 with masked-crash).
 - comparator self-test lambdas refactored for clarity before first run
   (no behavioral red).
+- LIVE shadow run 34140659251 (SHA 4a7ff527, PR #721): aggregate RED with
+  exact diagnosis `missing-artifact:p6/junit.enforcer.xml` +
+  `proof-failed:p7 rc=1`. Classified: p7 = candidate-lane defect (bare p7
+  enforcer used default artifacts/b14_p7 output root; fixed with explicit
+  --artifacts-dir); p6 = incumbent CI defect (conftest Gate C vs missing
+  DATABASE_URL, crash masked by tee, job green-vacuous; evidence 816-byte
+  artifact). Lane failed closed precisely as designed; no engineer action
+  forced (shadow, P2-C3).
 
 ## 10. Residual debt register (Phase II slice 1)
 

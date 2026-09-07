@@ -103,6 +103,19 @@ def main() -> int:
                       failing=["t::x"] if p == "p1" and rel == "junit.runtime.xml" else [])
         check("aggregator-junit-red-RED", aggregate(art, sha) != 0)
 
+    # Masked pytest crash (rc=0 recorded, JUnit never emitted -- the live p6
+    # shape: `pytest|tee` without pipefail hides the crash) must still RED
+    # via missing-artifact, never launder to GREEN.
+    with tempfile.TemporaryDirectory() as tmp:
+        art = Path(tmp) / "d"
+        for p in EXPECTED_PROOFS:
+            record(art, p, 0, sha)
+            for rel in EXPECTED_JUNIT[p]:
+                if p == "p6":
+                    continue
+                junit(art / p / rel, ["t::x"])
+        check("aggregator-masked-crash-RED", aggregate(art, sha) != 0)
+
     # --- env-sig foreign state (Gate 7) ---
     from b14_env_signature import compute_signature
     sig = compute_signature()
@@ -127,10 +140,12 @@ def main() -> int:
     from b14_provision_template_dbs import PROOF_DBS, dsn_for
     m = "postgresql://postgres:postgres@127.0.0.1:5432/postgres"
     dsns = {p: dsn_for(m, db) for p, db in PROOF_DBS.items()}
-    check("provisioner-7-isolated-dbs", len(set(dsns.values())) == 7, str(len(set(dsns.values()))))
+    check("provisioner-8-isolated-dbs", len(set(dsns.values())) == 8, str(len(set(dsns.values()))))
     check("provisioner-no-shared-consequence-db",
           all("b14_p" in d and d != m for d in dsns.values()))
-    check("provisioner-p6-stateless", "p6" not in PROOF_DBS)
+    # p6 rides an empty clone so its static suite executes (incumbent p6
+    # crash-masks behind tee; see provisioner docstring for evidence).
+    check("provisioner-p6-has-clone", "p6" in PROOF_DBS)
 
     print(f"B14 consolidation negative controls: {passed} passed, {failed} failed", flush=True)
     return 0 if failed == 0 else 1

@@ -218,12 +218,16 @@ jobs:
           python3 scripts/ci/b14_record_proof_result.py --proof p5 --return-code "$RC" --artifacts-dir artifacts/b14_consolidated --sha "${{ env.ADJUDICATED_SHA }}"
           exit 0
 
-      # --- Proof p6 (verbatim ci.yml b14-p6 commands; static, no DB) ---
+      # --- Proof p6 (ci.yml b14-p6 commands; static suite runs against an
+      # empty clone so conftest Gate C passes -- incumbent omits DATABASE_URL
+      # and crash-masks behind tee; see provisioner docstring) ---
       - name: Consolidated proof B1.4-P6 proof-plane binding
         run: |
           set +e
           (
             set -e
+            export DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/b14_p6_proof
+            export MIGRATION_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/b14_p6_proof
             if python scripts/ci/enforce_b14_p6_proof_plane_binding.py --simulate-regression; then
               echo "expected B1.4-P6 regression simulation to fail"
               exit 1
@@ -248,8 +252,9 @@ jobs:
               echo "expected B1.4-P7 regression simulation to fail"
               exit 1
             fi
-            python scripts/ci/enforce_b14_p7_e2e_privacy_system_proofs.py
             mkdir -p artifacts/b14_consolidated/p7
+            python scripts/ci/enforce_b14_p7_e2e_privacy_system_proofs.py \
+              --artifacts-dir artifacts/b14_consolidated/p7
             pytest backend/tests/integration/test_b14_p7_e2e_privacy_system_proofs.py -q -rs --junitxml=artifacts/b14_consolidated/p7/junit.runtime.xml | tee artifacts/b14_consolidated/p7/runtime.log
             if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
               python scripts/ci/capture_b14_p7_branch_protection_evidence.py \

@@ -33,7 +33,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 
 LANE_ID = "b14-privacy-consolidated"
-LANE_VERSION = "1.0.0-shadow"
+LANE_VERSION = "1.0.1-shadow"
 PYTHON_VERSION = "3.11"
 POSTGRES_IMAGE = "postgres:15-alpine"
 

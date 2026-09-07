@@ -5,13 +5,20 @@ Immutable substrate (shared, content-addressed): one Postgres 15-alpine
 service, one dependency install, one `alembic upgrade head` into
 `b14_template`.
 
-Mutable proof state (isolated per P2-C6): every DB-backed predecessor proof
-(p0, p1, p2, p3, p4, p5, p7) receives a FRESH logical database cloned with
-`CREATE DATABASE <proof_db> TEMPLATE b14_template`. The clone carries the
-migrated schema and cluster-level roles but zero proof consequence rows, so
-each proof starts from the same empty-consequence state a fresh per-job
-Postgres service provided. p6 is a static topology binding with no DB
-requirement and runs without database variables.
+Mutable proof state (isolated per P2-C6): every predecessor proof runs against
+a FRESH logical database cloned with `CREATE DATABASE <proof_db> TEMPLATE
+b14_template`. The clone carries the migrated schema and cluster-level roles
+but zero proof consequence rows, so each proof starts from the same
+empty-consequence state a fresh per-job Postgres service provided.
+
+p6 note: the incumbent p6 job is static (no PG service) but its pytest still
+imports backend conftest, whose B0.5.3.3 Gate C requires DATABASE_URL in CI.
+The incumbent sets none, so its pytest crashes at import behind `pytest|tee`
+(GHA `bash -e` has no pipefail) and the job reports GREEN-VACUOUS (evidence:
+run 34047052521 artifact b14-p6-runtime-artifacts, 816 bytes, no JUnit).
+The consolidated lane provisions p6 an empty migrated clone too, so the
+static suite actually executes here (strictly stronger witness, P2-C1); the
+identical fix belongs in ci.yml p6 at DUAL promotion.
 
 Why a template clone instead of per-proof `alembic upgrade head` replays:
 roles created by migrations are cluster-level objects, so replaying the full
@@ -34,7 +41,7 @@ import argparse
 
 MAINTENANCE_DB_FALLBACK = "postgres"
 TEMPLATE_DB = "b14_template"
-# DB-backed proofs only; p6 (static binding) takes no database.
+# One isolated clone per predecessor proof (p6 included: see module docstring).
 PROOF_DBS = {
     "p0": "b14_p0_proof",
     "p1": "b14_p1_proof",
@@ -42,6 +49,7 @@ PROOF_DBS = {
     "p3": "b14_p3_proof",
     "p4": "b14_p4_proof",
     "p5": "b14_p5_proof",
+    "p6": "b14_p6_proof",
     "p7": "b14_p7_proof",
 }
 
