@@ -100,6 +100,15 @@ ALLOWED_DOCKER_PATHS = {
     # and removing them would make the gate blind to the exact surfaces Exit
     # Gate 13 requires it to watch.
     Path("scripts/ci/assert_canonical_construction_authority.py"),
+    # P14 Corrective VI's custody manifest reads `docker-compose.c19.yml` in
+    # order to *check* it: Directive VI H-ART-VI-01 requires which processes
+    # receive the two B2.8 causal credentials to be read out of the deployed
+    # composition rather than inferred from Python imports, and the deployed
+    # composition is that file. It parses YAML, runs no container and adds no
+    # substrate -- the reference is the subject of the check. Removing it would
+    # make the gate blind to a compose edit handing the solver credential to
+    # the beat scheduler, which is the exact falsifier NC-P14-20 drives.
+    Path("scripts/ci/assert_b25_p14_custody_manifest.py"),
     Path("scripts/ci/validate_m0_scope_lock.py"),
     Path("scripts/ci/validate_m1_local_dev_authority.py"),
     Path("scripts/ci/validate_m2_test_feedback_loop.py"),
