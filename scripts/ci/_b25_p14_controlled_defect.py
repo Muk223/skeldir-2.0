@@ -378,9 +378,14 @@ def compatibility_accepts_any_known_revision() -> None:
     # its definition site would raise NameError -- `known_revisions` is defined
     # further down the module -- and a control that reds on an import error
     # measures nothing about the policy it claims to falsify.
-    anchor = "    if revision not in COMPATIBLE_SCHEMA_REVISIONS:\n"
+    #
+    # The anchor is the *admitting* short-circuit rather than the refusing
+    # branch: readiness returns early on a compatible revision so the
+    # accepting path touches no filesystem, and widening that test is what
+    # restores the entering tree's predicate -- known implies ready.
+    anchor = "    if revision in COMPATIBLE_SCHEMA_REVISIONS:\n"
     replacement = (
-        "    if revision not in known_revisions(migrations_root):  # NC-P14-18\n"
+        "    if revision in known_revisions(migrations_root):  # NC-P14-18\n"
     )
     _replace_once(
         CONSTRUCTION_AUTHORITY,
