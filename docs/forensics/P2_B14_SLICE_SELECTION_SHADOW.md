@@ -209,10 +209,26 @@ Next slices (same machine): B13 (9 jobs), B12 (4), B21 cohort (6-7).
 
 ## 10. Residual debt register (Phase II slice 1)
 
-R-P2-01: live paired corpus uncollected (needs pushes + merge_group entries).
-R-P2-02: DUAL/CUTOVER unexecuted (needs admin + corpus GREEN).
+R-P2-01: live paired corpus 1/10 (needs ordinary + merge_group + red-team events over days; vehicle PR #721).
+R-P2-02: DUAL/CUTOVER unexecuted (needs corpus GREEN + owner admin; runbook ready).
 R-P2-03: runtime-log construction counts (cache misses, PG boots, setup
 slot-minutes) pending first shadow runs.
 R-P2-04: queue/wall repo-wide closure pending slices 2..N.
 R-P2-05: role-DDL assumption (s3) pending red-team confirmation.
 R-P2-06: pipefail hygiene question deferred (s5).
+
+## 11. Exit-gate scoreboard (slice 1 = SHADOW; full Phase II needs DUAL/CUTOVER + corpus)
+
+| Gate | Slice-1 status | Evidence |
+|---|---|---|
+| Gate 1 decomposition/monolith reduction | SHADOW GREEN (lane extracted+proven; old retirement pending DUAL/CUTOVER) | shadow run 34141912972 GREEN; migration gate SHADOW |
+| Gate 2 env-construction reuse | GREEN (cohort -87.5% builds; content-addressed; foreign-state RED proven) | EnvSig 169 revs; NC 15/15 |
+| Gate 3 monotonic migration | GREEN machinery, UNEXECUTED transition | gate 10/10 incl. premature-retirement RED; runbook owner-gated |
+| Gate 4 semantic+failure equivalence | PARTIAL (7/8 GREEN; p6 vacuity dispositioned; red-team pending) | pair #1 corpus; comparator 9/9 |
+| Gate 5 shadow capacity isolation | GREEN so far (incumbent queue in baseline band) | pair #1 timings |
+| Gate 6 required-context totality | HELD (80/80 unchanged; shadow emits no required context) | contract v1.21.0 |
+| Gate 7 cache/env epistemic integrity | GREEN offline (hit/miss/stale/foreign controls) | NC 15/15 |
+| Gate 8 queue/wall closure | OPEN (cohort -97%/-85%; repo-wide needs slices 2..N) | pair #1 |
+| Gate 9 env-construction collapse | COHORT GREEN (-87.5%/-85.7%; runtime-log confirmation pending) | construction counts |
+| Gate 10 production-artifact fidelity | HELD (P13 untouched; host/container boundary unchanged) | no P13 change |
+| C2-01..C2-15 | SHADOW-subset GREEN; C2-04/07/08/09/10/12 await corpus+cutover | this pack |
