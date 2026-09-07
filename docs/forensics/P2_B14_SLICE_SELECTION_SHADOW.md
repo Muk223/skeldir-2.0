@@ -196,6 +196,16 @@ Next slices (same machine): B13 (9 jobs), B12 (4), B21 cohort (6-7).
   distortion. Unrelated reds on the pair PR (B2.1-P4 perf threshold
   5.2552>=5.0, cascade to Drift Gate, B0.4 10-min silent timeout):
   classified runner-contention/external; rerun requested to confirm flake.
+- RERUN (same SHA 5da45dbc, `--failed`, no code change): B2.1-P4, Phase Gates
+  B0.4, Drift Gate all GREEN (FAIL->RERUN->PASS confirms contention flake,
+  same class as Phase I s5.4). B2.1-P6 closure then RED with the IDENTICAL
+  signature `isolated_elapsed_not_under_threshold:5.2507>=5.0000` (B2.1-P4 job
+  itself: 5.2552). The B21-P4 benchmark gate misses its 5.0s threshold by ~5%
+  under burst load, deterministically-ish. Recorded, not touched (threshold
+  changes need a governance amendment per Phase I s9.1); out of B14 slice
+  scope, but corroborates H-P2-01/H-P2-06. P2-C7 note: the +1 shadow job is
+  ~2% of the 51-run burst and cannot be isolated as the cause; incumbent B14
+  queue stayed inside the Phase-I baseline band.
 
 ## 10. Residual debt register (Phase II slice 1)
 

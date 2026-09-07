@@ -1,1 +1,76 @@
-{"branch":"p2-b14-consolidation-shadow","cohort_delta":{"cold_dependency_builds":{"after":1,"before":8,"pct":-87.5},"db_boots":{"after":1,"before":7,"pct":-85.7},"migration_replays":{"after":1,"before":7,"pct":-85.7},"proof_executions":{"after":8,"before":8,"pct":0}},"environments":{"alembic_heads":["202512151400","202609071200"],"alembic_revisions":169,"dependency_digests":{"backend/requirements-dev.txt":"f01bef7544e1c5ff187c67011b43306c9509397a7a0a75ea34c7a2c1d11f54c5","backend/requirements.txt":"50a5d27830f1be32de24d3dba8498e6deb4c0ec7ea20cf71447dc6c16d233a28"},"envsig_digest":"0a4ed59ab1c598392e4d43a57faefb7a41f2fedb71a8efd8f4c4581c85fea930","pg_image":"postgres:15-alpine","python":"3.11"},"governance":{"contract":"b03.phase2.required_status_checks.main v1.21.0","contexts":"80/80 unchanged","migration_gate":"GREEN state=SHADOW","new_context":"B1.4 Privacy Consolidated Plane (shadow, non-required)"},"invariants":{"I-1_predecessors":["b14-p0-privacy-authority-lock","b14-p1-ingress-contract-sanitization","b14-p2-session-authority-proofs","b14-p3-attribution-locality-proofs","b14-p4-retention-deletion-proofs","b14-p5-export-log-artifact-no-leak","b14-p6-proof-plane-binding","b14-p7-e2e-privacy-system-proofs"],"successor":"B1.4 Privacy Consolidated Plane"},"non_vacuity":{"comparator_self_test":"9/9","consolidation_nc":"13/13","migration_self_test":"9/9","physics_guard":"65/65 conform"},"residual":["R-P2-01 live corpus uncollected","R-P2-02 DUAL/CUTOVER unexecuted","R-P2-03 runtime-log counts pending","R-P2-04 repo-wide queue/wall pending slices 2..N","R-P2-05 role-DDL assumption pending red-team","R-P2-06 pipefail hygiene deferred"],"slice":"B14 privacy plane (I-1)","state":"SHADOW"}
+{
+  "branch": "p2-b14-consolidation-shadow",
+  "cohort_delta": {
+    "cold_dependency_builds": {
+      "after": 1,
+      "before": 8,
+      "pct": -87.5
+    },
+    "db_boots": {
+      "after": 1,
+      "before": 7,
+      "pct": -85.7
+    },
+    "migration_replays": {
+      "after": 1,
+      "before": 7,
+      "pct": -85.7
+    },
+    "proof_executions": {
+      "after": 8,
+      "before": 8,
+      "pct": 0
+    }
+  },
+  "environments": {
+    "alembic_heads": [
+      "202512151400",
+      "202609071200"
+    ],
+    "alembic_revisions": 169,
+    "dependency_digests": {
+      "backend/requirements-dev.txt": "5b0b244d933aaaa6de9f12dcd636f0f6ea6e8b911280fe6396a8d3c99922dd5a",
+      "backend/requirements.txt": "cc9f615986c332977100a366d67d600ebeabf3fad9cb47b469f3110640843a88"
+    },
+    "envsig_digest": "9a9066f1b387a57749e534a0a0fb2ef70b3712267845174e15016b2c8640997e",
+    "pg_image": "postgres:15-alpine",
+    "python": "3.11",
+    "note": "CRLF-normalized content digests: Windows working copy and Linux runner agree byte-identical post-normalization (proven live run 34141912972)."
+  },
+  "governance": {
+    "contract": "b03.phase2.required_status_checks.main v1.21.0",
+    "contexts": "80/80 unchanged",
+    "migration_gate": "GREEN state=SHADOW",
+    "new_context": "B1.4 Privacy Consolidated Plane (shadow, non-required)"
+  },
+  "invariants": {
+    "I-1_predecessors": [
+      "b14-p0-privacy-authority-lock",
+      "b14-p1-ingress-contract-sanitization",
+      "b14-p2-session-authority-proofs",
+      "b14-p3-attribution-locality-proofs",
+      "b14-p4-retention-deletion-proofs",
+      "b14-p5-export-log-artifact-no-leak",
+      "b14-p6-proof-plane-binding",
+      "b14-p7-e2e-privacy-system-proofs"
+    ],
+    "successor": "B1.4 Privacy Consolidated Plane"
+  },
+  "non_vacuity": {
+    "comparator_self_test": "9/9",
+    "consolidation_nc": "15/15",
+    "migration_self_test": "10/10",
+    "physics_guard": "65/65 conform"
+  },
+  "residual": [
+    "R-P2-01 live corpus uncollected",
+    "R-P2-02 DUAL/CUTOVER unexecuted",
+    "R-P2-03 runtime-log counts pending",
+    "R-P2-04 repo-wide queue/wall pending slices 2..N",
+    "R-P2-05 role-DDL assumption pending red-team",
+    "R-P2-06 pipefail hygiene deferred"
+  ],
+  "slice": "B14 privacy plane (I-1)",
+  "state": "SHADOW (1 live pair)",
+  "pairs_collected": "1/10 (SHA 5da45dbc; comparator 7/8, p6 vacuity dispositioned)"
+}
