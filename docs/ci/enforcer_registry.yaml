@@ -670,8 +670,33 @@
   depends_on_celery: false
   depends_on_pooler: false
   default_execution: true
-  execution_cohort: b2-5-signing-verification
-  ci_visibility: workflow_job
+  execution_cohort: p13-adversarial-physics-adjudication
+  ci_visibility: executed
+  replacement: ''
+  deprecation_reason: ''
+  subsumed_by: ''
+  registry_action: keep
+- id: validate-p2-evacuation-ledger
+  path: scripts/ci/validate_p2_evacuation_ledger.py
+  status: required
+  owning_phase: Phase-II-Monolith-Evacuation
+  protected_invariant: The historical ci.yml monolith is completely evacuated with proof conservation.
+    Every incumbent job resolves to exactly one lawful final disposition (MIGRATED, SUBSUMED, or
+    RETIRED_AS_NONAUTHORITATIVE), no job is left UNRESOLVED, ci.yml is deleted at completion, and no
+    successor file recreates the monolith topology under a new filename.
+  command: python scripts/ci/validate_p2_evacuation_ledger.py --check
+  workflow_references: []
+  workflow_job_name: Phase II evacuation ledger (forensic tooling, not a merge gate)
+  local_reproduction_command: python scripts/ci/validate_p2_evacuation_ledger.py --check
+  expected_failure_meaning: An incumbent ci.yml job lacks a lawful final disposition, coverage is
+    incomplete, a retired job still executes, or a successor mega-monolith formed.
+  first_diagnostic_command: python scripts/ci/validate_p2_evacuation_ledger.py --check
+  depends_on_db: false
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: false
+  execution_cohort: phase-ii-evacuation
+  ci_visibility: executed
   replacement: ''
   deprecation_reason: ''
   subsumed_by: ''
