@@ -68,6 +68,7 @@ from __future__ import annotations
 import ast
 import configparser
 import os
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -170,9 +171,23 @@ def _chain_directories(migrations_root: Path) -> tuple[Path, ...]:
     return tuple(path for path in directories if path.is_dir()) or (migrations_root,)
 
 
-def _migration_modules(migrations_root: Path | None = None):
-    root = migrations_root or MIGRATIONS_ROOT
-    directories = _chain_directories(root) if migrations_root is None else (root,)
+@lru_cache(maxsize=8)
+def _scan_migrations(
+    root: Path, scoped_to_chain: bool
+) -> tuple[tuple[str | None, tuple[str, ...]], ...]:
+    """Read and parse the migration graph once per process.
+
+    Cached because the migration history is *source*: it ships inside the
+    production image and cannot change while the process lives. Uncached, every
+    call walked and parsed 171 modules, and `/health/ready` calls this on the
+    refusal path -- so a readiness probe could do 171 file reads and 171
+    `ast.parse` calls to answer a question whose answer cannot have changed
+    since the last probe. `reset_migration_scan_cache` exists for tests that
+    point at a temporary tree they then mutate.
+    """
+
+    directories = _chain_directories(root) if scoped_to_chain else (root,)
+    scanned: list[tuple[str | None, tuple[str, ...]]] = []
     for directory in directories:
         for path in sorted(directory.rglob("*.py")):
             if "__pycache__" in path.parts:
@@ -181,7 +196,20 @@ def _migration_modules(migrations_root: Path | None = None):
             # BOM, and `ast.parse` refuses a source string that starts with one.
             # Read as plain utf-8 it parsed as a SyntaxError, was silently
             # skipped, and its parent became a phantom second head.
-            yield _module_revision_identifiers(path.read_text(encoding="utf-8-sig"))
+            scanned.append(
+                _module_revision_identifiers(path.read_text(encoding="utf-8-sig"))
+            )
+    return tuple(scanned)
+
+
+def reset_migration_scan_cache() -> None:
+    """Forget the parsed migration graph. Test harness only."""
+    _scan_migrations.cache_clear()
+
+
+def _migration_modules(migrations_root: Path | None = None):
+    root = migrations_root or MIGRATIONS_ROOT
+    return _scan_migrations(root, migrations_root is None)
 
 
 # ---------------------------------------------------------------------------
@@ -317,18 +345,22 @@ def assert_production_construction_authority(
             + ",".join(sorted(revisions))
         )
     revision = revisions[0]
-    known = known_revisions(migrations_root)
-    if revision not in known:
+    if revision in COMPATIBLE_SCHEMA_REVISIONS:
+        # The admitting case is a frozenset membership test and nothing else.
+        # Readiness runs this on every probe, so the *accepting* path must not
+        # touch the filesystem: whether a revision is one this repository knows
+        # only matters once we are already refusing and owe the operator a
+        # reason.
+        return revision
+    if revision not in known_revisions(migrations_root):
         raise ConstructionAuthorityError(
             f"database_construction_unauthoritative:unknown_revision:{revision}"
         )
-    if revision not in COMPATIBLE_SCHEMA_REVISIONS:
-        raise ConstructionAuthorityError(
-            "database_construction_unauthoritative:incompatible_revision:"
-            f"{revision};this build requires "
-            + ",".join(sorted(COMPATIBLE_SCHEMA_REVISIONS))
-        )
-    return revision
+    raise ConstructionAuthorityError(
+        "database_construction_unauthoritative:incompatible_revision:"
+        f"{revision};this build requires "
+        + ",".join(sorted(COMPATIBLE_SCHEMA_REVISIONS))
+    )
 
 
 #: The definer function the 202609061200 revision installs. The runtime
@@ -389,4 +421,5 @@ __all__ = [
     "known_revisions",
     "migration_graph_head",
     "read_construction_revisions",
+    "reset_migration_scan_cache",
 ]
