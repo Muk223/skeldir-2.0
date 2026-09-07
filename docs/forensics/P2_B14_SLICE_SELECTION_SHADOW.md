@@ -176,6 +176,11 @@ Next slices (same machine): B13 (9 jobs), B12 (4), B21 cohort (6-7).
   of Phase II scope to rewrite). Fix: lane-side relocation copies after
   pytest (proof executes byte-identically; `set -e` keeps it fail-closed).
   Scan confirms p0-p6 tests have no such hardcoded roots.
+- LIVE shadow run 34141912972 (SHA 5da45dbc, PR #721): **GREEN** — 8/8
+  ledger rows rc=0 on one SHA, aggregate GREEN, JUnit + NC evidence present.
+  Lane works end-to-end (1 env build, 1 PG boot, 1 migration, 8 clones,
+  15 pytest files, enforcers, scans). Awaiting incumbent CI run 34141912982
+  on the same SHA for pair #1.
 
 ## 10. Residual debt register (Phase II slice 1)
 
