@@ -256,6 +256,13 @@ directive-compliance validator that runs on every PR by design
 (`# physics-exempt: advisory-pr-paths`), advisory-only so merge authority is
 unaffected.
 
+Phase II shadow lanes (required-lane consolidation) carry the same two
+exemptions while non-authoritative: a shadow must observe `merge_group`
+speculative SHAs and every PR class unfiltered to build the same-SHA paired
+corpus, and it produces no required context until promotion adds one to the
+contract — at which point the lane is required and the exemptions lapse.
+See `docs/forensics/P2_B14_SLICE_SELECTION_SHADOW.md`.
+
 ### Rule 8 — required jobs must not skip on merge_group
 
 **A job that publishes a merge-blocking context must not carry a job-level

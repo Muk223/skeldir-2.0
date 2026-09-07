@@ -480,3 +480,5 @@ This index enumerates evidence packs stored under `docs/forensics/`.
 | --- | --- | --- | --- | --- |
 | CI throughput remediation | docs/forensics/CI_THROUGHPUT_REMEDIATION_EVIDENCE.md | Advisory-lane burst remediation: re-measured baseline, guard rules 6-7, trigger diffs, verification, honest gate accounting, Phase 2 proposal | local-uncommitted | pending |
 | CI throughput remediation | docs/forensics/ci_throughput_remediation.evidence.json | Machine-readable before/after measurements, fault-corpus outcomes, VAC re-check, landing record | PR #715 / 93dbdb14 | pending |
+| Phase II slice 1 (B14 shadow) | docs/forensics/P2_B14_SLICE_SELECTION_SHADOW.md | B14 privacy-plane consolidation: causal spine, Graphs A/B/C, empirical slice selection, cohort deltas (-87.5% cold builds, -85.7% DB boots), non-vacuity record, live-corpus plan, residual register R-P2-01..06 | p2-b14-consolidation-shadow / pending | pending |
+| Phase II slice 1 (B14 shadow) | docs/forensics/p2_b14_slice_selection_shadow.evidence.json | Machine-readable slice record: env authority digests, cohort deltas, governance state, NC outcomes | p2-b14-consolidation-shadow / pending | pending |
