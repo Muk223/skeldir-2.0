@@ -41,7 +41,7 @@
   "CI-C5 merge authority conservation"
  ],
  "contract_id": "ci.proof_conservation",
- "contract_version": "v1.0.1",
+ "contract_version": "v1.0.2",
  "invariants": [
   {
    "advisory_owners": [
@@ -419,10 +419,10 @@
    "evidence_tier": "meta-proof: guards prove the proofs run (Plane D discipline); 18/18 NC must pass",
    "id": "I-10",
    "negative_controls": [
-    "validate_ci_physics.py NC suite 22/22 (incl. 7 new throughput NCs: advisory merge_group x3, advisory pr-paths x3, required missing-MG x1)",
+    "validate_ci_physics.py NC suite 24/24 (15 inherited + advisory-MG x3 + advisory-paths x3 + required-missing-MG x1 + required-job-if x2)",
     "validate_p13_merge_governance.py NC suite",
     "P12 Plane D (projection 3 + isolation 4 + ci_gate 7, asserted counts)",
-    "forensics INDEX enforcer E-VAC-01"
+    "forensics INDEX enforcer E-VAC-01 + 2026-09-06 re-check"
    ],
    "proof_obligation": "Proof-system self-integrity (guards are non-vacuous; topology changes turn red)",
    "required_owners": [

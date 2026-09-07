@@ -155,6 +155,31 @@
    "completed": 191,
    "required_missing": 0
   },
-  "nc_suite": "24/24"
+  "nc_suite": "24/24",
+  "merged": {
+   "pr": 715,
+   "sha": "93dbdb14fe5228a2474c5c0a5febe2f9fb173268",
+   "at": "2026-09-07T00:03:45Z",
+   "via": "main-merge-queue ALLGREEN, no bypass"
+  },
+  "steady_state_docs_only": {
+   "pre_runs": 42,
+   "post_runs": 24,
+   "delta_pct": -43,
+   "note": "22 pull_request (21 required workflows + exempt empirical) + 2 pull_request_target (required b11-p2/p4 fork doubles); b11-p1/p3 correctly absent (path-filtered)"
+  },
+  "entry4_burst": {
+   "runs_same_minute": 21,
+   "all_completed": true
+  },
+  "pr715_ci_queue": {
+   "run": 34056154235,
+   "wall": 41.55,
+   "queue_med": 24.03,
+   "queue_p90": 29.58,
+   "exec_med": 1.28,
+   "exec_max": 12.95,
+   "confounded": "session self-load (3 PRs + reruns in one hour); min-queue 6.32 vs 0.02 proves system backlog at start"
+  }
  }
 }
