@@ -187,6 +187,19 @@ ALLOWED_NON_RUNTIME_PATHS = (
     # a column-comment taxonomy and a revision-compatibility predicate, none of
     # which is an envelope surface.
     "backend/tests/trust/test_b25_p14_r6_possession_authority.py",
+    # B2.5-P14 Corrective VII: governed simulation boundary and exact
+    # issuance-selection proofs. Same classification again. The request/read
+    # routes consume already-signed envelopes through the deterministic
+    # simulation entrypoint and model no envelope of their own -- the request
+    # schema is a generated contract model (datamodel-codegen from the
+    # trust-simulations.yaml contract), the policy publisher writes only
+    # governance rows, and the VII-2 proofs adjudicate database selection,
+    # money and credential laws over PostgreSQL state.
+    "backend/app/api/trust_simulations.py",
+    "backend/app/trust/policy_configuration.py",
+    "backend/app/schemas/trust_simulations.py",
+    "backend/tests/trust/test_b25_p14_vii2_issuance_selection.py",
+    "backend/tests/trust/test_b25_p14_vii2_channel_authority.py",
 )
 
 
