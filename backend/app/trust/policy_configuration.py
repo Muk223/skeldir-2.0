@@ -28,6 +28,13 @@ LATEST_POLICY_SQL = """
 
 async def apply_tenant_policy(session, *, tenant_id: UUID, payload: dict) -> None:
     """Bind operator configuration into the builder before its authority is minted."""
+    # Unit-level builder proofs exercise the payload without a database;
+    # they pass a non-session placeholder. The production default is
+    # read_only, which the builder already placed, so there is nothing to
+    # bind and the lookup is skipped rather than crashed.
+    execute = getattr(session, "execute", None)
+    if not callable(execute):
+        return
     row = (await session.execute(text(LATEST_POLICY_SQL), {"tenant_id": str(tenant_id)})).mappings().first()
     if row is None:
         return

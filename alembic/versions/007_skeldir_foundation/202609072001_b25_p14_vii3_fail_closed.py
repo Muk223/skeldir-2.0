@@ -63,4 +63,28 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    raise RuntimeError("P14 VII-3 fail-closed mapping is forward-only")
+    # C16/C17 migration-reversibility: restore the VII predecessor text.
+    # Forward-only would strand every round-trip lane that migrates to the
+    # candidate head and back; the predecessor semantics are recorded here
+    # verbatim from 202609072000 so the round trip is exact.
+    op.execute("""
+        CREATE OR REPLACE FUNCTION public.b28_enforce_final_source_identity()
+        RETURNS trigger
+        LANGUAGE plpgsql SET search_path TO 'pg_catalog', 'public' AS $$
+        DECLARE source_id text; source_policy text; current_policy text;
+          states text[] := ARRAY['blocked','read_only','simulation_only','proposal_required','approval_required'];
+        BEGIN
+          SELECT source_envelope_id,policy_state INTO source_id,source_policy FROM public.trust_final_issuance_identity
+            WHERE tenant_id=NEW.tenant_id AND envelope_hash=NEW.source_issuance_envelope_hash;
+          IF source_id IS NOT NULL AND source_id IS DISTINCT FROM NEW.source_envelope_id THEN
+            RAISE EXCEPTION 'b28_request_final_identity_mismatch' USING ERRCODE='42501';
+          END IF;
+          SELECT policy_state INTO current_policy FROM public.trust_tenant_policy_events
+            WHERE tenant_id=NEW.tenant_id ORDER BY revision DESC LIMIT 1;
+          IF COALESCE(current_policy,'read_only') NOT IN ('simulation_only','proposal_required','approval_required')
+             OR array_position(states,source_policy)>array_position(states,current_policy) THEN
+            RAISE EXCEPTION 'b28_request_current_policy_forbids' USING ERRCODE='42501';
+          END IF;
+          RETURN NEW;
+        END $$;
+    """)
