@@ -170,6 +170,12 @@ Next slices (same machine): B13 (9 jobs), B12 (4), B21 cohort (6-7).
   DATABASE_URL, crash masked by tee, job green-vacuous; evidence 816-byte
   artifact). Lane failed closed precisely as designed; no engineer action
   forced (shadow, P2-C3).
+- LIVE shadow run 34141216197 (SHA df9ea248): p6 GREEN with real JUnit
+  (clone fix works); p7 rc=1 persists -> root-caused to the p7 TEST itself
+  hardcoding `artifacts/b14_p7` as its report root (product-test code, out
+  of Phase II scope to rewrite). Fix: lane-side relocation copies after
+  pytest (proof executes byte-identically; `set -e` keeps it fail-closed).
+  Scan confirms p0-p6 tests have no such hardcoded roots.
 
 ## 10. Residual debt register (Phase II slice 1)
 

@@ -256,6 +256,13 @@ jobs:
             python scripts/ci/enforce_b14_p7_e2e_privacy_system_proofs.py \
               --artifacts-dir artifacts/b14_consolidated/p7
             pytest backend/tests/integration/test_b14_p7_e2e_privacy_system_proofs.py -q -rs --junitxml=artifacts/b14_consolidated/p7/junit.runtime.xml | tee artifacts/b14_consolidated/p7/runtime.log
+            # The p7 test hardcodes its report root to artifacts/b14_p7
+            # (product-test code, out of Phase II scope to rewrite). The proof
+            # executes byte-identically; the lane relocates copies into its
+            # own bundle. Under set -e a missing report fails the section.
+            for f in p7_composed_runtime_report.json p7_negative_controls_report.json p7_runtime_logs.txt; do
+              cp "artifacts/b14_p7/$f" "artifacts/b14_consolidated/p7/$f"
+            done
             if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
               python scripts/ci/capture_b14_p7_branch_protection_evidence.py \
                 --output artifacts/b14_consolidated/p7/p7_branch_protection_evidence.json \
