@@ -1146,6 +1146,9 @@ async def build_unsigned_trust_envelope(
                 request=request,
                 source=source,
             )
+        from app.trust.policy_configuration import apply_tenant_policy
+
+        await apply_tenant_policy(db_session, tenant_id=request.tenant_id, payload=payload)
         after_modules = set(sys.modules)
         llm_modules = _loaded_llm_modules(before_modules, after_modules)
         if llm_modules:
@@ -1198,6 +1201,9 @@ async def build_unsigned_trust_envelope(
             source=source,
             money_decision=money_decision,
         )
+    from app.trust.policy_configuration import apply_tenant_policy
+
+    await apply_tenant_policy(db_session, tenant_id=request.tenant_id, payload=payload)
     after_modules = set(sys.modules)
     llm_modules = _loaded_llm_modules(before_modules, after_modules)
     if llm_modules:

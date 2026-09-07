@@ -102,6 +102,9 @@ app.include_router(
     tags=["Revenue Verification"],
 )
 app.include_router(export.router, prefix="/api/export", tags=["Export"])
+from app.api import trust_simulations
+
+app.include_router(trust_simulations.router, prefix="/api", tags=["Trust Simulations"])
 app.include_router(trust_api.router, prefix="/api", tags=["Trust API"])
 app.include_router(trust_export.router, prefix="/api", tags=["Trust Export"])
 app.include_router(trust_keys.router, prefix="/api", tags=["Trust Keys"])

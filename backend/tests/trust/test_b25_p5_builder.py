@@ -72,6 +72,8 @@ class FakeReadOnlySession:
             self.row.get("tenant_id") if self.row else ""
         ):
             return _FakeResult(None)
+        if "trust_tenant_policy_events" in text:
+            return _FakeResult(None)
         return _FakeResult(self.row)
 
 

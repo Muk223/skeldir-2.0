@@ -27,6 +27,7 @@ they ever do not.
 
 from __future__ import annotations
 
+import os
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
@@ -304,6 +305,11 @@ def _prepare_authority_surface(config: AuthorityConfig) -> bool:
                 cursor,
                 config.b28_solver_user,
                 config.b28_solver_password,
+                rotate_existing=rotate,
+            )
+            _create_or_alter_login_role(
+                cursor, "app_trust_policy_admin",
+                os.environ.get("TRUST_POLICY_ADMIN_PASSWORD", "app_trust_policy_admin"),
                 rotate_existing=rotate,
             )
             # The migration principal must be a member of the worker role:

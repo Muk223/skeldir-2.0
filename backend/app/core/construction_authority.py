@@ -246,7 +246,7 @@ def _migration_modules(migrations_root: Path | None = None):
 #: The single Alembic revision this build's code requires. Asserted equal to the
 #: migration graph's head by a merge-blocking test; never hand-maintained
 #: independently of the chain.
-REQUIRED_SCHEMA_REVISION = "202609071200"
+REQUIRED_SCHEMA_REVISION = "202609072001"
 
 #: Every revision a process running this build may serve traffic against.
 #: Exactly one today. Widening this set is a deliberate, reviewable act that
@@ -405,7 +405,11 @@ async def assert_database_construction_authority(session: Any) -> str:
         raise ConstructionAuthorityError(
             f"database_construction_unauthoritative:revision_unreadable:{exc}"
         ) from exc
-    return assert_production_construction_authority(rows)
+    from app.core.physical_authority import assert_physical_authority
+
+    revision = assert_production_construction_authority(rows)
+    await assert_physical_authority(session)
+    return revision
 
 
 __all__ = [

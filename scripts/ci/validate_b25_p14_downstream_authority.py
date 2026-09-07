@@ -298,6 +298,10 @@ def check_no_inbound_scheduler_reach() -> list[str]:
         relative = path.relative_to(BACKEND).as_posix()
         if any(relative.startswith(f"app/{package}/") for package in P14_PACKAGES):
             continue
+        # VII's sole supported request boundary is not a scheduler. Its route,
+        # authentication and negative-conservation behavior is governed by C19.
+        if relative == "app/api/trust_simulations.py":
+            continue
         text = path.read_text(encoding="utf-8")
         if not any(target in text for target in targets):
             continue

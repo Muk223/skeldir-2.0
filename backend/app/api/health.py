@@ -390,6 +390,9 @@ async def _evaluate_readiness() -> dict[str, object]:
             # checks. A process on an unconstructed database never becomes
             # ready, and therefore never receives traffic.
             try:
+                from app.core.physical_authority import assert_physical_authority
+
+                await assert_physical_authority(conn)
                 assert_production_construction_authority(
                     await read_construction_revisions(conn)
                 )

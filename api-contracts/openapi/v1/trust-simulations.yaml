@@ -1,0 +1,53 @@
+openapi: 3.1.0
+info: {title: Design Partner Simulations, version: 1.0.0}
+paths:
+  /api/trust/v1/simulations:
+    post:
+      operationId: requestTrustSimulation
+      security: [{MachineBearer: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Correlation'}
+        - {$ref: '#/components/parameters/Tenant'}
+        - {$ref: '#/components/parameters/Nonce'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SimulationSubmission'}
+      responses:
+        '201': {description: Durable explicit request and deterministic consequence}
+        '401': {description: Authentication refused}
+        '403': {description: Source or current policy refuses simulation}
+        '404': {description: Tenant-scoped source unavailable}
+        '409': {description: Duplicate request or stale source}
+        '422': {description: Invalid request or insufficient evidence}
+  /api/trust/v1/simulations/{request_id}:
+    get:
+      operationId: readTrustSimulation
+      security: [{MachineBearer: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Correlation'}
+        - {$ref: '#/components/parameters/Tenant'}
+        - {$ref: '#/components/parameters/Nonce'}
+        - {name: request_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: Tenant-safe durable status, result and human-review proposal}
+        '401': {description: Authentication refused}
+        '404': {description: Request unavailable to this tenant}
+components:
+  securitySchemes:
+    MachineBearer: {type: http, scheme: bearer}
+  parameters:
+    Correlation: {name: X-Correlation-ID, in: header, required: true, schema: {type: string, format: uuid}}
+    Tenant: {name: X-Tenant-ID, in: header, required: true, schema: {type: string, format: uuid}}
+    Nonce: {name: X-Trust-Nonce, in: header, required: true, schema: {type: string, minLength: 16, maxLength: 256}}
+  schemas:
+    SimulationSubmission:
+      type: object
+      additionalProperties: false
+      required: [source_envelope_id, source_final_envelope_hash, total_budget_minor, request_ref]
+      properties:
+        source_envelope_id: {type: string, pattern: '^env_[a-f0-9]{32}$'}
+        source_final_envelope_hash: {type: string, pattern: '^sha256:[a-f0-9]{64}$'}
+        total_budget_minor: {type: integer, minimum: 1, maximum: 9007199254740991}
+        request_ref: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9._:-]+$'}
