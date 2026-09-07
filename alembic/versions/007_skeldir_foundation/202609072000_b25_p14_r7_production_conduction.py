@@ -24,6 +24,24 @@ def _replace_function(name: str, old: str, new: str) -> None:
     op.execute(definition.replace(old, new))
 
 
+def _grant_if_role_exists(role: str, statement: str) -> None:
+    # Repository convention from 202609071200: migrations must run on a bare
+    # database where app roles may not exist (B0/B1 lanes migrate as bare
+    # postgres with no provisioned role graph). Unconditional GRANT/REVOKE
+    # to a missing role aborts the whole migration with UndefinedObject.
+    op.execute(
+        f"""
+        DO $$
+        BEGIN
+            IF EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = '{role}')
+            THEN
+                EXECUTE $stmt${statement}$stmt$;
+            END IF;
+        END $$;
+        """
+    )
+
+
 def upgrade() -> None:
     op.execute("""
         CREATE VIEW public.trust_final_issuance_identity
@@ -51,11 +69,11 @@ def upgrade() -> None:
           AND attempt.signature_hash IS NOT DISTINCT FROM ledger.issued_signature_hash
           AND attempt.signing_key_id IS NOT DISTINCT FROM ledger.issued_signing_key_id;
         REVOKE ALL ON public.trust_final_issuance_identity FROM PUBLIC;
-        GRANT SELECT ON public.trust_final_issuance_identity
-          TO app_user, app_worker, app_b28_requester, app_b28_solver, app_trust_issuer;
         COMMENT ON VIEW public.trust_final_issuance_identity IS
           'Explicit audit-stage to final signer-confirmed artifact mapping. envelope_hash remains the immutable audit-stage foreign key; final_envelope_hash identifies the retained final artifact.';
     """)
+    for _role in ("app_user", "app_worker", "app_b28_requester", "app_b28_solver", "app_trust_issuer"):
+        _grant_if_role_exists(_role, f"GRANT SELECT ON public.trust_final_issuance_identity TO {_role}")
     for name in ("b27_enforce_explanation_consequence", "b28_enforce_request_consequence", "b28_enforce_result_consequence"):
         _replace_function(name, "FROM public.trust_envelope_issuance_log", "FROM public.trust_final_issuance_identity")
 
@@ -76,8 +94,7 @@ def upgrade() -> None:
         CREATE POLICY tenant_isolation_policy_trust_tenant_policy_events ON public.trust_tenant_policy_events
           USING (tenant_id=current_setting('app.current_tenant_id',true)::uuid)
           WITH CHECK (tenant_id=current_setting('app.current_tenant_id',true)::uuid);
-        REVOKE ALL ON public.trust_tenant_policy_events FROM PUBLIC,app_user,app_worker,app_rw,app_ro;
-        GRANT SELECT ON public.trust_tenant_policy_events TO app_user,app_worker,app_b28_requester,app_b28_solver;
+        REVOKE ALL ON public.trust_tenant_policy_events FROM PUBLIC;
         DO $$ BEGIN
           IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='app_trust_policy_admin') THEN
             CREATE ROLE app_trust_policy_admin NOLOGIN;
@@ -118,6 +135,10 @@ def upgrade() -> None:
         CREATE TRIGGER trg_b28_final_source_identity BEFORE INSERT ON public.b28_simulation_requests
           FOR EACH ROW EXECUTE FUNCTION public.b28_enforce_final_source_identity();
     """)
+    for _role in ("app_user", "app_worker", "app_rw", "app_ro"):
+        _grant_if_role_exists(_role, f"REVOKE ALL ON public.trust_tenant_policy_events FROM {_role}")
+    for _role in ("app_user", "app_worker", "app_b28_requester", "app_b28_solver"):
+        _grant_if_role_exists(_role, f"GRANT SELECT ON public.trust_tenant_policy_events TO {_role}")
     for name in ("b28_authenticate_request_possession", "b28_enforce_request_possession"):
         _replace_function(name, "now()", "clock_timestamp()")
     for table, column in (("b28_request_authentications", "authenticated_at"), ("b28_simulation_requests", "requested_at"), ("b28_simulation_results", "created_at"), ("b28_proposals", "created_at")):
