@@ -792,7 +792,14 @@ def upgrade() -> None:
     # 6. The persisted solver contract stops claiming an execution event.
     # ------------------------------------------------------------------
     op.execute(
-        "ALTER TABLE public.b28_simulation_results DROP COLUMN solver_invocations"
+        # CI:DESTRUCTIVE_OK - the column is the defect. `solver_invocations`
+        # asserts an execution event the database has no witness for, and an
+        # audit persisted an exact allocation carrying it having never invoked
+        # the solver. The upgrade asserts both B2.8 relations are empty before
+        # reaching here, so no row is lost; a populated relation fails closed
+        # with b25_p14_r6_requires_empty_b28_simulation_results.
+        "ALTER TABLE public.b28_simulation_results"
+        " DROP COLUMN solver_invocations"  # CI:DESTRUCTIVE_OK - see above
     )
     op.execute(
         f"""
@@ -845,7 +852,10 @@ def upgrade() -> None:
         _REQUEST_PRINCIPAL,
         "GRANT SELECT ON TABLE public.b28_request_authentications"
         f" TO {_REQUEST_PRINCIPAL};"
-        " REVOKE INSERT, UPDATE, DELETE, TRUNCATE"
+        # CI:DESTRUCTIVE_OK - this REVOKE *removes* the TRUNCATE privilege from
+        # the request principal; it destroys authority, not data. The pattern
+        # match is on the privilege name.
+        " REVOKE INSERT, UPDATE, DELETE, TRUNCATE"  # CI:DESTRUCTIVE_OK - see above
         " ON TABLE public.b28_request_authentications"
         f" FROM {_REQUEST_PRINCIPAL}",
     )
@@ -881,16 +891,21 @@ def downgrade() -> None:
         " ON public.b28_simulation_requests"
     )
     op.execute("DROP FUNCTION IF EXISTS public.b28_enforce_request_possession()")
+    # CI:DESTRUCTIVE_OK - downgrade rollback; this revision created the index.
     op.execute("DROP INDEX IF EXISTS public.uq_b28_request_authentication")
     op.execute(
+        # CI:DESTRUCTIVE_OK - downgrade rollback; this revision added the column.
         "ALTER TABLE public.b28_simulation_requests"
-        " DROP COLUMN IF EXISTS request_authentication_id"
+        " DROP COLUMN IF EXISTS request_authentication_id"  # CI:DESTRUCTIVE_OK
     )
     op.execute(
         "DROP FUNCTION IF EXISTS public.b28_authenticate_request_possession("
         "uuid, text, text, text, text)"
     )
-    op.execute("DROP TABLE IF EXISTS public.b28_request_authentications")
+    # CI:DESTRUCTIVE_OK - downgrade rollback; this revision created the table.
+    op.execute(
+        "DROP TABLE IF EXISTS public.b28_request_authentications"  # CI:DESTRUCTIVE_OK
+    )
     op.execute(
         "DROP FUNCTION IF EXISTS"
         " public.b28_request_authentication_binding(uuid, text, text, text)"
@@ -905,12 +920,14 @@ def downgrade() -> None:
             op.execute(f"COMMENT ON COLUMN public.{relation}.{column} IS NULL")
 
     op.execute(
+        # CI:DESTRUCTIVE_OK - downgrade rollback; this revision added the CHECK.
         "ALTER TABLE public.b28_simulation_results"
         " DROP CONSTRAINT IF EXISTS ck_b28_result_solver_consequence_kind"
     )
     op.execute(
+        # CI:DESTRUCTIVE_OK - downgrade rollback; this revision added the column.
         "ALTER TABLE public.b28_simulation_results"
-        " DROP COLUMN IF EXISTS solver_consequence_kind"
+        " DROP COLUMN IF EXISTS solver_consequence_kind"  # CI:DESTRUCTIVE_OK
     )
     op.execute(
         "ALTER TABLE public.b28_simulation_results"
