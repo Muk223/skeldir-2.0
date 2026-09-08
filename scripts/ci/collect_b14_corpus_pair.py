@@ -18,6 +18,16 @@ Usage:
 
 Pair classes: ordinary | high_risk | docs_only | merge_group | red_team.
 Requires `gh` (read-only API use; never mutates authority).
+
+red_team encoding (failure equivalence, Layer F): a controlled defect must
+yield OLD RED + NEW RED for the corresponding proof obligation. Record such
+a pair with `--class red_team --allow-red`: the pair `verdict` is GREEN iff
+failure is present on BOTH sides (at least one old B14 conclusion is
+`failure` AND the new conclusion is `failure`); the precise failure-class
+match (`red-matched`, identical failing test IDs) is adjudicated by
+`compare_b14_equivalence.py` and stored in `comparator` (GREEN required).
+`proof_verdicts` records the raw RED/RED outcome so a GREEN pair verdict is
+never mistaken for passing proofs.
 """
 from __future__ import annotations
 
@@ -153,7 +163,15 @@ def main() -> int:
     ap.add_argument("--old-run", required=True)
     ap.add_argument("--new-run", required=True)
     ap.add_argument("--corpus", required=True)
+    ap.add_argument("--allow-red", action="store_true",
+                    help="red_team only: admit OLD RED + NEW RED as GREEN equivalence claim")
+    ap.add_argument("--defect", default=None,
+                    help="red_team only: controlled-defect description recorded in the pair")
     args = ap.parse_args()
+    if args.allow_red and args.cls != "red_team":
+        ap.error("--allow-red requires --class red_team")
+    if args.defect and args.cls != "red_team":
+        ap.error("--defect requires --class red_team")
 
     old_created = run_created_at(args.old_run)
     new_created = run_created_at(args.new_run)
@@ -165,8 +183,15 @@ def main() -> int:
     conclusions = check_conclusions(args.sha)
 
     missing_old = [c for c in OLD_CONTEXTS if conclusions.get(c) != "success"]
+    failed_old = [c for c in OLD_CONTEXTS if conclusions.get(c) == "failure"]
     new_conclusion = conclusions.get(NEW_CONTEXT)
-    verdict = "GREEN" if (not missing_old and new_conclusion == "success") else "PENDING"
+    if args.cls == "red_team":
+        red_both = bool(failed_old) and new_conclusion == "failure"
+        verdict = "GREEN" if (args.allow_red and red_both) else "PENDING"
+        proof_verdicts = f"RED/RED (old failed: {failed_old}, new: {new_conclusion})"
+    else:
+        verdict = "GREEN" if (not missing_old and new_conclusion == "success") else "PENDING"
+        proof_verdicts = "GREEN/GREEN"
 
     pair = {
         "id": f"{args.event}-{args.sha[:12]}",
@@ -179,11 +204,14 @@ def main() -> int:
         "new_run": args.new_run,
         "old_conclusions": {c: conclusions.get(c) for c in OLD_CONTEXTS},
         "new_conclusion": new_conclusion,
+        "proof_verdicts": proof_verdicts,
         "old_job_timing": old_t,
         "new_job_timing": new_t,
         "verdict": verdict,
         "comparator": "NOT-RUN",
     }
+    if args.defect:
+        pair["controlled_defect"] = args.defect
     corpus_path = Path(args.corpus)
     corpus: dict = {"pairs": []}
     if corpus_path.exists():

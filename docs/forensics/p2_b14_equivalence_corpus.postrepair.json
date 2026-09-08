@@ -85,6 +85,90 @@
       "superseded_sibling_note": "Sibling push f0876e2b (corpus record commit) was superseded by 64614ca4 before its runs completed (PR concurrency cancel-in-progress): both its runs cancelled, no pair recorded. Lesson: strictly one SHA in flight per vehicle PR."
     },
     {
+      "id": "pull_request-3126efc860b6",
+      "class": "high_risk",
+      "event": "pull_request",
+      "sha": "3126efc860b678af7feb52a2d101d89b5a12bad6",
+      "old_sha": "3126efc860b678af7feb52a2d101d89b5a12bad6",
+      "new_sha": "3126efc860b678af7feb52a2d101d89b5a12bad6",
+      "old_run": "34192040527",
+      "new_run": "34192040647",
+      "old_conclusions": {
+        "B1.4 P0 Privacy Authority Lock": "success",
+        "B1.4 P1 Ingress Contract Sanitization": "success",
+        "B1.4 P2 Session Authority Proofs": "success",
+        "B1.4 P3 Attribution Locality Proofs": "success",
+        "B1.4 P4 Retention + Deterministic Deletion Proofs": "success",
+        "B1.4 P5 Export Log Artifact No-Leak": "success",
+        "B1.4 P6 Merge-Blocking Privacy Proof Plane Binding": "success",
+        "B1.4 P7 E2E Privacy System Proofs": "success"
+      },
+      "new_conclusion": "success",
+      "proof_verdicts": "GREEN/GREEN",
+      "old_job_timing": {
+        "B1.4 P4 Retention + Deterministic Deletion Proofs": {
+          "job_id": "101951913432",
+          "conclusion": "success",
+          "queue_s": 529.0,
+          "exec_s": 91.0
+        },
+        "B1.4 P2 Session Authority Proofs": {
+          "job_id": "101951913473",
+          "conclusion": "success",
+          "queue_s": 554.0,
+          "exec_s": 63.0
+        },
+        "B1.4 P5 Export Log Artifact No-Leak": {
+          "job_id": "101951913646",
+          "conclusion": "success",
+          "queue_s": 584.0,
+          "exec_s": 67.0
+        },
+        "B1.4 P3 Attribution Locality Proofs": {
+          "job_id": "101951913705",
+          "conclusion": "success",
+          "queue_s": 699.0,
+          "exec_s": 82.0
+        },
+        "B1.4 P0 Privacy Authority Lock": {
+          "job_id": "101951913758",
+          "conclusion": "success",
+          "queue_s": 712.0,
+          "exec_s": 64.0
+        },
+        "B1.4 P1 Ingress Contract Sanitization": {
+          "job_id": "101951913769",
+          "conclusion": "success",
+          "queue_s": 701.0,
+          "exec_s": 56.0
+        },
+        "B1.4 P6 Merge-Blocking Privacy Proof Plane Binding": {
+          "job_id": "101954411580",
+          "conclusion": "success",
+          "queue_s": 872.0,
+          "exec_s": 73.0
+        },
+        "B1.4 P7 E2E Privacy System Proofs": {
+          "job_id": "101954969203",
+          "conclusion": "success",
+          "queue_s": 1259.0,
+          "exec_s": 74.0
+        }
+      },
+      "new_job_timing": {
+        "B1.4 Privacy Consolidated Plane": {
+          "job_id": "101951913539",
+          "conclusion": "success",
+          "queue_s": 341.0,
+          "exec_s": 101.0
+        }
+      },
+      "verdict": "GREEN",
+      "comparator": "GREEN",
+      "comparator_detail": "compare_b14_equivalence.py exit 0 with live conclusions: same-sha, 8/8 test-identity GREEN, verdict GREEN, proof-verdict green 8/8, env-authority 9a9066f1b387. Old CI 34192040527 full SUCCESS. New shadow 34192040647 success (first run with lane-side pipefail in all 8 proof sections).",
+      "class_rationale": "high_risk: SHA modifies the B1.4 consolidated proof lane itself (set -o pipefail in all 8 proof sections)."
+    },
+    {
       "id": "pull_request-64614ca4d6a4",
       "class": "docs_only",
       "event": "pull_request",
