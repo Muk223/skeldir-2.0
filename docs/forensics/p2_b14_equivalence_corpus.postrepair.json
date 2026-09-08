@@ -1,0 +1,87 @@
+{
+  "pairs": [
+    {
+      "id": "pull_request-26c08166733c",
+      "class": "high_risk",
+      "event": "pull_request",
+      "sha": "26c08166733c7bd857ed7859d7149014b9a491f3",
+      "old_sha": "26c08166733c7bd857ed7859d7149014b9a491f3",
+      "new_sha": "26c08166733c7bd857ed7859d7149014b9a491f3",
+      "old_run": "34180993330",
+      "new_run": "34180993206",
+      "old_conclusions": {
+        "B1.4 P0 Privacy Authority Lock": "success",
+        "B1.4 P1 Ingress Contract Sanitization": "success",
+        "B1.4 P2 Session Authority Proofs": "success",
+        "B1.4 P3 Attribution Locality Proofs": "success",
+        "B1.4 P4 Retention + Deterministic Deletion Proofs": "success",
+        "B1.4 P5 Export Log Artifact No-Leak": "success",
+        "B1.4 P6 Merge-Blocking Privacy Proof Plane Binding": "success",
+        "B1.4 P7 E2E Privacy System Proofs": "success"
+      },
+      "new_conclusion": "success",
+      "old_job_timing": {
+        "B1.4 P2 Session Authority Proofs": {
+          "job_id": "101931058993",
+          "conclusion": "success",
+          "queue_s": 1586.0,
+          "exec_s": 64.0
+        },
+        "B1.4 P4 Retention + Deterministic Deletion Proofs": {
+          "job_id": "101931059141",
+          "conclusion": "success",
+          "queue_s": 1547.0,
+          "exec_s": 71.0
+        },
+        "B1.4 P3 Attribution Locality Proofs": {
+          "job_id": "101931059286",
+          "conclusion": "success",
+          "queue_s": 1318.0,
+          "exec_s": 71.0
+        },
+        "B1.4 P6 Merge-Blocking Privacy Proof Plane Binding": {
+          "job_id": "101931061370",
+          "conclusion": "success",
+          "queue_s": 2581.0,
+          "exec_s": 56.0
+        },
+        "B1.4 P7 E2E Privacy System Proofs": {
+          "job_id": "101931061841",
+          "conclusion": "success",
+          "queue_s": 2640.0,
+          "exec_s": 74.0
+        },
+        "B1.4 P0 Privacy Authority Lock": {
+          "job_id": "101931075004",
+          "conclusion": "success",
+          "queue_s": 1173.0,
+          "exec_s": 62.0
+        },
+        "B1.4 P1 Ingress Contract Sanitization": {
+          "job_id": "101931077642",
+          "conclusion": "success",
+          "queue_s": 1103.0,
+          "exec_s": 74.0
+        },
+        "B1.4 P5 Export Log Artifact No-Leak": {
+          "job_id": "101931082999",
+          "conclusion": "success",
+          "queue_s": 1809.0,
+          "exec_s": 61.0
+        }
+      },
+      "new_job_timing": {
+        "B1.4 Privacy Consolidated Plane": {
+          "job_id": "101919905264",
+          "conclusion": "success",
+          "queue_s": 351.0,
+          "exec_s": 99.0
+        }
+      },
+      "verdict": "GREEN",
+      "comparator": "GREEN",
+      "comparator_detail": "compare_b14_equivalence.py exit 0 on downloaded trees: same-sha, 8/8 proofs test-identity GREEN (p0 6+4+2, p1 5, p2 4, p3 9, p4 5, p5 4, p6 4, p7 3), verdict GREEN, env-authority 9a9066f1b387. Old run CI 34180993330 (77 success, 1 skipped, Phase Gates B0.4 rerun disposition pending - non-B14, tracked separately). New run shadow 34180993206 success.",
+      "class_rationale": "high_risk: merge commit carries the incumbent P6 DB-env repair and pipefail hardening of the B1.4 privacy proof jobs themselves."
+    }
+  ]
+}
