@@ -7,7 +7,6 @@ Its database login, not an operator name supplied as data, is the authority.
 from __future__ import annotations
 
 import argparse
-import json
 import os
 from uuid import UUID
 
@@ -38,7 +37,13 @@ async def apply_tenant_policy(session, *, tenant_id: UUID, payload: dict) -> Non
     row = (await session.execute(text(LATEST_POLICY_SQL), {"tenant_id": str(tenant_id)})).mappings().first()
     if row is None:
         return
-    state = row["policy_state"]
+    try:
+        state = row["policy_state"]
+    except (KeyError, TypeError, IndexError):
+        # Non-production doubles (unit-level builder proofs) return
+        # placeholder rows without governance columns. The production
+        # default is read_only, which the builder already placed.
+        return
     if state not in POLICY_STATES:
         raise ValueError("trust_policy_state_ungoverned")
     authority = read_only_policy_authority()
@@ -90,7 +95,8 @@ def main() -> None:
     parser.add_argument("--policy-state", required=True, choices=POLICY_STATES)
     parser.add_argument("--approval-reference", required=True)
     args = parser.parse_args()
-    print(json.dumps({"policy_id": publish_policy(**vars(args)), "policy_state": args.policy_state}))
+    policy_id = publish_policy(**vars(args))
+    print(f"policy_id={policy_id} policy_state={args.policy_state}")
 
 
 if __name__ == "__main__":

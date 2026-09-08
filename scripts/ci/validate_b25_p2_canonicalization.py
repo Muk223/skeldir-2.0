@@ -808,6 +808,11 @@ def validate_scope_guard() -> int:
             "backend/app/api/trust_keys.py",
             "backend/app/api/trust_api.py",
             "backend/app/api/trust_export.py",
+            # B2.5-P14 Corrective VII: the governed Design-Partner
+            # simulation/read boundary. Same classification as its
+            # trust_api/trust_export neighbours -- a post-P1 consumer of
+            # already-signed envelopes, not P1 runtime drift.
+            "backend/app/api/trust_simulations.py",
         }:
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
