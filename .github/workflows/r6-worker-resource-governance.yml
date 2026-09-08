@@ -421,4 +421,4 @@ jobs:
           set -euo pipefail
           echo "R6_POST_MERGE_SOAK sha=${GITHUB_SHA} run=${GITHUB_RUN_ID}"
           echo "This context is diagnostic only; governing authority is the merge_group run."
-          python scripts/ci/validate_b25_p14_viii_execution_identity.py
+          python3 scripts/ci/validate_b25_p14_viii_execution_identity.py
