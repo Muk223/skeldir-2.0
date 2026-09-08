@@ -164,7 +164,7 @@ def downgrade() -> None:
     # CI:DESTRUCTIVE_OK - downgrade rollback; this revision created the function.
     op.execute("DROP FUNCTION IF EXISTS public.trust_tenant_policy_append_only()")
     # CI:DESTRUCTIVE_OK - downgrade rollback; this revision created the table.
-    op.execute("DROP TABLE IF EXISTS public.trust_tenant_policy_events")
+    op.execute("DROP TABLE IF EXISTS public.trust_tenant_policy_events")  # CI:DESTRUCTIVE_OK - downgrade rollback of VII policy table
     # CI:DESTRUCTIVE_OK - downgrade rollback; this revision created the view.
     op.execute("DROP VIEW IF EXISTS public.trust_final_issuance_identity")
     for name in ("b27_enforce_explanation_consequence", "b28_enforce_request_consequence", "b28_enforce_result_consequence"):
