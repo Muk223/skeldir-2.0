@@ -95,14 +95,12 @@ def upgrade() -> None:
           USING (tenant_id=current_setting('app.current_tenant_id',true)::uuid)
           WITH CHECK (tenant_id=current_setting('app.current_tenant_id',true)::uuid);
         REVOKE ALL ON public.trust_tenant_policy_events FROM PUBLIC;
-        DO $$ BEGIN
-          IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='app_trust_policy_admin') THEN
-            CREATE ROLE app_trust_policy_admin NOLOGIN;
-          END IF;
-        END $$;
-        GRANT USAGE ON SCHEMA public TO app_trust_policy_admin;
-        GRANT INSERT,SELECT ON public.trust_tenant_policy_events TO app_trust_policy_admin;
-        GRANT USAGE ON SEQUENCE public.trust_tenant_policy_events_revision_seq TO app_trust_policy_admin;
+        -- The publisher role is provisioned by
+        -- scripts/database/prepare_migration_authority_boundary.py, never by
+        -- migrations: CREATE ROLE here would fail for restricted migration
+        -- users (only CREATEROLE roles may create roles) on lanes that
+        -- migrate without the full role graph. Grants below are
+        -- role-tolerant; the role itself arrives via provisioning.
         CREATE FUNCTION public.trust_tenant_policy_append_only() RETURNS trigger
         LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$
         BEGIN
@@ -139,6 +137,9 @@ def upgrade() -> None:
         _grant_if_role_exists(_role, f"REVOKE ALL ON public.trust_tenant_policy_events FROM {_role}")
     for _role in ("app_user", "app_worker", "app_b28_requester", "app_b28_solver"):
         _grant_if_role_exists(_role, f"GRANT SELECT ON public.trust_tenant_policy_events TO {_role}")
+    _grant_if_role_exists("app_trust_policy_admin", "GRANT USAGE ON SCHEMA public TO app_trust_policy_admin")
+    _grant_if_role_exists("app_trust_policy_admin", "GRANT INSERT,SELECT ON public.trust_tenant_policy_events TO app_trust_policy_admin")
+    _grant_if_role_exists("app_trust_policy_admin", "GRANT USAGE ON SEQUENCE public.trust_tenant_policy_events_revision_seq TO app_trust_policy_admin")
     for name in ("b28_authenticate_request_possession", "b28_enforce_request_possession"):
         _replace_function(name, "now()", "clock_timestamp()")
     for table, column in (("b28_request_authentications", "authenticated_at"), ("b28_simulation_requests", "requested_at"), ("b28_simulation_results", "created_at"), ("b28_proposals", "created_at")):
