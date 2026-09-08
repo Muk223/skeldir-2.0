@@ -670,8 +670,33 @@
   depends_on_celery: false
   depends_on_pooler: false
   default_execution: true
-  execution_cohort: b2-5-signing-verification
-  ci_visibility: workflow_job
+  execution_cohort: p13-adversarial-physics-adjudication
+  ci_visibility: executed
+  replacement: ''
+  deprecation_reason: ''
+  subsumed_by: ''
+  registry_action: keep
+- id: validate-p2-evacuation-ledger
+  path: scripts/ci/validate_p2_evacuation_ledger.py
+  status: required
+  owning_phase: Phase-II-Monolith-Evacuation
+  protected_invariant: The historical ci.yml monolith is completely evacuated with proof conservation.
+    Every incumbent job resolves to exactly one lawful final disposition (MIGRATED, SUBSUMED, or
+    RETIRED_AS_NONAUTHORITATIVE), no job is left UNRESOLVED, ci.yml is deleted at completion, and no
+    successor file recreates the monolith topology under a new filename.
+  command: python scripts/ci/validate_p2_evacuation_ledger.py --check
+  workflow_references: []
+  workflow_job_name: Phase II evacuation ledger (forensic tooling, not a merge gate)
+  local_reproduction_command: python scripts/ci/validate_p2_evacuation_ledger.py --check
+  expected_failure_meaning: An incumbent ci.yml job lacks a lawful final disposition, coverage is
+    incomplete, a retired job still executes, or a successor mega-monolith formed.
+  first_diagnostic_command: python scripts/ci/validate_p2_evacuation_ledger.py --check
+  depends_on_db: false
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: false
+  execution_cohort: phase-ii-evacuation
+  ci_visibility: executed
   replacement: ''
   deprecation_reason: ''
   subsumed_by: ''
@@ -4108,6 +4133,160 @@
   depends_on_pooler: false
   default_execution: true
   execution_cohort: p13-adversarial-physics-adjudication
+  ci_visibility: executed
+  replacement: ''
+  deprecation_reason: ''
+  subsumed_by: ''
+  registry_action: keep
+- id: b14-env-signature
+  path: scripts/ci/b14_env_signature.py
+  status: required
+  owning_phase: Phase-II-B14-Shadow
+  protected_invariant: Content-addressed environment signature binding OS, toolchain, dependency and schema authority for the B14 lane.
+  command: python scripts/ci/b14_env_signature.py --check artifacts/b14_consolidated/env_signature.json
+  workflow_references:
+  - .github/workflows/b14-privacy-consolidated.yml
+  workflow_job_name: B1.4 Privacy Consolidated Plane
+  local_reproduction_command: python scripts/ci/b14_env_signature.py --check artifacts/b14_consolidated/env_signature.json
+  expected_failure_meaning: The B14 consolidation machinery lost a load-bearing property.
+  first_diagnostic_command: python scripts/ci/b14_env_signature.py --check artifacts/b14_consolidated/env_signature.json
+  depends_on_db: false
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: false
+  execution_cohort: b14-privacy-consolidated
+  ci_visibility: executed
+  replacement: ''
+  deprecation_reason: ''
+  subsumed_by: ''
+  registry_action: keep
+- id: b14-provision-template-dbs
+  path: scripts/ci/b14_provision_template_dbs.py
+  status: required
+  owning_phase: Phase-II-B14-Shadow
+  protected_invariant: Template-plus-clone provisioner - one migrated template, per-proof isolated consequence databases for the B14 lane.
+  command: python scripts/ci/b14_provision_template_dbs.py --phase clone-proofs --maintenance-dsn postgresql://postgres:postgres@127.0.0.1:5432/postgres
+  workflow_references:
+  - .github/workflows/b14-privacy-consolidated.yml
+  workflow_job_name: B1.4 Privacy Consolidated Plane
+  local_reproduction_command: python scripts/ci/b14_provision_template_dbs.py --phase clone-proofs --maintenance-dsn postgresql://postgres:postgres@127.0.0.1:5432/postgres
+  expected_failure_meaning: The B14 consolidation machinery lost a load-bearing property.
+  first_diagnostic_command: python scripts/ci/b14_provision_template_dbs.py --phase clone-proofs --maintenance-dsn postgresql://postgres:postgres@127.0.0.1:5432/postgres
+  depends_on_db: false
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: false
+  execution_cohort: b14-privacy-consolidated
+  ci_visibility: executed
+  replacement: ''
+  deprecation_reason: ''
+  subsumed_by: ''
+  registry_action: keep
+- id: b14-record-proof-result
+  path: scripts/ci/b14_record_proof_result.py
+  status: required
+  owning_phase: Phase-II-B14-Shadow
+  protected_invariant: Per-proof result ledger plus terminal aggregator; refuses wrapper-green-over-missing-child for the B14 lane.
+  command: python scripts/ci/b14_record_proof_result.py --aggregate --artifacts-dir artifacts/b14_consolidated --sha <SHA>
+  workflow_references:
+  - .github/workflows/b14-privacy-consolidated.yml
+  workflow_job_name: B1.4 Privacy Consolidated Plane
+  local_reproduction_command: python scripts/ci/b14_record_proof_result.py --aggregate --artifacts-dir artifacts/b14_consolidated --sha <SHA>
+  expected_failure_meaning: The B14 consolidation machinery lost a load-bearing property.
+  first_diagnostic_command: python scripts/ci/b14_record_proof_result.py --aggregate --artifacts-dir artifacts/b14_consolidated --sha <SHA>
+  depends_on_db: false
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: false
+  execution_cohort: b14-privacy-consolidated
+  ci_visibility: executed
+  replacement: ''
+  deprecation_reason: ''
+  subsumed_by: ''
+  registry_action: keep
+- id: collect-b14-corpus-pair
+  path: scripts/ci/collect_b14_corpus_pair.py
+  status: required
+  owning_phase: Phase-II-B14-Shadow
+  protected_invariant: Same-SHA paired corpus collector binding incumbent B14 jobs with the consolidated shadow job.
+  command: python scripts/ci/collect_b14_corpus_pair.py --sha <SHA> --event pull_request --class ordinary --old-run <R1> --new-run <R2> --corpus docs/forensics/p2_b14_equivalence_corpus.json
+  workflow_references:
+  - .github/workflows/b14-privacy-consolidated.yml
+  workflow_job_name: B1.4 Privacy Consolidated Plane
+  local_reproduction_command: python scripts/ci/collect_b14_corpus_pair.py --sha <SHA> --event pull_request --class ordinary --old-run <R1> --new-run <R2> --corpus docs/forensics/p2_b14_equivalence_corpus.json
+  expected_failure_meaning: The B14 consolidation machinery lost a load-bearing property.
+  first_diagnostic_command: python scripts/ci/collect_b14_corpus_pair.py --sha <SHA> --event pull_request --class ordinary --old-run <R1> --new-run <R2> --corpus docs/forensics/p2_b14_equivalence_corpus.json
+  depends_on_db: false
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: false
+  execution_cohort: b14-privacy-consolidated
+  ci_visibility: executed
+  replacement: ''
+  deprecation_reason: ''
+  subsumed_by: ''
+  registry_action: keep
+- id: compare-b14-equivalence
+  path: scripts/ci/compare_b14_equivalence.py
+  status: required
+  owning_phase: Phase-II-B14-Shadow
+  protected_invariant: Old/new semantic equivalence comparator for the B14 migration (SHA, test identity, NC evidence, verdict, env authority).
+  command: python scripts/ci/compare_b14_equivalence.py --self-test
+  workflow_references:
+  - .github/workflows/b14-privacy-consolidated.yml
+  workflow_job_name: B1.4 Privacy Consolidated Plane
+  local_reproduction_command: python scripts/ci/compare_b14_equivalence.py --self-test
+  expected_failure_meaning: The B14 consolidation machinery lost a load-bearing property.
+  first_diagnostic_command: python scripts/ci/compare_b14_equivalence.py --self-test
+  depends_on_db: false
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: false
+  execution_cohort: b14-privacy-consolidated
+  ci_visibility: executed
+  replacement: ''
+  deprecation_reason: ''
+  subsumed_by: ''
+  registry_action: keep
+- id: test-b14-consolidation-negative-controls
+  path: scripts/ci/test_b14_consolidation_negative_controls.py
+  status: required
+  owning_phase: Phase-II-B14-Shadow
+  protected_invariant: Negative-control suite for B14 consolidation - env-signature, provisioner isolation, ledger severance.
+  command: python scripts/ci/test_b14_consolidation_negative_controls.py
+  workflow_references:
+  - .github/workflows/b14-privacy-consolidated.yml
+  workflow_job_name: B1.4 Privacy Consolidated Plane
+  local_reproduction_command: python scripts/ci/test_b14_consolidation_negative_controls.py
+  expected_failure_meaning: The B14 consolidation machinery lost a load-bearing property.
+  first_diagnostic_command: python scripts/ci/test_b14_consolidation_negative_controls.py
+  depends_on_db: false
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: false
+  execution_cohort: b14-privacy-consolidated
+  ci_visibility: executed
+  replacement: ''
+  deprecation_reason: ''
+  subsumed_by: ''
+  registry_action: keep
+- id: validate-b14-migration
+  path: scripts/ci/validate_b14_migration.py
+  status: required
+  owning_phase: Phase-II-B14-Shadow
+  protected_invariant: Monotonic-authority validator for the B14 migration (SHADOW to DUAL to CUTOVER).
+  command: python scripts/ci/validate_b14_migration.py
+  workflow_references:
+  - .github/workflows/b14-privacy-consolidated.yml
+  workflow_job_name: B1.4 Privacy Consolidated Plane
+  local_reproduction_command: python scripts/ci/validate_b14_migration.py
+  expected_failure_meaning: The B14 consolidation machinery lost a load-bearing property.
+  first_diagnostic_command: python scripts/ci/validate_b14_migration.py
+  depends_on_db: false
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: false
+  execution_cohort: b14-privacy-consolidated
   ci_visibility: executed
   replacement: ''
   deprecation_reason: ''
