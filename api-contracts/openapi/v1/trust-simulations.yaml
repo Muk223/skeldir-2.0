@@ -15,7 +15,14 @@ paths:
           application/json:
             schema: {$ref: '#/components/schemas/SimulationSubmission'}
       responses:
-        '201': {description: Durable explicit request and deterministic consequence}
+        '201':
+          description: Durable explicit request and deterministic consequence
+          headers:
+            X-Correlation-ID:
+              schema: {type: string, format: uuid}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SimulationReceipt'}
         '401': {description: Authentication refused}
         '403': {description: Source or current policy refuses simulation}
         '404': {description: Tenant-scoped source unavailable}
@@ -31,7 +38,14 @@ paths:
         - {$ref: '#/components/parameters/Nonce'}
         - {name: request_id, in: path, required: true, schema: {type: string, format: uuid}}
       responses:
-        '200': {description: Tenant-safe durable status, result and human-review proposal}
+        '200':
+          description: Tenant-safe durable status, result and human-review proposal
+          headers:
+            X-Correlation-ID:
+              schema: {type: string, format: uuid}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SimulationRead'}
         '401': {description: Authentication refused}
         '404': {description: Request unavailable to this tenant}
 components:
@@ -51,3 +65,22 @@ components:
         source_final_envelope_hash: {type: string, pattern: '^sha256:[a-f0-9]{64}$'}
         total_budget_minor: {type: integer, minimum: 1, maximum: 9007199254740991}
         request_ref: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9._:-]+$'}
+    SimulationReceipt:
+      type: object
+      additionalProperties: false
+      required: [request_id, tenant_id_hash, correlation_id, status]
+      properties:
+        request_id: {type: string, format: uuid}
+        tenant_id_hash: {type: string}
+        correlation_id: {type: string, format: uuid}
+        status: {type: string, enum: [completed, refused]}
+    SimulationRead:
+      type: object
+      additionalProperties: true
+      required: [tenant_id_hash, correlation_id, status, causal_authority, external_execution_authority]
+      properties:
+        tenant_id_hash: {type: string}
+        correlation_id: {type: string, format: uuid}
+        status: {type: string, enum: [completed, pending, refused]}
+        causal_authority: {type: string, enum: [none]}
+        external_execution_authority: {type: string, enum: [none]}

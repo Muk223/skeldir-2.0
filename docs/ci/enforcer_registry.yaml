@@ -4113,3 +4113,28 @@
   deprecation_reason: ''
   subsumed_by: ''
   registry_action: keep
+- id: b25-p14-authority-manifest-regenerator
+  path: scripts/ci/regenerate_b25_p14_authority_manifest.py
+  status: required
+  owning_phase: B2.5-P14-Corrective-VII
+  protected_invariant: The physical-authority manifest is generated from an independently migrated candidate
+    database, never hand-edited and never learned from a serving database. The serving database must never
+    become the teacher that defines what correct is.
+  command: python scripts/ci/regenerate_b25_p14_authority_manifest.py --dsn "$MIGRATION_DATABASE_URL"
+  workflow_references: []
+  workflow_job_name: ''
+  local_reproduction_command: python scripts/ci/regenerate_b25_p14_authority_manifest.py --dsn
+    "postgresql://migration_owner:migration_owner@127.0.0.1:5432/skeldir_b25_p14"
+  expected_failure_meaning: The checked-in authority manifest was produced by hand or from a serving database
+    rather than from a reviewed migration replay, so production physical-schema drift is no longer falsifiable.
+  first_diagnostic_command: python scripts/ci/regenerate_b25_p14_authority_manifest.py --help
+  depends_on_db: true
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: false
+  execution_cohort: utility-only
+  ci_visibility: not_executed
+  replacement: ''
+  deprecation_reason: Utility-only until a workflow references it through the registry.
+  subsumed_by: ''
+  registry_action: utility

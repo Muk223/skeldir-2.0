@@ -3033,3 +3033,22 @@
   local_reproduction_command: python scripts/ci/test_p13_adversarial_physics_negative_controls.py
   risk_if_removed: The adjudicator could silently accept a skipped lane.
   decision: keep_all
+- gate_id: b25-p14-authority-manifest-regenerator
+  workflow: ''
+  job: ''
+  script: scripts/ci/regenerate_b25_p14_authority_manifest.py
+  owning_phase: B2.5-P14-Corrective-VII
+  protected_invariant: The physical-authority manifest is generated from an independently migrated candidate
+    database, never hand-edited and never learned from a serving database.
+  current_status: utility
+  default_execution: false
+  candidate_action: keep_utility
+  subsuming_gate: ''
+  subsumption_evidence: A generator invoked by engineers to refresh the checked-in manifest after reviewed
+    migration changes; the P14 job's readiness and physical-authority assertions adjudicate the artifact it
+    produces. Utility-only until a workflow references it through the registry.
+  negative_control_preserved_by: ''
+  local_reproduction_command: python scripts/ci/regenerate_b25_p14_authority_manifest.py --help
+  risk_if_removed: Engineers would hand-edit the manifest or derive it from a serving database, making
+    physical-schema drift unfalsifiable.
+  decision: keep_utility
