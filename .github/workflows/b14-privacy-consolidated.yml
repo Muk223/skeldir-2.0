@@ -114,6 +114,7 @@ jobs:
           set +e
           (
             set -e
+            set -o pipefail
             export DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/b14_p0_proof
             export MIGRATION_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/b14_p0_proof
             python scripts/ci/enforce_b14_p0_privacy_authority.py
@@ -132,6 +133,7 @@ jobs:
           set +e
           (
             set -e
+            set -o pipefail
             export DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/b14_p1_proof
             export MIGRATION_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/b14_p1_proof
             python scripts/ci/enforce_b14_p1_ingress_privacy.py
@@ -149,6 +151,7 @@ jobs:
           set +e
           (
             set -e
+            set -o pipefail
             export DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/b14_p2_proof
             export MIGRATION_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/b14_p2_proof
             python scripts/ci/enforce_b14_p2_session_authority.py
@@ -166,6 +169,7 @@ jobs:
           set +e
           (
             set -e
+            set -o pipefail
             export DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/b14_p3_proof
             export MIGRATION_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/b14_p3_proof
             python scripts/ci/enforce_b14_p3_attribution_locality.py
@@ -183,6 +187,7 @@ jobs:
           set +e
           (
             set -e
+            set -o pipefail
             export DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/b14_p4_proof
             export MIGRATION_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/b14_p4_proof
             python scripts/ci/enforce_b14_p4_retention_deletion.py
@@ -200,6 +205,7 @@ jobs:
           set +e
           (
             set -e
+            set -o pipefail
             export DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/b14_p5_proof
             export MIGRATION_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/b14_p5_proof
             python scripts/ci/enforce_b14_p5_export_log_artifact_no_leak.py
@@ -226,6 +232,7 @@ jobs:
           set +e
           (
             set -e
+            set -o pipefail
             export DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/b14_p6_proof
             export MIGRATION_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/b14_p6_proof
             if python scripts/ci/enforce_b14_p6_proof_plane_binding.py --simulate-regression; then
@@ -246,6 +253,7 @@ jobs:
           set +e
           (
             set -e
+            set -o pipefail
             export DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/b14_p7_proof
             export MIGRATION_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/b14_p7_proof
             if python scripts/ci/enforce_b14_p7_e2e_privacy_system_proofs.py --simulate-regression; then

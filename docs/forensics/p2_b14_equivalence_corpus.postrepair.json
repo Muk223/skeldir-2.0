@@ -166,6 +166,89 @@
       "comparator": "GREEN",
       "comparator_detail": "compare_b14_equivalence.py exit 0 with live conclusions: same-sha, 8/8 test-identity GREEN, verdict GREEN, proof-verdict green 8/8, NC evidence present both sides, env-authority 9a9066f1b387. Old CI 34185060482 full SUCCESS. New shadow 34185060454 success.",
       "class_rationale": "docs_only: SHA carries only the slice-selection addendum doc (P6 landed, qualifying 1/10, R-P2-06 closed)."
+    },
+    {
+      "id": "pull_request-c59e57ad7231",
+      "class": "ordinary",
+      "event": "pull_request",
+      "sha": "c59e57ad72310014030a8f2be93038251429ee67",
+      "old_sha": "c59e57ad72310014030a8f2be93038251429ee67",
+      "new_sha": "c59e57ad72310014030a8f2be93038251429ee67",
+      "old_run": "34188780219",
+      "new_run": "34188780232",
+      "old_conclusions": {
+        "B1.4 P0 Privacy Authority Lock": "success",
+        "B1.4 P1 Ingress Contract Sanitization": "success",
+        "B1.4 P2 Session Authority Proofs": "success",
+        "B1.4 P3 Attribution Locality Proofs": "success",
+        "B1.4 P4 Retention + Deterministic Deletion Proofs": "success",
+        "B1.4 P5 Export Log Artifact No-Leak": "success",
+        "B1.4 P6 Merge-Blocking Privacy Proof Plane Binding": "success",
+        "B1.4 P7 E2E Privacy System Proofs": "success"
+      },
+      "new_conclusion": "success",
+      "old_job_timing": {
+        "B1.4 P0 Privacy Authority Lock": {
+          "job_id": "101942365280",
+          "conclusion": "success",
+          "queue_s": 600.0,
+          "exec_s": 70.0
+        },
+        "B1.4 P4 Retention + Deterministic Deletion Proofs": {
+          "job_id": "101942365602",
+          "conclusion": "success",
+          "queue_s": 809.0,
+          "exec_s": 78.0
+        },
+        "B1.4 P2 Session Authority Proofs": {
+          "job_id": "101942365610",
+          "conclusion": "success",
+          "queue_s": 977.0,
+          "exec_s": 61.0
+        },
+        "B1.4 P3 Attribution Locality Proofs": {
+          "job_id": "101942365705",
+          "conclusion": "success",
+          "queue_s": 1082.0,
+          "exec_s": 61.0
+        },
+        "B1.4 P5 Export Log Artifact No-Leak": {
+          "job_id": "101942365816",
+          "conclusion": "success",
+          "queue_s": 1127.0,
+          "exec_s": 63.0
+        },
+        "B1.4 P1 Ingress Contract Sanitization": {
+          "job_id": "101942365966",
+          "conclusion": "success",
+          "queue_s": 1146.0,
+          "exec_s": 66.0
+        },
+        "B1.4 P6 Merge-Blocking Privacy Proof Plane Binding": {
+          "job_id": "101946001973",
+          "conclusion": "success",
+          "queue_s": 1405.0,
+          "exec_s": 64.0
+        },
+        "B1.4 P7 E2E Privacy System Proofs": {
+          "job_id": "101946793230",
+          "conclusion": "success",
+          "queue_s": 1687.0,
+          "exec_s": 65.0
+        }
+      },
+      "new_job_timing": {
+        "B1.4 Privacy Consolidated Plane": {
+          "job_id": "101942363925",
+          "conclusion": "success",
+          "queue_s": 157.0,
+          "exec_s": 106.0
+        }
+      },
+      "verdict": "GREEN",
+      "comparator": "GREEN",
+      "comparator_detail": "compare_b14_equivalence.py exit 0 with live conclusions: same-sha, 8/8 test-identity GREEN, verdict GREEN, proof-verdict green 8/8, env-authority 9a9066f1b387. Old CI 34188780219 full SUCCESS. New shadow 34188780232 success.",
+      "class_rationale": "ordinary: SHA carries only the qualifying-corpus progress record (forensics evidence, no proof semantics)."
     }
   ]
 }
