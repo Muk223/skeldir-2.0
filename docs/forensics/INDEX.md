@@ -480,3 +480,5 @@ This index enumerates evidence packs stored under `docs/forensics/`.
 | --- | --- | --- | --- | --- |
 | CI throughput remediation | docs/forensics/CI_THROUGHPUT_REMEDIATION_EVIDENCE.md | Advisory-lane burst remediation: re-measured baseline, guard rules 6-7, trigger diffs, verification, honest gate accounting, Phase 2 proposal | local-uncommitted | pending |
 | CI throughput remediation | docs/forensics/ci_throughput_remediation.evidence.json | Machine-readable before/after measurements, fault-corpus outcomes, VAC re-check, landing record | PR #715 / 93dbdb14 | pending |
+| Phase II (P6 repair) | docs/forensics/P2_P6_INCUMBENT_REPAIR.md | Pre-promotion incumbent P6 vacuity evidence, identity-preserving repair (DB env + pipefail), controls, corpus consequence | p2-p6-incumbent-repair / pending | pending |
+| Phase II (ledger) | docs/forensics/p2_monolith_evacuation_ledger.json | Machine-readable ci.yml evacuation authority: 69-job Phase II start census, per-job invariant/proof/disposition, Gate M accounting (validator: scripts/ci/validate_p2_evacuation_ledger.py) | p2-p6-incumbent-repair / pending | pending |

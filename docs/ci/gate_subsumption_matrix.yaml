@@ -3052,3 +3052,18 @@
   risk_if_removed: Engineers would hand-edit the manifest or derive it from a serving database, making
     physical-schema drift unfalsifiable.
   decision: keep_utility
+- gate_id: validate-p2-evacuation-ledger
+  workflow: forensic-tooling
+  job: Phase II evacuation ledger (not a merge gate)
+  script: scripts/ci/validate_p2_evacuation_ledger.py
+  owning_phase: Phase-II-Monolith-Evacuation
+  protected_invariant: Every incumbent ci.yml job resolves to exactly one lawful final disposition.
+  current_status: required
+  default_execution: false
+  candidate_action: keep_all
+  subsuming_gate: ''
+  subsumption_evidence: Ledger validator with self-test; Gate M extinction accounting for Directive-2.
+  negative_control_preserved_by: python scripts/ci/validate_p2_evacuation_ledger.py --self-test
+  local_reproduction_command: python scripts/ci/validate_p2_evacuation_ledger.py --check
+  risk_if_removed: Monolith evacuation progress becomes narrative rather than machine-checked.
+  decision: keep_all
