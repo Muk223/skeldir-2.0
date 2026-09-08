@@ -89,16 +89,29 @@ def anchor_sensor(path: str, anchor: str, defect: str) -> tuple[bool, bool, str]
 
 def test_c_selector() -> None:
     red, green, detail = anchor_sensor(
-        "backend/app/api/trust_simulations.py", "    if len(rows) != 1:\n", "final_selector_bypass")
+        "backend/app/simulation/persistence.py",
+        '        source_semantic_truth_hash=str(envelope.get("semantic_truth_hash", "")),\n'
+        "        source_issuance_envelope_hash=source_issuance_envelope_hash,\n"
+        "        total_budget_minor",
+        "final_selector_bypass")
     record("C-final-selector", red, green, detail)
 
 
 def test_d_policy() -> None:
-    red, green, detail = anchor_sensor(
-        "backend/app/api/trust_simulations.py",
-        '    if envelope["policy_action_authority"]["policy_state"] not in SIMULATION_ADMISSIBLE_POLICY_STATES:\n',
-        "policy_conjunct_severed")
-    record("D-policy-conjunct", red, green, detail)
+    # Behavioral sensor (DB-free): the admission conjunction must refuse
+    # read_only/blocked before any deterministic work.
+    sensor = ["backend/tests/trust/test_b25_p14_b28_simulation_conservation.py::"
+              "test_b28_s7_a_source_policy_that_forbids_simulation_blocks_the_solver"]
+    r = sh([sys.executable, "-m", "pytest", *sensor, "-q", "--no-header", "-p", "no:randomly"])
+    green_ok = r.returncode == 0 and "2 passed" in r.stdout
+    d = sh([sys.executable, "scripts/ci/_b25_p14_controlled_defect.py", "apply", "policy_conjunct_severed"])
+    assert d.returncode == 0, d.stderr
+    r2 = sh([sys.executable, "-m", "pytest", *sensor, "-q", "--no-header", "-p", "no:randomly"])
+    red_ok = r2.returncode != 0 and "2 failed" in r2.stdout
+    sh(["git", "checkout", "--", "backend/app/simulation/admission.py"])
+    r3 = sh([sys.executable, "-m", "pytest", *sensor, "-q", "--no-header", "-p", "no:randomly"])
+    record("D-policy-conjunct", red_ok, green_ok and r3.returncode == 0 and "2 passed" in r3.stdout,
+           "policy_conjunct_severed")
 
 
 def test_route() -> None:

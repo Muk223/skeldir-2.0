@@ -4043,54 +4043,54 @@ jobs:
             | tee /tmp/nc_p14_07_restored.out
           grep -F '[b25-p14] container projection parity PASSED' /tmp/nc_p14_07_restored.out
 
-      # NC-P14-21. Corrective VIII falsifier C: the HTTP request boundary must
-      # resolve (tenant, envelope, final_hash) to exactly one signer-backed
-      # issuance. Disabling the exact-selector refusal must turn the
-      # vii2 issuance-selection sensor red (unknown/foreign/ambiguous
-      # selectors), and exact restore must return it green.
+      # NC-P14-21. Corrective VIII falsifier C: the production request
+      # boundary must cite the exact signer-backed issuance hash the final
+      # selector resolved. Citing the logical envelope id instead must turn
+      # the vii2 issuance-selection sensor red, and exact restore must return
+      # it green.
       - name: NC-P14-21 ignoring the final selector turns issuance selection red
         run: |
           set -euo pipefail
-          cp backend/app/api/trust_simulations.py /tmp/p14_trust_simulations_pristine.py
+          cp backend/app/simulation/persistence.py /tmp/p14_persistence_pristine.py
           python scripts/ci/_b25_p14_controlled_defect.py apply \
             final_selector_bypass
           if python -m pytest \
               backend/tests/trust/test_b25_p14_vii2_issuance_selection.py \
               -q --no-header -p no:randomly > /tmp/nc_p14_21.out 2>&1; then
             echo "NC-P14-21 did not fire: an unselected source was tolerated"
-            cp /tmp/p14_trust_simulations_pristine.py backend/app/api/trust_simulations.py
+            cp /tmp/p14_persistence_pristine.py backend/app/simulation/persistence.py
             cat /tmp/nc_p14_21.out
             exit 1
           fi
           grep -E "[0-9]+ failed" /tmp/nc_p14_21.out
-          cp /tmp/p14_trust_simulations_pristine.py backend/app/api/trust_simulations.py
-          git diff --exit-code backend/app/api/trust_simulations.py
+          cp /tmp/p14_persistence_pristine.py backend/app/simulation/persistence.py
+          git diff --exit-code backend/app/simulation/persistence.py
           python -m pytest \
             backend/tests/trust/test_b25_p14_vii2_issuance_selection.py \
             -q --no-header -p no:randomly | tee /tmp/nc_p14_21_restored.out
           grep -E "[0-9]+ passed" /tmp/nc_p14_21_restored.out
 
-      # NC-P14-22. Corrective VIII falsifier D: severing policy admission at
-      # the supported POST boundary must let a read_only Trust conduct, which
-      # the B28 conservation sensor must refuse. Red under defect, green on
-      # exact restore.
+      # NC-P14-22. Corrective VIII falsifier D: severing policy admission in
+      # the admission conjunction must let a read_only/blocked Trust conduct,
+      # which the B28 conservation sensor must refuse. Red under defect, green
+      # on exact restore.
       - name: NC-P14-22 severed policy admission turns conservation red
         run: |
           set -euo pipefail
-          cp backend/app/api/trust_simulations.py /tmp/p14_trust_simulations_pristine.py
+          cp backend/app/simulation/admission.py /tmp/p14_admission_pristine.py
           python scripts/ci/_b25_p14_controlled_defect.py apply \
             policy_conjunct_severed
           if python -m pytest \
               backend/tests/trust/test_b25_p14_b28_simulation_conservation.py \
               -q --no-header -p no:randomly > /tmp/nc_p14_22.out 2>&1; then
             echo "NC-P14-22 did not fire: a read_only source conducted"
-            cp /tmp/p14_trust_simulations_pristine.py backend/app/api/trust_simulations.py
+            cp /tmp/p14_admission_pristine.py backend/app/simulation/admission.py
             cat /tmp/nc_p14_22.out
             exit 1
           fi
           grep -E "[0-9]+ failed" /tmp/nc_p14_22.out
-          cp /tmp/p14_trust_simulations_pristine.py backend/app/api/trust_simulations.py
-          git diff --exit-code backend/app/api/trust_simulations.py
+          cp /tmp/p14_admission_pristine.py backend/app/simulation/admission.py
+          git diff --exit-code backend/app/simulation/admission.py
           python -m pytest \
             backend/tests/trust/test_b25_p14_b28_simulation_conservation.py \
             -q --no-header -p no:randomly | tee /tmp/nc_p14_22_restored.out

@@ -33,6 +33,7 @@ SIMULATION_SERVICE = REPO_ROOT / "backend/app/simulation/service.py"
 EXPLANATION_SERVICE = REPO_ROOT / "backend/app/explanation/service.py"
 TRUST_SIMULATIONS_ROUTE = REPO_ROOT / "backend/app/api/trust_simulations.py"
 APP_MAIN = REPO_ROOT / "backend/app/main.py"
+SIMULATION_ADMISSION = REPO_ROOT / "backend/app/simulation/admission.py"
 PROFILE_REGISTRY = REPO_ROOT / "contracts/trust-api/projection-profiles.v1.yaml"
 PRODUCTION_DOCKERFILE = REPO_ROOT / "backend/Dockerfile"
 EXPLANATION_CONSERVATION = REPO_ROOT / "backend/app/explanation/conservation.py"
@@ -447,37 +448,52 @@ def custody_secret_reaches_an_untrusted_container() -> None:
 
 
 def final_selector_bypass() -> None:
-    """Corrective VIII falsifier C: ignore the exact final-artifact selector.
+    """Corrective VIII falsifier C: mis-handle the exact final-artifact selector.
 
-    The HTTP request boundary must resolve ``(tenant, envelope, final_hash)``
-    to exactly one signer-backed issuance (``len(rows) != 1`` refuses).
-    This control disables the refusal so unknown/wrong/ambiguous selectors
-    proceed past selection. The vii2 issuance-selection suite (unknown hash,
-    foreign hash, shared-envelope disambiguation) must turn RED, proving the
-    governing sensor measures selection rather than shape.
+    The production request boundary (``conduct_requested_simulation``) must
+    cite the exact signer-backed issuance hash the final selector resolved.
+    This control cites the LOGICAL envelope id where the issuance hash
+    belongs, so the durable request no longer names the selected issuance.
+    The vii2 issuance-selection suite must turn RED (exact binding broken,
+    conduction refused by the durable-issuance guard), proving the governing
+    sensor measures selection binding rather than shape.
+
+    Layer note: the HTTP ``_source`` resolver is measured only over live HTTP
+    (C19 topology); pairing an HTTP mutation with this DB-backed suite is
+    vacuous (first VIII attempt demonstrated exactly that non-firing). The
+    cite layer is the governed-system mutation this sensor adjudicates.
     """
 
     _replace_once(
-        TRUST_SIMULATIONS_ROUTE,
-        "    if len(rows) != 1:\n",
-        "    if False:  # NC-P14-21\n",
+        SIMULATION_PERSISTENCE,
+        '        source_semantic_truth_hash=str(envelope.get("semantic_truth_hash", "")),\n'
+        "        source_issuance_envelope_hash=source_issuance_envelope_hash,\n"
+        "        total_budget_minor",
+        '        source_semantic_truth_hash=str(envelope.get("semantic_truth_hash", "")),\n'
+        '        source_issuance_envelope_hash=str(envelope.get("envelope_id", "")),  # NC-P14-21\n'
+        "        total_budget_minor",
         what="final_selector_bypass",
     )
 
 
 def policy_conjunct_severed() -> None:
-    """Corrective VIII falsifier D: sever policy admission at the HTTP boundary.
+    """Corrective VIII falsifier D: sever policy admission in the admission
+    conjunction.
 
-    The supported POST boundary refuses non-admissible source policy states
-    (``read_only``/``blocked``) before any deterministic work. This control
-    disables that refusal so a ``read_only`` Trust conducts. The B28
-    conservation suite's ``read_only`` block must turn RED, proving admission
+    The governed admission path (``simulate_from_trust``) refuses
+    non-admissible source policy states (``read_only``/``blocked``) before
+    any deterministic work. This control disables that refusal so a
+    ``read_only`` Trust conducts through the solver. The B28 conservation
+    suite's ``read_only``/``blocked`` block must turn RED, proving admission
     is enforced rather than assumed.
+
+    Layer note: the suite measures the admission conjunction, not the HTTP
+    ``_source`` pre-check; the defect lives where the sensor looks.
     """
 
     _replace_once(
-        TRUST_SIMULATIONS_ROUTE,
-        '    if envelope["policy_action_authority"]["policy_state"] not in SIMULATION_ADMISSIBLE_POLICY_STATES:\n',
+        SIMULATION_ADMISSION,
+        "    if projection.source_policy_state not in SIMULATION_ADMISSIBLE_POLICY_STATES:\n",
         "    if False:  # NC-P14-22\n",
         what="policy_conjunct_severed",
     )
