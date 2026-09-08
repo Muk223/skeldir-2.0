@@ -3073,7 +3073,7 @@
   script: scripts/ci/validate_b25_p14_viii_execution_identity.py
   owning_phase: B2.5-P14-Corrective-VIII
   protected_invariant: The required R6 context is emitted from exactly one governance lifecycle family
-    (merge_group plus pull_request) and never from push, so one SHA plus one required name cannot carry two
+    (merge_group plus pull_request) with no push trigger, so one SHA plus one required name cannot carry two
     competing authority states.
   current_status: required
   default_execution: true
@@ -3081,7 +3081,7 @@
   subsuming_gate: ''
   subsumption_evidence: Self-guarding sensor inside the R6 proof job itself; no other gate parses the R6
     workflow trigger topology, so nothing subsumes it.
-  negative_control_preserved_by: Reintroducing a push emission of the required R6 name (removing the event guard)
+  negative_control_preserved_by: Re-adding a push trigger to the R6 workflow
     turns the sensor and the R6 job red; exact restore returns green.
   local_reproduction_command: python scripts/ci/validate_b25_p14_viii_execution_identity.py
   risk_if_removed: Same-SHA contradictory R6 verdicts could recur silently, voiding the meaning of required-check

@@ -1,9 +1,8 @@
 """Corrective VIII falsifier B: required-execution identity sensor.
 
 Asserts the R6 required context is emitted from exactly one governance
-lifecycle family (merge_group + pull_request) and never from the post-merge
-soak lifecycle (push). Reintroducing a push emission of the required name
-turns this test RED; exact restore returns GREEN.
+lifecycle family (merge_group + pull_request) with no push trigger.
+Re-adding a push trigger turns this test RED; exact restore returns GREEN.
 
 This test shells to the governing sensor
 ``scripts/ci/validate_b25_p14_viii_execution_identity.py`` so the pytest

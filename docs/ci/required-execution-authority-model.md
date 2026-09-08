@@ -13,26 +13,29 @@ epistemically meaningless while that ambiguity exists.
 
 ## Decision (least-complex architecture)
 
-Separate the lifecycles by identity; do not rename the governing contexts
-(renaming 80 required contexts would require a synchronized branch-protection
-change with a far larger blast radius):
+Separate the lifecycles by trigger elimination; do not rename the governing
+contexts (renaming 80 required contexts would require a synchronized
+branch-protection change with a far larger blast radius). Gating the job with
+`if:` is explicitly NOT accepted: the merge-governance validator correctly
+refuses conditional required contexts (a skipped required context is not a
+passed one, and the merge queue would wait on it forever).
 
 | Lifecycle | Event | Authority | Required-name emission |
 |---|---|---|---|
 | MERGE ADMISSION PROOF | `merge_group` | GOVERNING: the only verdict that admits a merge and certifies the landed tree | YES (e.g. `R6 Worker Resource Governance`) |
 | PRE-MERGE SIGNAL | `pull_request` | advisory signal on PR bytes; never admission | YES (same name; superseded per-push by concurrency cancel) |
-| POST-MERGE SOAK / DIAGNOSTIC | `push` to `main` | NON-GOVERNING soak; must never compete with the governing verdict | NO -- runs only under a DISTINCT `- (Post-Merge Soak)` / diagnostic name, or not at all |
+| POST-MERGE SOAK / DIAGNOSTIC | `push` to `main` | NON-GOVERNING soak | NO for R6 -- the workflow has no `push` trigger at all, so a competing post-merge emission of the required name is structurally impossible |
 
 Concretely for R6 (the observed contradictory context):
 
-* The required job `R6 Worker Resource Governance` carries
-  `if: github.event_name != 'push'`, so a push run can never post a competing
-  governing state for the same SHA.
-* Post-merge soak runs as `R6 Worker Resource Governance (Post-Merge Soak)`,
-  guarded `if: github.event_name == 'push'`, non-required, diagnostic only.
+* The workflow triggers are `workflow_dispatch` + `pull_request` +
+  `merge_group` only. There is no `push` trigger and no event `if:` guard on
+  the required job (unconditional, as merge governance demands).
+* Post-merge soak for the R6 proof is covered by the R7 diagnostic lane
+  (non-required), which re-runs the R6 gathering under its own lifecycle.
 * The job self-checks this model every run via
   `scripts/ci/validate_b25_p14_viii_execution_identity.py` (falsifier B's
-  sensor): reintroducing a push emission of the required name turns R6 RED.
+  sensor): re-adding a `push` trigger turns R6 RED.
 
 ## What creates / proves a candidate
 

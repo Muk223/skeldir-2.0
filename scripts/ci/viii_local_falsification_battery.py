@@ -30,19 +30,20 @@ def record(name: str, red_ok: bool, green_ok: bool, detail: str = "") -> None:
     print(f"[{status}] {name} red={red_ok} green={green_ok} {detail}")
 
 
-def mutate_guard_removed() -> str:
+def mutate_push_trigger_added() -> str:
     p = REPO / ".github/workflows/r6-worker-resource-governance.yml"
     orig = p.read_text(encoding="utf-8")
-    anchor = "    if: github.event_name != 'push'\n"
-    assert p.read_text(encoding="utf-8").count(anchor) == 1
-    p.write_text(orig.replace(anchor, "", 1), encoding="utf-8")
+    anchor = "on:\n  workflow_dispatch:\n  pull_request:\n  merge_group:\n"
+    assert orig.count(anchor) == 1
+    injected = anchor + "  push:\n    branches: [main]\n"
+    p.write_text(orig.replace(anchor, injected, 1), encoding="utf-8")
     return orig
 
 
 def test_b_identity() -> None:
     green = sh([sys.executable, "scripts/ci/validate_b25_p14_viii_execution_identity.py"])
     green_ok = green.returncode == 0 and "R6_EXECUTION_IDENTITY_PASS" in green.stdout
-    orig = mutate_guard_removed()
+    orig = mutate_push_trigger_added()
     try:
         red = sh([sys.executable, "scripts/ci/validate_b25_p14_viii_execution_identity.py"])
         red_ok = red.returncode != 0 and "R6_EXECUTION_IDENTITY_FAIL" in red.stdout

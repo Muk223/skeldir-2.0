@@ -200,6 +200,11 @@ ALLOWED_NON_RUNTIME_PATHS = (
     "backend/app/schemas/trust_simulations.py",
     "backend/tests/trust/test_b25_p14_vii2_issuance_selection.py",
     "backend/tests/trust/test_b25_p14_vii2_channel_authority.py",
+    # Corrective VIII proof-plane sensors: execution-identity and route-mount
+    # wiring tests. They assert CI/workflow topology, define no runtime
+    # TrustEnvelope models, and change no product authority.
+    "backend/tests/trust/test_b25_p14_viii_execution_identity.py",
+    "backend/tests/trust/test_b25_p14_viii_route_mount.py",
 )
 
 

@@ -1,16 +1,17 @@
 # R6 — Worker Resource Governance (Context Gathering)
 #
-# Corrective VIII required-execution authority model (§14):
-#   MERGE ADMISSION PROOF = merge_group event (governing authority).
-#   PRE-MERGE SIGNAL       = pull_request event (non-admission signal).
-#   POST-MERGE SOAK        = push event, NON-GOVERNING, emitted ONLY under the
-#                            distinct context "R6 Worker Resource Governance
-#                            (Post-Merge Soak)" which branch protection never
-#                            consumes.
-# The required context below MUST NOT run on push: one SHA + one required
-# name must never carry two competing authority states. Auditor recovery:
+# Corrective VIII required-execution authority model (§14, H-VIII-05/H-VIII-06):
+# this required context is emitted from exactly one governance lifecycle
+# family -- merge_group (governing merge-admission proof) plus pull_request
+# (pre-merge signal). There is deliberately NO push trigger: a push emission
+# under the same required name let one SHA carry both a merge-group GREEN and
+# a later push RED with no machine-readable distinction, voiding the meaning
+# of required-check green. Eliminating the duplicate trigger path (rather
+# than gating the job with `if:`, which the merge-governance validator
+# correctly refuses for required contexts) makes competing governing results
+# structurally impossible. Post-merge soak for R6 is covered by the R7
+# diagnostic lane; auditor recovery for the governing run:
 #   gh run list --commit <SHA> --event merge_group
-#   gh api repos/{owner}/{repo}/commits/<SHA>/check-runs
 # Full model: docs/ci/required-execution-authority-model.md
 name: "R6: Worker Resource Governance (Context Gathering)"
 
@@ -18,15 +19,6 @@ on:
   workflow_dispatch:
   pull_request:
   merge_group:
-  push:
-    branches: [main]
-    paths:
-      - 'backend/app/**'
-      - 'alembic/**'
-      - 'scripts/r6/**'
-      - 'scripts/ci/validate_b25_p14_viii_execution_identity.py'
-      - 'docs/ci/required-execution-authority-model.md'
-      - '.github/workflows/r6-worker-resource-governance.yml'
 
 concurrency:
   # Keyed on event_name as well as PR number: a workflow that declares both
@@ -42,10 +34,6 @@ concurrency:
 jobs:
   r6-worker-resource-governance:
     name: "R6 Worker Resource Governance"
-    # Governing job: merge-admission family only. Push (post-merge soak) is
-    # served by the distinct non-required soak job below and must never emit
-    # this required name (Corrective VIII H-VIII-05/H-VIII-06).
-    if: github.event_name != 'push'
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -400,25 +388,3 @@ jobs:
             r6_worker.log
             r6_probe.log
             docs/forensics/validation/runtime/R6_context_gathering/${{ github.sha }}/
-
-  # Post-merge soak / diagnostic authority (NON-GOVERNING).
-  # Runs ONLY on push to main under a DISTINCT context name that branch
-  # protection never consumes, so it can never compete with the governing
-  # merge-admission verdict above for the same SHA.
-  r6-post-merge-soak:
-    name: "R6 Worker Resource Governance (Post-Merge Soak)"
-    if: github.event_name == 'push'
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
-
-      - name: Soak marker
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "R6_POST_MERGE_SOAK sha=${GITHUB_SHA} run=${GITHUB_RUN_ID}"
-          echo "This context is diagnostic only; governing authority is the merge_group run."
-          python3 scripts/ci/validate_b25_p14_viii_execution_identity.py
