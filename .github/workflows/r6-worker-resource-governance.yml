@@ -1,4 +1,17 @@
 # R6 — Worker Resource Governance (Context Gathering)
+#
+# Corrective VIII required-execution authority model (§14):
+#   MERGE ADMISSION PROOF = merge_group event (governing authority).
+#   PRE-MERGE SIGNAL       = pull_request event (non-admission signal).
+#   POST-MERGE SOAK        = push event, NON-GOVERNING, emitted ONLY under the
+#                            distinct context "R6 Worker Resource Governance
+#                            (Post-Merge Soak)" which branch protection never
+#                            consumes.
+# The required context below MUST NOT run on push: one SHA + one required
+# name must never carry two competing authority states. Auditor recovery:
+#   gh run list --commit <SHA> --event merge_group
+#   gh api repos/{owner}/{repo}/commits/<SHA>/check-runs
+# Full model: docs/ci/required-execution-authority-model.md
 name: "R6: Worker Resource Governance (Context Gathering)"
 
 on:
@@ -11,6 +24,8 @@ on:
       - 'backend/app/**'
       - 'alembic/**'
       - 'scripts/r6/**'
+      - 'scripts/ci/validate_b25_p14_viii_execution_identity.py'
+      - 'docs/ci/required-execution-authority-model.md'
       - '.github/workflows/r6-worker-resource-governance.yml'
 
 concurrency:
@@ -27,6 +42,10 @@ concurrency:
 jobs:
   r6-worker-resource-governance:
     name: "R6 Worker Resource Governance"
+    # Governing job: merge-admission family only. Push (post-merge soak) is
+    # served by the distinct non-required soak job below and must never emit
+    # this required name (Corrective VIII H-VIII-05/H-VIII-06).
+    if: github.event_name != 'push'
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -145,7 +164,30 @@ jobs:
             --max-memory-per-child "${CELERY_WORKER_MAX_MEMORY_PER_CHILD_KB}" \
             --logfile r6_worker.log \
             --pidfile /tmp/r6_worker.pid >/dev/null 2>&1 &
-          sleep 5
+
+      - name: Wait for worker readiness (event-based, not sleep-based)
+        # Corrective VIII §12 (H-VIII-01): proceed only after an observed
+        # task round-trip + live parent PID. A fixed sleep is not readiness
+        # evidence. Fails closed with a causal class (WORKER_NEVER_READY /
+        # WORKER_DISAPPEARED / CONTROL_CHANNEL_UNREACHABLE / ...) instead of
+        # a bare TimeoutError.
+        shell: bash
+        env:
+          R6_SHA: ${{ github.sha }}
+          R6_READINESS_DEADLINE_S: "120"
+          R6_READINESS_POLL_S: "2"
+        run: |
+          set -euo pipefail
+          python scripts/r6/r6_wait_for_worker.py
+
+      - name: Validate required-execution identity (falsifier B sensor)
+        # Corrective VIII Exit Gate 2: the proof plane checks its own
+        # authority model every run. Reintroducing a push emission of the
+        # required name turns this step RED.
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ci/validate_b25_p14_viii_execution_identity.py
 
       - name: Run R6 context gathering
         shell: bash
@@ -195,6 +237,15 @@ jobs:
           echo "R6_PROBE_RECYCLE_JSON_BEGIN"
           cat "$base/R6_PROBE_RECYCLE.json" || true
           echo "R6_PROBE_RECYCLE_JSON_END"
+          echo "R6_WORKER_READINESS_JSON_BEGIN"
+          cat "$base/R6_WORKER_READINESS.json" || true
+          echo "R6_WORKER_READINESS_JSON_END"
+          echo "R6_WORKER_LIFECYCLE_JSON_BEGIN"
+          cat "$base/R6_WORKER_LIFECYCLE.json" || true
+          echo "R6_WORKER_LIFECYCLE_JSON_END"
+          echo "R6_FAILURE_DIAGNOSIS_JSON_BEGIN"
+          cat "$base/R6_FAILURE_DIAGNOSIS.json" || true
+          echo "R6_FAILURE_DIAGNOSIS_JSON_END"
           echo "R6_PROBE_LOG_BEGIN"
           cat r6_probe.log || true
           echo "R6_PROBE_LOG_END"
@@ -226,6 +277,18 @@ jobs:
           retry = read_json("R6_PROBE_RETRY.json")
           recycle = read_json("R6_PROBE_RECYCLE.json")
           prefetch = read_json("R6_PROBE_PREFETCH.json")
+          # Corrective VIII Exit Gate 1: readiness must be observed, not slept
+          # through. A run without readiness evidence is not PASS.
+          readiness = read_json("R6_WORKER_READINESS.json")
+          lifecycle = read_json("R6_WORKER_LIFECYCLE.json")
+          if readiness.get("ready") is not True:
+              print(f"R6_VERIFY_READINESS_FAIL {readiness.get('failure_cause')}")
+              sys.exit(1)
+          print(f"R6_VERIFY_READINESS_OK ready_at={readiness.get('worker_ready_timestamp_utc')}")
+          if not lifecycle.get("worker_ready_timestamp_utc"):
+              print("R6_VERIFY_LIFECYCLE_FAIL missing observed ready timestamp")
+              sys.exit(1)
+          print("R6_VERIFY_LIFECYCLE_OK")
 
           env_sha = env.get("R6_SHA")
           github_sha = env.get("github_sha") or sha
@@ -337,3 +400,25 @@ jobs:
             r6_worker.log
             r6_probe.log
             docs/forensics/validation/runtime/R6_context_gathering/${{ github.sha }}/
+
+  # Post-merge soak / diagnostic authority (NON-GOVERNING).
+  # Runs ONLY on push to main under a DISTINCT context name that branch
+  # protection never consumes, so it can never compete with the governing
+  # merge-admission verdict above for the same SHA.
+  r6-post-merge-soak:
+    name: "R6 Worker Resource Governance (Post-Merge Soak)"
+    if: github.event_name == 'push'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+
+      - name: Soak marker
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "R6_POST_MERGE_SOAK sha=${GITHUB_SHA} run=${GITHUB_RUN_ID}"
+          echo "This context is diagnostic only; governing authority is the merge_group run."
+          python scripts/ci/validate_b25_p14_viii_execution_identity.py

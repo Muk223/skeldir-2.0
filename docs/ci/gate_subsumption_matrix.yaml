@@ -3067,3 +3067,40 @@
   local_reproduction_command: python scripts/ci/validate_p2_evacuation_ledger.py --check
   risk_if_removed: Monolith evacuation progress becomes narrative rather than machine-checked.
   decision: keep_all
+- gate_id: b25-p14-viii-execution-identity
+  workflow: .github/workflows/r6-worker-resource-governance.yml
+  job: R6 Worker Resource Governance
+  script: scripts/ci/validate_b25_p14_viii_execution_identity.py
+  owning_phase: B2.5-P14-Corrective-VIII
+  protected_invariant: The required R6 context is emitted from exactly one governance lifecycle family
+    (merge_group plus pull_request) and never from push, so one SHA plus one required name cannot carry two
+    competing authority states.
+  current_status: required
+  default_execution: true
+  candidate_action: keep_all
+  subsuming_gate: ''
+  subsumption_evidence: Self-guarding sensor inside the R6 proof job itself; no other gate parses the R6
+    workflow trigger topology, so nothing subsumes it.
+  negative_control_preserved_by: Reintroducing a push emission of the required R6 name (removing the event guard)
+    turns the sensor and the R6 job red; exact restore returns green.
+  local_reproduction_command: python scripts/ci/validate_b25_p14_viii_execution_identity.py
+  risk_if_removed: Same-SHA contradictory R6 verdicts could recur silently, voiding the meaning of required-check
+    green for the worker-governance proof.
+  decision: keep_all
+- gate_id: b25-p14-viii-local-falsification-battery
+  workflow: forensic-tooling
+  job: Corrective VIII local battery (not a merge gate)
+  script: scripts/ci/viii_local_falsification_battery.py
+  owning_phase: B2.5-P14-Corrective-VIII
+  protected_invariant: The VIII falsifiers are re-executable RED-to-GREEN demonstrations using the adjudicated
+    sensor predicates, so the completion evidence is reproducible rather than narrative.
+  current_status: utility
+  default_execution: false
+  candidate_action: keep_utility
+  subsuming_gate: ''
+  subsumption_evidence: Local-only reproducibility harness; the CI-adjudicated halves live in the R6 job (readiness,
+    identity) and the P14 downstream job (NC-P14-21 through NC-P14-24).
+  negative_control_preserved_by: It is itself a negative-control battery.
+  local_reproduction_command: python scripts/ci/viii_local_falsification_battery.py
+  risk_if_removed: VIII completion evidence could not be re-executed by an independent reader.
+  decision: keep_utility

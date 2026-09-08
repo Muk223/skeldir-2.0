@@ -4163,3 +4163,53 @@
   deprecation_reason: Utility-only until a workflow references it through the registry.
   subsumed_by: ''
   registry_action: utility
+- id: b25-p14-viii-execution-identity
+  path: scripts/ci/validate_b25_p14_viii_execution_identity.py
+  status: required
+  owning_phase: B2.5-P14-Corrective-VIII
+  protected_invariant: The required R6 context is emitted from exactly one governance lifecycle family
+    (merge_group plus pull_request) and never from the post-merge soak lifecycle (push), so one SHA plus one
+    required name can never carry two competing authority states.
+  command: python scripts/ci/validate_b25_p14_viii_execution_identity.py
+  workflow_references:
+  - .github/workflows/r6-worker-resource-governance.yml
+  workflow_job_name: R6 Worker Resource Governance
+  local_reproduction_command: python scripts/ci/validate_b25_p14_viii_execution_identity.py
+  expected_failure_meaning: A push emission of the required R6 name was reintroduced (or the governing merge_group
+    lifecycle was removed), so the same SHA and context name can again claim both merge-admission and post-merge
+    authority and no auditor can identify the adjudicating execution.
+  first_diagnostic_command: python scripts/ci/validate_b25_p14_viii_execution_identity.py
+  depends_on_db: false
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: true
+  execution_cohort: r6-worker-resource-governance
+  ci_visibility: inline_step
+  replacement: ''
+  deprecation_reason: ''
+  subsumed_by: ''
+  registry_action: retain
+- id: b25-p14-viii-local-falsification-battery
+  path: scripts/ci/viii_local_falsification_battery.py
+  status: utility
+  owning_phase: B2.5-P14-Corrective-VIII
+  protected_invariant: Every Corrective VIII falsifier (worker-governance bound, execution identity, final selector,
+    policy conjunct, possession TTL mirror, route mount, readiness fail-closed, R7 aggregate contract) demonstrably
+    goes RED under defect and GREEN on exact restore, using the same sensor predicates CI adjudicates.
+  command: python scripts/ci/viii_local_falsification_battery.py
+  workflow_references: []
+  workflow_job_name: ''
+  local_reproduction_command: python scripts/ci/viii_local_falsification_battery.py
+  expected_failure_meaning: A Corrective VIII sensor no longer detects its defect class (or the battery itself
+    regressed), so the proof plane's self-falsification claim is void and must be repaired, not skipped.
+  first_diagnostic_command: python scripts/ci/viii_local_falsification_battery.py
+  depends_on_db: false
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: false
+  execution_cohort: utility-only
+  ci_visibility: not_executed
+  replacement: ''
+  deprecation_reason: Utility-only until a workflow references it through the registry.
+  subsumed_by: ''
+  registry_action: utility

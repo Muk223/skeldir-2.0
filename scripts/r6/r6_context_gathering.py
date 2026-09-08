@@ -3,6 +3,24 @@ R6 Worker Resource Governance - Context Gathering Harness.
 
 Generates SHA-anchored runtime artifacts and minimal probes for worker
 governance controls (timeouts, retries, prefetch).
+
+Corrective VIII physics notes (read before changing probe semantics):
+
+* The workflow must establish worker readiness through
+  ``scripts/r6/r6_wait_for_worker.py`` (observed task round-trip + live
+  parent PID) BEFORE invoking this harness. Elapsed sleep is not readiness
+  evidence (``elapsed time != readiness evidence``).
+* The prefetch probe measures a BOUNDED-STARVATION invariant (every short
+  task starts within 20 s despite long-task pressure), not an exact
+  scheduler ordering. Celery does not contractually guarantee completion
+  ordering, so assertions stronger than the bound would measure accidental
+  timing rather than a production guarantee. Keep the bound loose; tighten
+  only if production actually requires a stronger ordering AND the runtime
+  is hardened to provide it.
+* Remote-control ``inspect`` over the PostgreSQL-backed transport is
+  telemetry, not authority: an empty inspect reply with a successful task
+  round-trip means the control channel is unreachable, not that the worker
+  is absent. Task round-trip plus PID liveness is the authority signal.
 """
 from __future__ import annotations
 
@@ -294,8 +312,179 @@ def _build_gap_report(
     return "\n".join(lines) + "\n"
 
 
+def _pid_alive(pid: object) -> bool:
+    """Report whether a worker parent PID is currently alive (Corrective VIII).
+
+    Used to discriminate ``worker never became ready`` from ``worker became
+    ready and later disappeared`` and from ``control channel unreachable``.
+    """
+    try:
+        pid_int = int(str(pid))
+    except Exception:
+        return False
+    try:
+        os.kill(pid_int, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except Exception:
+        return False
+    return True
+
+
+def _read_parent_pid() -> int | None:
+    pidfile = Path(os.getenv("R6_WORKER_PIDFILE", "/tmp/r6_worker.pid"))
+    try:
+        return int(pidfile.read_text(encoding="utf-8").strip().split()[0])
+    except Exception:
+        return None
+
+
+def _dsn_reachable(raw_dsn: str, timeout_s: int = 5) -> tuple[bool, str]:
+    """Best-effort broker/result-backend reachability check (scheme + SELECT 1)."""
+    dsn = (raw_dsn or "").strip()
+    if not dsn:
+        return False, "empty-dsn"
+    coerced = dsn
+    for prefix in ("sqla+postgresql://", "db+postgresql://"):
+        if coerced.startswith(prefix):
+            coerced = "postgresql://" + coerced[len(prefix):]
+    if not coerced.startswith("postgresql"):
+        return False, f"non-postgres-scheme:{urlsplit(dsn).scheme}"
+    try:
+        from sqlalchemy import create_engine, text as sql_text
+
+        engine = create_engine(
+            coerced, connect_args={"connect_timeout": int(timeout_s)}
+        )
+        with engine.connect() as conn:
+            conn.execute(sql_text("SELECT 1"))
+        engine.dispose()
+        return True, "select-1-ok"
+    except Exception as exc:  # noqa: BLE001
+        return False, f"{exc.__class__.__name__}:{str(exc)[:200]}"
+
+
+def _worker_log_tail(path: Path, max_lines: int = 40) -> list[str]:
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        return lines[-max_lines:]
+    except Exception:
+        return []
+
+
+def _diagnose_result_failure(
+    ctx: R6Context,
+    *,
+    what: str,
+    task_id: str | None,
+    published_at_utc: str,
+    error: str,
+) -> dict[str, Any]:
+    """Build a causally discriminating failure statement (Corrective VIII §11).
+
+    Replaces a bare ``TimeoutError`` with an evidence bundle permitting an
+    independent reader to determine whether the worker never became ready,
+    became ready and later disappeared, or remained alive while the
+    control/result channel became unreachable.
+    """
+    parent_pid = _read_parent_pid()
+    broker_ok, broker_detail = _dsn_reachable(
+        str(getattr(celery_app.conf, "broker_url", "") or "")
+    )
+    backend_ok, backend_detail = _dsn_reachable(
+        str(getattr(celery_app.conf, "result_backend", "") or "")
+    )
+    try:
+        ping = celery_app.control.inspect(timeout=5).ping() or {}
+        ping_ok: bool = bool(ping)
+        ping_detail = f"replied={len(ping)}"
+    except Exception as exc:  # noqa: BLE001
+        ping_ok = False
+        ping_detail = f"{exc.__class__.__name__}:{str(exc)[:160]}"
+    try:
+        state = AsyncResult(task_id).state if task_id else "UNKNOWN"
+    except Exception:
+        state = "UNKNOWN"
+    probe_events = _read_probe_events(ctx.probe_log_path)
+    diagnosis = {
+        "what": what,
+        "task_id": task_id,
+        "task_published_at_utc": published_at_utc,
+        "result_read_at_utc": _utc_now(),
+        "error": error,
+        "worker_parent_pid": parent_pid,
+        "worker_parent_pid_alive": _pid_alive(parent_pid) if parent_pid else False,
+        "broker_reachable": broker_ok,
+        "broker_detail": broker_detail,
+        "result_backend_reachable": backend_ok,
+        "result_backend_detail": backend_detail,
+        "remote_control_ping_succeeds": ping_ok,
+        "remote_control_ping_detail": ping_detail,
+        "result_state": state,
+        "probe_log_event_count": len(probe_events),
+        "worker_log_tail": _worker_log_tail(ctx.worker_log_path),
+        "causal_class": (
+            "WORKER_NEVER_READY"
+            if (not _pid_alive(parent_pid) if parent_pid else True) and not ping_ok
+            else "WORKER_DISAPPEARED"
+            if parent_pid and not _pid_alive(parent_pid)
+            else "CONTROL_OR_RESULT_CHANNEL_UNREACHABLE"
+            if not ping_ok
+            else "TASK_FAILED_DESPITE_LIVE_WORKER"
+        ),
+    }
+    _write_json(
+        ctx.output_dir / "R6_FAILURE_DIAGNOSIS.json",
+        diagnosis,
+        sha=ctx.sha,
+        timestamp=ctx.timestamp_utc,
+    )
+    print(f"R6_FAILURE_DIAGNOSIS what={what} causal_class={diagnosis['causal_class']}")
+    print(f"R6_FAILURE_DIAGNOSIS error={error}")
+    return diagnosis
+
+
+def _causal_get(
+    ctx: R6Context, result: Any, *, timeout: float, what: str
+) -> Any:
+    """Await a Celery result, emitting causal diagnosis instead of bare timeout."""
+    task_id = getattr(result, "id", None)
+    published_at = _utc_now()
+    try:
+        value = result.get(timeout=timeout)
+        return value
+    except Exception as exc:  # noqa: BLE001
+        _diagnose_result_failure(
+            ctx,
+            what=what,
+            task_id=task_id,
+            published_at_utc=published_at,
+            error=f"{exc.__class__.__name__}:{exc}",
+        )
+        raise
+
+
+def _readiness_evidence(sha: str) -> dict[str, Any]:
+    """Adopt the observed readiness timestamp from the readiness gate, if present."""
+    path = (
+        Path("docs/forensics/validation/runtime/R6_context_gathering")
+        / sha
+        / "R6_WORKER_READINESS.json"
+    )
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(payload, dict) and payload.get("ready") is True:
+            return payload
+    except Exception:
+        pass
+    return {}
+
+
 def _wait_for_worker_snapshot(timeout_s: int = 30) -> dict[str, Any]:
     deadline = time.time() + timeout_s
+    last_error = "none"
     while time.time() < deadline:
         try:
             result = celery_app.send_task(
@@ -304,9 +493,15 @@ def _wait_for_worker_snapshot(timeout_s: int = 30) -> dict[str, Any]:
                 queue="housekeeping",
             )
             return result.get(timeout=10)
-        except Exception:
+        except Exception as exc:  # noqa: BLE001
+            last_error = f"{exc.__class__.__name__}:{str(exc)[:160]}"
             time.sleep(1)
-    raise RuntimeError("Worker runtime snapshot did not return within timeout")
+    raise RuntimeError(
+        "Worker runtime snapshot did not return within timeout "
+        f"(timeout_s={timeout_s} last_error={last_error}). "
+        "Run scripts/r6/r6_wait_for_worker.py first: elapsed sleep is not "
+        "readiness evidence; a task round-trip plus live parent PID is."
+    )
 
 
 def _probe_timeout(ctx: R6Context) -> dict[str, Any]:
@@ -393,8 +588,14 @@ def _probe_retry(ctx: R6Context) -> dict[str, Any]:
 
 
 def _probe_prefetch(ctx: R6Context) -> dict[str, Any]:
+    # Bounded-starvation invariant (NOT an ordering assertion): with
+    # concurrency=2, prefetch=1 and max-tasks-per-child=1, four 2 s long tasks
+    # on maintenance must not starve four short tasks on housekeeping beyond
+    # 20 s. Celery guarantees no exact interleaving; asserting one would
+    # measure accidental timing (H-VIII-04). The bound is the guarantee.
     run_id = f"prefetch-{uuid4()}"
     sent_at = datetime.now(timezone.utc)
+    published_at_utc = sent_at.isoformat()
     long_ids = [
         celery_app.send_task(
             "app.tasks.r6_resource_governance.prefetch_long_task",
@@ -413,8 +614,18 @@ def _probe_prefetch(ctx: R6Context) -> dict[str, Any]:
     ]
 
     result_timeout_s = int(os.getenv(RESULT_GET_TIMEOUT_ENV, "90"))
-    long_results = [AsyncResult(tid).get(timeout=result_timeout_s) for tid in long_ids]
-    short_results = [AsyncResult(tid).get(timeout=result_timeout_s) for tid in short_ids]
+    long_results = [
+        _causal_get(
+            ctx, AsyncResult(tid), timeout=result_timeout_s, what=f"prefetch-long-{tid}"
+        )
+        for tid in long_ids
+    ]
+    short_results = [
+        _causal_get(
+            ctx, AsyncResult(tid), timeout=result_timeout_s, what=f"prefetch-short-{tid}"
+        )
+        for tid in short_ids
+    ]
 
     events = _read_probe_events(ctx.probe_log_path)
     short_start_events = [
@@ -442,6 +653,9 @@ def _probe_prefetch(ctx: R6Context) -> dict[str, Any]:
     probe_valid = bool(short_start_events)
     payload = {
         "run_id": run_id,
+        "tasks_published_at_utc": published_at_utc,
+        "result_read_at_utc": _utc_now(),
+        "long_result_count": len(long_results),
         "short_start_events": short_start_events,
         "short_start_count": len(short_start_events),
         "long_start_count": len(long_start_events),
@@ -470,7 +684,9 @@ def _probe_recycle(ctx: R6Context) -> dict[str, Any]:
             kwargs={"run_id": run_id, "index": index},
             queue="housekeeping",
         )
-        payload = result.get(timeout=10)
+        payload = _causal_get(
+            ctx, result, timeout=10, what=f"pid-probe-{run_id}-{index}"
+        )
         if isinstance(payload, dict) and payload.get("pid"):
             pids.append(int(payload["pid"]))
     unique_pids = sorted(set(pids))
@@ -539,6 +755,44 @@ def main() -> int:
         "postgres_image": os.getenv("R6_POSTGRES_IMAGE", "unknown"),
     }
     _write_json(output_dir / "R6_ENV_SNAPSHOT.json", env_snapshot, sha=sha, timestamp=timestamp)
+
+    # Corrective VIII §11: bind the observed readiness gate into the lifecycle
+    # record so a reader can tell never-ready / disappeared / unreachable apart.
+    gate = _readiness_evidence(sha)
+    parent_pid_at_start = _read_parent_pid()
+    lifecycle: dict[str, Any] = {
+        "sha": sha,
+        "gathering_started_at_utc": timestamp,
+        "worker_parent_pid_at_start": parent_pid_at_start,
+        "worker_parent_pid_alive_at_start": (
+            _pid_alive(parent_pid_at_start) if parent_pid_at_start else False
+        ),
+        "readiness_gate_observed": bool(gate),
+        "worker_ready_timestamp_utc": gate.get("worker_ready_timestamp_utc"),
+        "readiness_task_id": (gate.get("task_round_trip") or {}).get("task_id"),
+        "broker_scheme": _dsn_scheme_and_hash(
+            str(getattr(celery_app.conf, "broker_url", "") or "")
+        ).get("scheme"),
+        "result_backend_scheme": _dsn_scheme_and_hash(
+            str(getattr(celery_app.conf, "result_backend", "") or "")
+        ).get("scheme"),
+    }
+    _write_json(
+        output_dir / "R6_WORKER_LIFECYCLE.json",
+        lifecycle,
+        sha=sha,
+        timestamp=timestamp,
+    )
+    if gate:
+        print(
+            "R6_READINESS_ADOPTED ready_at="
+            f"{gate.get('worker_ready_timestamp_utc')}"
+        )
+    else:
+        print(
+            "R6_READINESS_GATE_ABSENT proceeding with inline snapshot polling; "
+            "CI must run scripts/r6/r6_wait_for_worker.py first"
+        )
 
     snapshot = _wait_for_worker_snapshot()
 
@@ -644,6 +898,20 @@ def main() -> int:
     _probe_prefetch(ctx)
     _probe_recycle(ctx)
     _probe_timeout(ctx)
+
+    lifecycle.update(
+        {
+            "gathering_finished_at_utc": _utc_now(),
+            "worker_parent_pid_at_end": _read_parent_pid(),
+            "probe_log_event_count": len(_read_probe_events(ctx.probe_log_path)),
+        }
+    )
+    _write_json(
+        output_dir / "R6_WORKER_LIFECYCLE.json",
+        lifecycle,
+        sha=ctx.sha,
+        timestamp=ctx.timestamp_utc,
+    )
 
     return 0
 

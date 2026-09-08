@@ -31,6 +31,8 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SIMULATION_SERVICE = REPO_ROOT / "backend/app/simulation/service.py"
 EXPLANATION_SERVICE = REPO_ROOT / "backend/app/explanation/service.py"
+TRUST_SIMULATIONS_ROUTE = REPO_ROOT / "backend/app/api/trust_simulations.py"
+APP_MAIN = REPO_ROOT / "backend/app/main.py"
 PROFILE_REGISTRY = REPO_ROOT / "contracts/trust-api/projection-profiles.v1.yaml"
 PRODUCTION_DOCKERFILE = REPO_ROOT / "backend/Dockerfile"
 EXPLANATION_CONSERVATION = REPO_ROOT / "backend/app/explanation/conservation.py"
@@ -444,6 +446,79 @@ def custody_secret_reaches_an_untrusted_container() -> None:
     )
 
 
+def final_selector_bypass() -> None:
+    """Corrective VIII falsifier C: ignore the exact final-artifact selector.
+
+    The HTTP request boundary must resolve ``(tenant, envelope, final_hash)``
+    to exactly one signer-backed issuance (``len(rows) != 1`` refuses).
+    This control disables the refusal so unknown/wrong/ambiguous selectors
+    proceed past selection. The vii2 issuance-selection suite (unknown hash,
+    foreign hash, shared-envelope disambiguation) must turn RED, proving the
+    governing sensor measures selection rather than shape.
+    """
+
+    _replace_once(
+        TRUST_SIMULATIONS_ROUTE,
+        "    if len(rows) != 1:\n",
+        "    if False:  # NC-P14-21\n",
+        what="final_selector_bypass",
+    )
+
+
+def policy_conjunct_severed() -> None:
+    """Corrective VIII falsifier D: sever policy admission at the HTTP boundary.
+
+    The supported POST boundary refuses non-admissible source policy states
+    (``read_only``/``blocked``) before any deterministic work. This control
+    disables that refusal so a ``read_only`` Trust conducts. The B28
+    conservation suite's ``read_only`` block must turn RED, proving admission
+    is enforced rather than assumed.
+    """
+
+    _replace_once(
+        TRUST_SIMULATIONS_ROUTE,
+        '    if envelope["policy_action_authority"]["policy_state"] not in SIMULATION_ADMISSIBLE_POLICY_STATES:\n',
+        "    if False:  # NC-P14-22\n",
+        what="policy_conjunct_severed",
+    )
+
+
+def possession_ttl_zero() -> None:
+    """Corrective VIII falsifier E: regress the wall-clock possession fence.
+
+    The 900 s wall-clock witness fence (``clock_timestamp()``-based, mirrored
+    between code and migration) bounds credential replay. Zeroing the TTL
+    makes every lawful witness instantly stale, so lawful conduction REDs via
+    liveness loss AND the governed-constants mirror test REDs via drift. A
+    sensor that stays green under this defect measures neither freshness nor
+    the code/migration mirror.
+    """
+
+    _replace_once(
+        REQUESTER_IDENTITY,
+        "POSSESSION_WITNESS_TTL_SECONDS = 900",
+        "POSSESSION_WITNESS_TTL_SECONDS = 0  # NC-P14-23",
+        what="possession_ttl_zero",
+    )
+
+
+def caller_route_disconnected() -> None:
+    """Corrective VIII falsifier: disconnect the simulation request route.
+
+    The supported product boundary is HTTP: exactly one non-test caller (the
+    mounted POST route) may invoke simulation admission. Unmounting the
+    router must turn the route census (2 routes) RED and make POST/GET
+    unreachable, proving reachability is mounted rather than assumed.
+    """
+
+    _replace_once(
+        APP_MAIN,
+        'app.include_router(trust_simulations.router, prefix="/api", tags=["Trust Simulations"])',
+        '# NC-P14-24 app.include_router(trust_simulations.router, prefix="/api", tags=["Trust Simulations"])',
+        what="caller_route_disconnected",
+    )
+
+
 DEFECTS = {
     "platform_write": platform_write,
     "second_solver_caller": second_solver_caller,
@@ -464,6 +539,10 @@ DEFECTS = {
     "custody_secret_reaches_an_untrusted_container": (
         custody_secret_reaches_an_untrusted_container
     ),
+    "final_selector_bypass": final_selector_bypass,
+    "policy_conjunct_severed": policy_conjunct_severed,
+    "possession_ttl_zero": possession_ttl_zero,
+    "caller_route_disconnected": caller_route_disconnected,
 }
 
 
