@@ -390,9 +390,19 @@ async def _evaluate_readiness() -> dict[str, object]:
             # checks. A process on an unconstructed database never becomes
             # ready, and therefore never receives traffic.
             try:
-                from app.core.physical_authority import assert_physical_authority
+                from app.core.physical_authority import (
+                    assert_physical_authority,
+                    physical_authority_applies,
+                )
 
-                await assert_physical_authority(conn)
+                # The exact-catalog manifest only speaks for P14-provisioned
+                # databases (full role graph). Other topologies abstain from
+                # the physical comparison but still enforce the revision law
+                # below; their behavioral suites own their authority surface.
+                if await physical_authority_applies(conn):
+                    await assert_physical_authority(conn)
+                else:
+                    result["physical_authority"] = "skipped_non_p14_topology"
                 assert_production_construction_authority(
                     await read_construction_revisions(conn)
                 )

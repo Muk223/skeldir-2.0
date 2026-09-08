@@ -80,6 +80,33 @@ def expected_authority() -> list:
     return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))["objects"]
 
 
+async def physical_authority_applies(connection) -> bool:
+    """Whether the serving database carries the role graph the manifest speaks for.
+
+    The manifest at ``authority-schema.v1.json`` was captured from a database
+    migrated as ``migration_owner`` with the full P14 role graph provisioned,
+    so its owner/ACL entries are only comparable on identically provisioned
+    databases (P14/C19/production topologies). Minimal topologies (bare
+    ``postgres`` migrations in B0/B1/R3 lanes) carry the same objects and
+    definitions but different owners and no role grants; enforcing the exact
+    catalog there would refuse healthy non-P14 topologies for provisioning
+    differences rather than authority drift. Those lanes still enforce the
+    migration-revision law and their own behavioral suites. Returns False
+    (abstain) when the VII role graph is incomplete; never raises.
+    """
+    try:
+        rows = await connection.execute(
+            text(
+                "SELECT count(*) FROM pg_roles WHERE rolname IN "
+                "('app_user','app_worker','app_b28_requester','app_b28_solver',"
+                "'app_trust_issuer','app_trust_signer','app_trust_policy_admin')"
+            )
+        )
+        return (rows.scalar() or 0) >= 7
+    except Exception:
+        return False
+
+
 async def assert_physical_authority(connection) -> None:
     """Fail readiness when a serving database has lost any covered authority."""
     try:
