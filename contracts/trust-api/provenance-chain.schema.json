@@ -60,7 +60,8 @@
           "trust_access_log",
           "trust_envelope_issuance_log",
           "trust_replay_events",
-          "trust_scope_denial_events"
+          "trust_scope_denial_events",
+          "trust_tenant_policy_events"
         ]
       },
       "source_ref": {

@@ -28,6 +28,8 @@ import jwt
 import psycopg2
 import pytest
 
+from app.trust.hash_identity import compute_envelope_payload_hash
+
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKELDIR_B25_P13_C19_TOPOLOGY_PROOF") != "1",
@@ -328,68 +330,16 @@ def _verify_from_public_jwks(envelope: dict[str, object], jwks: dict[str, object
         )
 
 
-#: Directive VI section 29. The P14 leg runs inside the production `api`
-#: container -- the only service that receives the two B2.8 causal DSNs -- so the
-#: application code exercised is the compiled image's own, with no source mount
-#: and no host substitution. Only the *driver* is external, exactly as a library
-#: caller would be.
-_P14_CONDUCTION_DRIVER = r"""
-import json, os, sys
-payload = json.loads(os.environ["C19_P14_PAYLOAD"])
-from app.simulation.contract import ChannelEvidence
-from app.simulation.persistence import conduct_requested_simulation
-
-channels = tuple(
-    ChannelEvidence(
-        channel_id=c["channel_id"],
-        verified_revenue_minor=int(c["verified_revenue_minor"]),
-        conversion_count=int(c["conversion_count"]),
-    )
-    for c in payload["channels"]
-)
-result = {"policy_state": payload["policy_state"]}
-try:
-    conducted = conduct_requested_simulation(
-        envelope=payload["envelope"],
-        tenant_id=payload["tenant_id"],
-        presented_token=payload["token"],
-        source_issuance_envelope_hash=payload["issuance_envelope_hash"],
-        total_budget_minor=int(payload["budget"]),
-        currency=payload["currency"],
-        channels=channels,
-    )
-    result["outcome"] = "CONDUCTED"
-    result["identifiers"] = {k: str(v) for k, v in conducted["identifiers"].items()}
-    result["request_id"] = str(conducted["request_id"])
-    result["requested_by"] = str(conducted["requested_by"])
-except Exception as exc:
-    result["outcome"] = "REFUSED"
-    result["reason"] = str(exc).strip().splitlines()[0]
-    result["type"] = type(exc).__name__
-sys.stdout.write("C19_P14_RESULT " + json.dumps(result))
-"""
-
-
-def _conduct_p14_in_api_container(payload: dict[str, object]) -> dict[str, object]:
-    """Drive the lawful B2.8 path inside the unmodified production image."""
-
-    completed = _compose(
-        "exec",
-        "-T",
-        "-e",
-        f"C19_P14_PAYLOAD={json.dumps(payload, separators=(',', ':'))}",
-        "api",
-        "python",
-        "-c",
-        _P14_CONDUCTION_DRIVER,
-    )
-    for line in completed.stdout.splitlines():
-        if line.startswith("C19_P14_RESULT "):
-            return json.loads(line[len("C19_P14_RESULT ") :])
-    raise AssertionError(
-        "the in-container P14 driver produced no result: "
-        f"stdout={completed.stdout!r} stderr={completed.stderr!r}"
-    )
+def _publish_tenant_policy(control: dict[str, str], state: str) -> None:
+    """Use the supported operator command in an isolated production-image job."""
+    image = _compose("images", "-q", "api").stdout.strip().splitlines()[0]
+    subprocess.run([
+        "docker", "run", "--rm", "--network", _required("C19_COMPOSE_PROJECT_NAME") + "_default",
+        "-e", "TRUST_POLICY_ADMIN_DATABASE_URL=postgresql://app_trust_policy_admin:app_trust_policy_admin@postgres:5432/skeldir_c19",
+        image, "python", "-m", "app.trust.policy_configuration",
+        "--tenant-id", control["tenant_id"], "--policy-state", state,
+        "--approval-reference", "c19-explicit-design-partner-configuration",
+    ], check=True, capture_output=True, text=True)
 
 
 def _record_evidence(payload: dict[str, object]) -> None:
@@ -534,6 +484,7 @@ def test_c19_context_robust_production_topology() -> None:
     assert fit[8]
     assert fit[9] in {"high", "medium", "low"}
 
+    _publish_tenant_policy(control_a, "simulation_only")
     subject_ref = f"urn:skeldir:confidence_projection:{fit_id}"
     response = httpx.get(
         f"{base_url}/api/trust/v1/envelopes/confidence_projection/{subject_ref}",
@@ -604,188 +555,61 @@ def test_c19_context_robust_production_topology() -> None:
     )
     assert access_history and int(access_history[0]) >= 1
 
-    # ------------------------------------------------------------------
-    # B2.5-P14 Corrective VI, Exit Gate 14 -- the conducted state reaches P14.
-    # ------------------------------------------------------------------
-    # Everything above this line was produced by the running production
-    # services from authenticated HTTP ingress: the events, the B2.3 verdicts,
-    # the real PyMC posterior, the confidence projection, the remote signature,
-    # the durable issuance. This section carries that exact state across the P14
-    # boundary and measures what the deployed system does with it.
-    #
-    # What it does is refuse, and the refusal is the point. The production
-    # issuance path emits exactly one policy authority --
-    # `read_only_policy_authority()` in `app/trust/policy_defaults.py` is the
-    # only producer of `policy_action_authority` in the tree -- and
-    # `read_only` is strictly weaker than simulating. P14's conservation law
-    #
-    #     Authority(downstream) <= Authority(source Trust)
-    #
-    # therefore forbids a durable B2.8 consequence over conducted Trust, and the
-    # database says so by name before any row exists. That is measured here on
-    # physically conducted state rather than inferred from the code.
-    # The request guard binds the row to its source Trust by two identities --
-    # it finds the issuance record by `source_issuance_envelope_hash` and then
-    # requires `source_semantic_truth_hash` to equal that record's -- before it
-    # evaluates policy at all. Whether a *production-issued* envelope satisfies
-    # that binding is a question nothing had asked, so this measures it rather
-    # than assuming either answer.
-    from app.trust.hash_identity import compute_envelope_payload_hash  # noqa: PLC0415
-
+    # VII: final-artifact mapping and supported consumer conduction are mandatory.
     with _admin_connection() as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT envelope_hash, semantic_truth_hash, policy_state, audit_ref
-              FROM public.trust_envelope_issuance_log
-             WHERE tenant_id = %s AND status = 'success'
-             ORDER BY created_at DESC
-            """,
-            (control_a["tenant_id"],),
-        )
-        issuance_rows = cur.fetchall()
-    assert issuance_rows, "no durable issuance to conduct into P14"
-
-    envelope_payload_hash = compute_envelope_payload_hash(envelope)
-    envelope_truth_hash = envelope["semantic_truth_hash"]
-    matched_by_envelope_hash = [r for r in issuance_rows if r[0] == envelope_payload_hash]
-    matched_by_truth = [r for r in issuance_rows if r[1] == envelope_truth_hash]
-
-    p14_source_binding = {
-        "issuance_log_rows": len(issuance_rows),
-        "envelope_payload_hash": envelope_payload_hash,
-        "envelope_semantic_truth_hash": envelope_truth_hash,
-        "log_envelope_hashes": [r[0] for r in issuance_rows],
-        "log_semantic_truth_hashes": [r[1] for r in issuance_rows],
-        "log_policy_states": sorted({r[2] for r in issuance_rows}),
-        "matched_by_envelope_hash": len(matched_by_envelope_hash),
-        "matched_by_semantic_truth": len(matched_by_truth),
-    }
-
-    # Prefer the row the guard would find; fall back so the leg still conducts
-    # and reports, rather than stopping before it reaches the boundary.
-    issued = (matched_by_envelope_hash or matched_by_truth or issuance_rows)[0]
-    conducted_policy_state = issued[2]
-    conducted_issuance_hash = issued[0] or envelope_payload_hash
-
-    # The simulation input is itself conducted state: the channel evidence is
-    # this tenant's own verified allocations, not an invented budget split.
-    with _admin_connection() as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT channel_code,
-                   sum(allocated_revenue_cents)::bigint,
-                   count(*)::int
-              FROM public.attribution_allocations
-             WHERE tenant_id = %s AND verified = true
-             GROUP BY channel_code
-            HAVING sum(allocated_revenue_cents) > 0
-             ORDER BY channel_code
-            """,
-            (control_a["tenant_id"],),
-        )
-        allocation_rows = cur.fetchall()
-    conducted_channels = [
-        {
-            "channel_id": str(row[0]),
-            "verified_revenue_minor": int(row[1]),
-            "conversion_count": int(row[2]),
-        }
-        for row in allocation_rows
-    ]
-
-    p14_outcome = _conduct_p14_in_api_container(
-        {
-            "envelope": envelope,
-            "tenant_id": control_a["tenant_id"],
-            "token": control_a["machine_token"],
-            "issuance_envelope_hash": conducted_issuance_hash,
-            "budget": 1_000_000,
-            "currency": "USD",
-            "channels": conducted_channels
-            or [
-                {
-                    "channel_id": "google_ads",
-                    "verified_revenue_minor": 400_000,
-                    "conversion_count": 12,
-                },
-                {
-                    "channel_id": "meta_ads",
-                    "verified_revenue_minor": 250_000,
-                    "conversion_count": 7,
-                },
-            ],
-            "policy_state": conducted_policy_state,
-        }
-    )
-
-    # The deployed system's answer must be the one the source Trust's authority
-    # implies, and whatever it is, it must leave no durable consequence it did
-    # not earn.
-    #
-    # `read_only` is what production issues, so the expected answer is a refusal.
-    # Which conjunct refuses is recorded rather than pinned: the source binding
-    # is checked before policy, so an envelope whose durable issuance record
-    # carries different identities is refused earlier -- a weaker outcome for the
-    # same reason, and a fact about the issuance path rather than about P14.
-    admissible = ("simulation_only", "proposal_required", "approval_required")
-    lawful_refusals = (
-        "b28_request_policy_forbids",
-        "b28_request_source_trust_mismatch",
-        "b28_request_requires_durable_issuance",
-    )
-    if conducted_policy_state in admissible and p14_source_binding[
-        "matched_by_envelope_hash"
-    ]:
-        assert p14_outcome["outcome"] == "CONDUCTED", p14_outcome
-    else:
-        assert p14_outcome["outcome"] == "REFUSED", p14_outcome
-        reason = str(p14_outcome.get("reason", ""))
-        assert any(name in reason for name in lawful_refusals), p14_outcome
-        p14_source_binding["refusing_conjunct"] = next(
-            name for name in lawful_refusals if name in reason
-        )
-
-    p14_side_effects = _fetch_one(
-        """
-        SELECT (SELECT count(*) FROM public.b28_simulation_requests
-                 WHERE tenant_id = %s),
-               (SELECT count(*) FROM public.b28_simulation_results
-                 WHERE tenant_id = %s),
-               (SELECT count(*) FROM public.b28_proposals WHERE tenant_id = %s),
-               (SELECT count(*) FROM public.b28_request_authentications
-                 WHERE tenant_id = %s)
-        """,
-        (control_a["tenant_id"],) * 4,
-    )
-    assert p14_side_effects is not None
-    durable_requests, durable_results, durable_proposals, durable_witnesses = (
-        int(value) for value in p14_side_effects
-    )
-    if p14_outcome["outcome"] == "REFUSED":
-        # A refused request earns nothing: not a result, not a proposal, and --
-        # Corrective VI's temporal property -- not even the possession witness,
-        # because the witness is minted inside the request transaction that
-        # rolls back. There is no orphan proof that somebody asked for something
-        # that never happened.
-        assert (
-            durable_requests,
-            durable_results,
-            durable_proposals,
-            durable_witnesses,
-        ) == (0, 0, 0, 0), p14_side_effects
-    else:
-        # A conducted request is durable and carries exactly one possession
-        # witness. Whether it also earned a *result* depends on admission --
-        # insufficient evidence is a lawful outcome with no result row -- so the
-        # identifiers the boundary returned decide, not a fixed number.
-        assert durable_requests == 1, p14_side_effects
-        assert durable_witnesses == 1, p14_side_effects
-        persisted = str(
-            (p14_outcome.get("identifiers") or {}).get("persisted", "false")
-        )
-        expected_consequences = 1 if persisted == "true" else 0
-        assert durable_results == expected_consequences, p14_side_effects
-        assert durable_proposals == expected_consequences, p14_side_effects
+        cur.execute("SELECT set_config('app.current_tenant_id',%s,true)", (control_a["tenant_id"],))
+        cur.execute("SELECT envelope_hash,final_envelope_hash,semantic_truth_hash FROM public.trust_final_issuance_identity WHERE tenant_id=%s AND source_envelope_id=%s", (control_a["tenant_id"], envelope["envelope_id"]))
+        mappings = cur.fetchall()
+    assert len(mappings) == 1
+    assert mappings[0][1] == compute_envelope_payload_hash(envelope)
+    assert mappings[0][2] == envelope["semantic_truth_hash"]
+    p14_source_binding = {"issuance_log_rows": 1, "matched_by_envelope_hash": 1,
+        "matched_by_semantic_truth": 1, "audit_stage_hash": mappings[0][0],
+        "final_envelope_hash": mappings[0][1], "final_semantic_truth_hash": mappings[0][2]}
+    conducted_policy_state = envelope["policy_action_authority"]["policy_state"]
+    assert conducted_policy_state == "simulation_only"
+    submitted = httpx.post(f"{base_url}/api/trust/v1/simulations",
+        headers=_machine_headers(control_a, prefix="p14-positive"),
+        json={"source_envelope_id": envelope["envelope_id"], "source_final_envelope_hash": compute_envelope_payload_hash(envelope), "total_budget_minor": 10000,
+              "request_ref": f"req_{uuid4().hex}"}, timeout=API_TIMEOUT_SECONDS)
+    assert submitted.status_code == 201, submitted.text
+    assert submitted.json()["status"] == "completed", submitted.text
+    request_id = submitted.json()["request_id"]
+    readback = httpx.get(f"{base_url}/api/trust/v1/simulations/{request_id}",
+        headers=_machine_headers(control_a, prefix="p14-read"), timeout=API_TIMEOUT_SECONDS)
+    assert readback.status_code == 200, readback.text
+    artifact = readback.json()
+    assert artifact["source_envelope_id"] == envelope["envelope_id"]
+    assert artifact["source_semantic_truth_hash"] == envelope["semantic_truth_hash"]
+    assert sum(x["allocation_minor"] for x in artifact["allocations"]) == 10000
+    assert artifact["requires_human_approval"] is True
+    assert artifact["causal_authority"] == artifact["external_execution_authority"] == "none"
+    foreign_read = httpx.get(f"{base_url}/api/trust/v1/simulations/{request_id}",
+        headers=_machine_headers(control_b, prefix="p14-foreign-read"), timeout=API_TIMEOUT_SECONDS)
+    assert foreign_read.status_code == 404, foreign_read.text
+    p14_outcome = {"outcome": "CONDUCTED", "identifiers": {"persisted": "true", "request_id": request_id}}
+    conducted_channels = artifact["allocations"]
+    census_sql = """SELECT
+        (SELECT count(*) FROM public.b28_simulation_requests WHERE tenant_id=%s),
+        (SELECT count(*) FROM public.b28_simulation_results WHERE tenant_id=%s),
+        (SELECT count(*) FROM public.b28_proposals WHERE tenant_id=%s),
+        (SELECT count(*) FROM public.b28_request_authentications WHERE tenant_id=%s)"""
+    p14_side_effects = _fetch_one(census_sql, (control_a["tenant_id"],)*4)
+    assert tuple(p14_side_effects) == (1,1,1,1)
+    durable_requests,durable_results,durable_proposals,durable_witnesses = p14_side_effects
+    _publish_tenant_policy(control_a, "read_only")
+    negative_trust = httpx.get(f"{base_url}/api/trust/v1/envelopes/confidence_projection/{subject_ref}",
+        headers=_machine_headers(control_a, prefix="p14-negative-trust"), timeout=API_TIMEOUT_SECONDS)
+    assert negative_trust.status_code == 200, negative_trust.text
+    assert negative_trust.json()["policy_action_authority"]["policy_state"] == "read_only"
+    for source_envelope in (negative_trust.json(), envelope):
+        refused = httpx.post(f"{base_url}/api/trust/v1/simulations",
+            headers=_machine_headers(control_a, prefix="p14-negative"),
+            json={"source_envelope_id": source_envelope["envelope_id"], "source_final_envelope_hash": compute_envelope_payload_hash(source_envelope), "total_budget_minor":10000,
+                  "request_ref":f"req_{uuid4().hex}"}, timeout=API_TIMEOUT_SECONDS)
+        assert refused.status_code == 403, refused.text
+    assert _fetch_one(census_sql, (control_a["tenant_id"],)*4) == p14_side_effects
+    print("P14_VII_POSITIVE_READ_AND_NEGATIVE_CONSERVATION_PASS")
 
     # The custody boundary, observed rather than declared: which processes
     # actually receive the two causal DSNs is read out of the running

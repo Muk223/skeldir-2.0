@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict txWZMMXsNp7glCyAUGwhm16E06ifyWdsjU346Ke1K2cd3M2A5qdirNbVvBfgbdc
+\restrict t2SecHJqcVNR2QlhHX1dDDBSnnXDhD7XB9NkiThhvfQkwlOsvPqMxBj7q1DCtyN
 
 -- Dumped from database version 15.19
--- Dumped by pg_dump version 15.15
+-- Dumped by pg_dump version 15.19
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2492,7 +2492,7 @@ CREATE FUNCTION public.b27_enforce_explanation_consequence() RETURNS trigger
             SELECT subject_type, subject_ref_hash, semantic_truth_hash, policy_state
               INTO issuance_subject_type, issuance_subject_ref_hash,
                    issuance_semantic_truth_hash, issuance_policy_state
-              FROM public.trust_envelope_issuance_log
+              FROM public.trust_final_issuance_identity
              WHERE tenant_id = NEW.tenant_id
                AND envelope_hash = NEW.source_issuance_envelope_hash;
             IF NOT FOUND THEN
@@ -2837,7 +2837,7 @@ CREATE FUNCTION public.b28_authenticate_request_possession(p_tenant_id uuid, p_p
             END IF;
             IF v_status IS DISTINCT FROM 'active'
                OR v_revoked_at IS NOT NULL
-               OR (v_expires_at IS NOT NULL AND v_expires_at <= now())
+               OR (v_expires_at IS NOT NULL AND v_expires_at <= clock_timestamp())
             THEN
                 RAISE EXCEPTION
                     'b28_request_possession_credential_not_live:%',
@@ -2993,6 +2993,43 @@ CREATE FUNCTION public.b28_enforce_downstream_immutability() RETURNS trigger
 
 
 --
+-- Name: b28_enforce_final_source_identity(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.b28_enforce_final_source_identity() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'public'
+    AS $$
+        DECLARE source_id text; source_policy text; current_policy text;
+          states text[] := ARRAY['blocked','read_only','simulation_only','proposal_required','approval_required'];
+        BEGIN
+          SELECT source_envelope_id,policy_state INTO source_id,source_policy
+            FROM public.trust_final_issuance_identity
+            WHERE tenant_id=NEW.tenant_id
+              AND envelope_hash=NEW.source_issuance_envelope_hash;
+          IF source_id IS NULL THEN
+            RAISE EXCEPTION 'b28_request_requires_durable_issuance:%',
+              NEW.source_issuance_envelope_hash USING ERRCODE='42501';
+          END IF;
+          IF source_id IS DISTINCT FROM NEW.source_envelope_id THEN
+            RAISE EXCEPTION 'b28_request_final_identity_mismatch'
+              USING ERRCODE='42501';
+          END IF;
+          SELECT policy_state INTO current_policy
+            FROM public.trust_tenant_policy_events
+            WHERE tenant_id=NEW.tenant_id ORDER BY revision DESC LIMIT 1;
+          IF COALESCE(current_policy,'read_only')
+               NOT IN ('simulation_only','proposal_required','approval_required')
+             OR array_position(states,source_policy)
+                > array_position(states,current_policy) THEN
+            RAISE EXCEPTION 'b28_request_current_policy_forbids'
+              USING ERRCODE='42501';
+          END IF;
+          RETURN NEW;
+        END $$;
+
+
+--
 -- Name: b28_enforce_proposal_consequence(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3103,7 +3140,7 @@ CREATE FUNCTION public.b28_enforce_request_consequence() RETURNS trigger
             -- Durable source Trust, unchanged from Corrective IV.
             SELECT semantic_truth_hash, policy_state
               INTO issuance_semantic_truth_hash, issuance_policy_state
-              FROM public.trust_envelope_issuance_log
+              FROM public.trust_final_issuance_identity
              WHERE tenant_id = NEW.tenant_id
                AND envelope_hash = NEW.source_issuance_envelope_hash;
             IF NOT FOUND THEN
@@ -3355,7 +3392,7 @@ CREATE FUNCTION public.b28_enforce_request_possession() RETURNS trigger
                     USING ERRCODE = '42501';
             END IF;
             IF w_at IS NULL
-               OR w_at <= now()
+               OR w_at <= clock_timestamp()
                    - interval '900 seconds'
             THEN
                 RAISE EXCEPTION
@@ -3496,7 +3533,7 @@ CREATE FUNCTION public.b28_enforce_result_consequence() RETURNS trigger
             END IF;
 
             SELECT policy_state INTO issuance_policy_state
-              FROM public.trust_envelope_issuance_log
+              FROM public.trust_final_issuance_identity
              WHERE tenant_id = NEW.tenant_id
                AND envelope_hash = request_row.source_issuance_envelope_hash;
             IF NOT FOUND THEN
@@ -5110,6 +5147,22 @@ CREATE FUNCTION public.trust_issuance_attempt_guard() RETURNS trigger
 
 
 --
+-- Name: trust_tenant_policy_append_only(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trust_tenant_policy_append_only() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'pg_catalog', 'public'
+    AS $$
+        BEGIN
+          IF TG_OP='DELETE' AND NOT EXISTS (SELECT 1 FROM public.tenants WHERE id=OLD.tenant_id) THEN
+            RETURN OLD;
+          END IF;
+          RAISE EXCEPTION 'trust_policy_append_only' USING ERRCODE='42501';
+        END $$;
+
+
+--
 -- Name: resolve_tenant_webhook_secrets(text); Type: FUNCTION; Schema: security; Owner: -
 --
 
@@ -6060,7 +6113,7 @@ CREATE TABLE public.b28_proposals (
     requires_human_approval boolean DEFAULT true NOT NULL,
     authority_class text DEFAULT 'non_authoritative_proposal'::text NOT NULL,
     allocations jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
     CONSTRAINT ck_b28_proposal_action_authority CHECK ((action_authority = ANY (ARRAY['blocked'::text, 'read_only'::text, 'simulation_only'::text, 'proposal_required'::text]))),
     CONSTRAINT ck_b28_proposal_allocations CHECK ((jsonb_typeof(allocations) = 'array'::text)),
     CONSTRAINT ck_b28_proposal_authority_class CHECK ((authority_class = 'non_authoritative_proposal'::text)),
@@ -6080,7 +6133,7 @@ CREATE TABLE public.b28_request_authentications (
     agent_client_id uuid NOT NULL,
     credential_id uuid NOT NULL,
     request_binding text NOT NULL,
-    authenticated_at timestamp with time zone DEFAULT now() NOT NULL,
+    authenticated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
     authenticated_by_principal text NOT NULL,
     CONSTRAINT ck_b28_request_authentication_binding CHECK ((request_binding ~ '^sha256:[0-9a-f]{64}$'::text)),
     CONSTRAINT ck_b28_request_authentication_principal CHECK (((length(authenticated_by_principal) >= 1) AND (length(authenticated_by_principal) <= 63)))
@@ -6105,7 +6158,7 @@ CREATE TABLE public.b28_simulation_requests (
     currency text NOT NULL,
     channel_count integer NOT NULL,
     sufficiency_policy_version text NOT NULL,
-    requested_at timestamp with time zone DEFAULT now() NOT NULL,
+    requested_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
     source_issuance_envelope_hash text NOT NULL,
     requested_by_agent_client_id uuid NOT NULL,
     requested_by_credential_id uuid NOT NULL,
@@ -6152,7 +6205,7 @@ CREATE TABLE public.b28_simulation_results (
     authority_class text DEFAULT 'deterministic_simulation'::text NOT NULL,
     llm_authority_over_allocation text DEFAULT 'none'::text NOT NULL,
     allocations jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
     solver_consequence_kind text NOT NULL,
     CONSTRAINT ck_b28_result_action_authority CHECK ((action_authority = ANY (ARRAY['blocked'::text, 'read_only'::text, 'simulation_only'::text, 'proposal_required'::text]))),
     CONSTRAINT ck_b28_result_allocations CHECK ((jsonb_typeof(allocations) = 'array'::text)),
@@ -10265,6 +10318,29 @@ ALTER TABLE ONLY public.trust_issuance_attempts FORCE ROW LEVEL SECURITY;
 
 
 --
+-- Name: trust_final_issuance_identity; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.trust_final_issuance_identity WITH (security_barrier='true') AS
+ SELECT history.tenant_id,
+    history.envelope_hash,
+    history.semantic_truth_hash AS audit_stage_semantic_truth_hash,
+    history.access_audit_ref,
+    history.subject_type,
+    history.subject_ref_hash,
+    attempt.id AS attempt_id,
+    attempt.signed_envelope_hash AS final_envelope_hash,
+    (attempt.signed_envelope ->> 'semantic_truth_hash'::text) AS semantic_truth_hash,
+    (attempt.signed_envelope ->> 'envelope_id'::text) AS source_envelope_id,
+    ((attempt.signed_envelope -> 'policy_action_authority'::text) ->> 'policy_state'::text) AS policy_state,
+    attempt.signed_envelope
+   FROM ((public.trust_envelope_issuance_log history
+     JOIN public.trust_access_log ledger ON (((ledger.tenant_id = history.tenant_id) AND (ledger.audit_ref = history.access_audit_ref))))
+     JOIN public.trust_issuance_attempts attempt ON (((attempt.tenant_id = ledger.tenant_id) AND (attempt.audit_ref = ledger.audit_ref) AND (attempt.id = ledger.issued_attempt_id))))
+  WHERE ((history.tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid) AND (history.status = 'success'::text) AND (ledger.issuance_state = 'issued'::text) AND (attempt.attempt_state = 'issued'::text) AND (NOT (attempt.signed_envelope IS DISTINCT FROM ledger.issued_envelope)) AND (NOT (attempt.signature IS DISTINCT FROM ledger.issued_signature)) AND (NOT (attempt.signature_hash IS DISTINCT FROM ledger.issued_signature_hash)) AND (NOT (attempt.signing_key_id IS DISTINCT FROM ledger.issued_signing_key_id)));
+
+
+--
 -- Name: trust_rate_limit_state; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -10348,6 +10424,40 @@ CREATE TABLE public.trust_scope_denial_events (
 );
 
 ALTER TABLE ONLY public.trust_scope_denial_events FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: trust_tenant_policy_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.trust_tenant_policy_events (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id uuid NOT NULL,
+    revision bigint NOT NULL,
+    policy_state text NOT NULL,
+    approval_reference text NOT NULL,
+    published_by name DEFAULT SESSION_USER NOT NULL,
+    created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    CONSTRAINT trust_tenant_policy_events_approval_reference_check CHECK (((length(approval_reference) >= 1) AND (length(approval_reference) <= 200))),
+    CONSTRAINT trust_tenant_policy_events_policy_state_check CHECK ((policy_state = ANY (ARRAY['blocked'::text, 'read_only'::text, 'simulation_only'::text, 'proposal_required'::text, 'approval_required'::text]))),
+    CONSTRAINT trust_tenant_policy_events_published_by_check CHECK ((published_by = 'app_trust_policy_admin'::name))
+);
+
+ALTER TABLE ONLY public.trust_tenant_policy_events FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: trust_tenant_policy_events_revision_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.trust_tenant_policy_events ALTER COLUMN revision ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.trust_tenant_policy_events_revision_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 --
@@ -12103,6 +12213,22 @@ ALTER TABLE ONLY public.trust_request_nonces
 
 ALTER TABLE ONLY public.trust_scope_denial_events
     ADD CONSTRAINT trust_scope_denial_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: trust_tenant_policy_events trust_tenant_policy_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.trust_tenant_policy_events
+    ADD CONSTRAINT trust_tenant_policy_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: trust_tenant_policy_events trust_tenant_policy_events_revision_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.trust_tenant_policy_events
+    ADD CONSTRAINT trust_tenant_policy_events_revision_key UNIQUE (revision);
 
 
 --
@@ -15297,6 +15423,13 @@ CREATE INDEX ix_trust_issuance_attempts_tenant_audit ON public.trust_issuance_at
 
 
 --
+-- Name: ix_trust_tenant_policy_latest; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_trust_tenant_policy_latest ON public.trust_tenant_policy_events USING btree (tenant_id, revision DESC);
+
+
+--
 -- Name: uq_b23_exception_records_one_open_per_verdict; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -17243,6 +17376,13 @@ CREATE TRIGGER trg_b28_allocation_conservation BEFORE INSERT OR UPDATE ON public
 
 
 --
+-- Name: b28_simulation_requests trg_b28_final_source_identity; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_b28_final_source_identity BEFORE INSERT ON public.b28_simulation_requests FOR EACH ROW EXECUTE FUNCTION public.b28_enforce_final_source_identity();
+
+
+--
 -- Name: b28_proposals trg_b28_proposal_consequence; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -17443,6 +17583,13 @@ CREATE TRIGGER trg_trust_issuance_consequence_authority BEFORE INSERT ON public.
 --
 
 CREATE TRIGGER trg_trust_issuance_history_immutable BEFORE DELETE OR UPDATE ON public.trust_envelope_issuance_log FOR EACH ROW EXECUTE FUNCTION public.trust_enforce_issuance_history_immutable();
+
+
+--
+-- Name: trust_tenant_policy_events trg_trust_policy_append_only; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_trust_policy_append_only BEFORE DELETE OR UPDATE ON public.trust_tenant_policy_events FOR EACH ROW EXECUTE FUNCTION public.trust_tenant_policy_append_only();
 
 
 --
@@ -18441,6 +18588,14 @@ ALTER TABLE ONLY public.trust_request_nonces
 
 ALTER TABLE ONLY public.trust_scope_denial_events
     ADD CONSTRAINT trust_scope_denial_events_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: trust_tenant_policy_events trust_tenant_policy_events_tenant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.trust_tenant_policy_events
+    ADD CONSTRAINT trust_tenant_policy_events_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 
 
 --
@@ -19912,6 +20067,13 @@ CREATE POLICY tenant_isolation_policy_trust_scope_denial_events ON public.trust_
 
 
 --
+-- Name: trust_tenant_policy_events tenant_isolation_policy_trust_tenant_policy_events; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY tenant_isolation_policy_trust_tenant_policy_events ON public.trust_tenant_policy_events USING ((tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid)) WITH CHECK ((tenant_id = (current_setting('app.current_tenant_id'::text, true))::uuid));
+
+
+--
 -- Name: webhook_ingress_identities tenant_isolation_policy_webhook_ingress_identities; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -19993,6 +20155,12 @@ ALTER TABLE public.trust_request_nonces ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.trust_scope_denial_events ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: trust_tenant_policy_events; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.trust_tenant_policy_events ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: users; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -20041,5 +20209,5 @@ ALTER TABLE public.worker_side_effects ENABLE ROW LEVEL SECURITY;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict txWZMMXsNp7glCyAUGwhm16E06ifyWdsjU346Ke1K2cd3M2A5qdirNbVvBfgbdc
+\unrestrict t2SecHJqcVNR2QlhHX1dDDBSnnXDhD7XB9NkiThhvfQkwlOsvPqMxBj7q1DCtyN
 

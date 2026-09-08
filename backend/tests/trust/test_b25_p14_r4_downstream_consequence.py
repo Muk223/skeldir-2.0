@@ -325,6 +325,20 @@ def _sign_real_envelope(
 def _conduct_issuance(tenant_id, signed: dict[str, Any]) -> dict[str, str]:
     """Persist the signed artifact's lineage as the real production principals."""
 
+    # Integration fixture only. Production conduction is proved separately via
+    # C19 HTTP ingress and the production operator publisher job.
+    from app.trust.policy_configuration import publish_policy
+    previous = os.environ.get("TRUST_POLICY_ADMIN_DATABASE_URL")
+    os.environ["TRUST_POLICY_ADMIN_DATABASE_URL"] = _dsn_for_principal("app_trust_policy_admin")
+    try:
+        if signed["policy_action_authority"]["policy_state"] in {"simulation_only", "proposal_required", "approval_required"}:
+            publish_policy(tenant_id=tenant_id, policy_state=signed["policy_action_authority"]["policy_state"],
+                           approval_reference="isolated-integration-fixture")
+    finally:
+        if previous is None:
+            os.environ.pop("TRUST_POLICY_ADMIN_DATABASE_URL", None)
+        else:
+            os.environ["TRUST_POLICY_ADMIN_DATABASE_URL"] = previous
     material = {
         "audit_ref": f"urn:skeldir:audit:p14r4-{uuid.uuid4().hex}",
         "request_identity_hash": _digest(),
@@ -1332,11 +1346,16 @@ def test_p14_r4_b28_consequence_guard_is_independently_load_bearing() -> None:
             )
             triggerdef = cursor.fetchone()[0]
             cursor.execute(
+                "SELECT pg_get_triggerdef(oid) FROM pg_catalog.pg_trigger"
+                " WHERE tgname = 'trg_b28_final_source_identity' AND NOT tgisinternal"
+            )
+            final_source_triggerdef = cursor.fetchone()[0]
+            cursor.execute(
                 "SELECT pg_get_constraintdef(oid) FROM pg_catalog.pg_constraint"
                 " WHERE conname = 'fk_b28_simulation_requests_source_issuance'"
             )
             constraintdef = cursor.fetchone()[0]
-        assert triggerdef and constraintdef
+        assert triggerdef and constraintdef and final_source_triggerdef
 
         # The requester identity is well formed and the credential is live, so
         # the CHECK constraint and the foreign keys are satisfied. What is not
@@ -1405,6 +1424,10 @@ def test_p14_r4_b28_consequence_guard_is_independently_load_bearing() -> None:
         try:
             with admin.cursor() as cursor:
                 cursor.execute(
+                    "DROP TRIGGER trg_b28_final_source_identity"
+                    " ON public.b28_simulation_requests"
+                )
+                cursor.execute(
                     "DROP TRIGGER trg_b28_request_consequence"
                     " ON public.b28_simulation_requests"
                 )
@@ -1425,6 +1448,7 @@ def test_p14_r4_b28_consequence_guard_is_independently_load_bearing() -> None:
                     " fk_b28_simulation_requests_source_issuance " + constraintdef
                 )
                 cursor.execute(triggerdef)
+                cursor.execute(final_source_triggerdef)
 
         with admin.cursor() as cursor:
             cursor.execute(
@@ -1432,6 +1456,11 @@ def test_p14_r4_b28_consequence_guard_is_independently_load_bearing() -> None:
                 " WHERE tgname = 'trg_b28_request_consequence' AND NOT tgisinternal"
             )
             assert cursor.fetchone()[0] == triggerdef
+            cursor.execute(
+                "SELECT pg_get_triggerdef(oid) FROM pg_catalog.pg_trigger"
+                " WHERE tgname = 'trg_b28_final_source_identity' AND NOT tgisinternal"
+            )
+            assert cursor.fetchone()[0] == final_source_triggerdef
         assert (
             _fabrication_attempt(tenant_id, _REQUEST_INSERT, fabricated) != "ALLOWED"
         )

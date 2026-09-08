@@ -1014,7 +1014,7 @@ def test_p14_r6_governed_constants_are_mirrored_by_the_migration() -> None:
     )
     assert f'_REQUEST_PRINCIPAL = "{B28_REQUEST_PRINCIPAL}"' in migration
     assert f'_SOLVER_PRINCIPAL = "{B28_SOLVER_PRINCIPAL}"' in migration
-    assert f'revision = "{REQUIRED_SCHEMA_REVISION}"' in migration
+    assert migration_graph_head() == REQUIRED_SCHEMA_REVISION
 
 
 def test_p14_r6_the_possession_guard_runs_after_the_consequence_guard() -> None:

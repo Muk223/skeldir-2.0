@@ -2592,7 +2592,7 @@ jobs:
           # contract under the corrected authority.
           granted=$(psql "$MIGRATION_DATABASE_URL" -tAc \
             "SELECT string_agg(table_name || ':' || privilege_type, ',' ORDER BY table_name, privilege_type) FROM information_schema.table_privileges WHERE grantee = 'app_trust_issuer'")
-          test "$granted" = "trust_access_log:SELECT,trust_access_log:UPDATE,trust_envelope_issuance_log:INSERT,trust_envelope_issuance_log:SELECT,trust_export_artifact_attempts:INSERT,trust_export_artifact_attempts:SELECT,trust_export_artifact_attempts:UPDATE,trust_issuance_attempts:INSERT,trust_issuance_attempts:SELECT,trust_issuance_attempts:UPDATE"
+          test "$granted" = "trust_access_log:SELECT,trust_access_log:UPDATE,trust_envelope_issuance_log:INSERT,trust_envelope_issuance_log:SELECT,trust_export_artifact_attempts:INSERT,trust_export_artifact_attempts:SELECT,trust_export_artifact_attempts:UPDATE,trust_final_issuance_identity:SELECT,trust_issuance_attempts:INSERT,trust_issuance_attempts:SELECT,trust_issuance_attempts:UPDATE"
           guard=$(psql "$MIGRATION_DATABASE_URL" -tAc \
             "SELECT count(*) FROM pg_trigger WHERE tgrelid = 'public.trust_access_log'::regclass AND tgname = 'trg_trust_access_log_issuance_authority_guard'")
           test "$guard" = "1"
@@ -3527,6 +3527,19 @@ jobs:
             backend/tests/trust/test_b25_p14_r6_possession_authority.py \
             -q -s --no-header -p no:randomly | tee /tmp/b25_p14_r6.out
           grep -E "12 passed" /tmp/b25_p14_r6.out
+
+      # B2.5-P14 Corrective VII/VII-2 successor proof plane (merge-authoritative).
+      # Exact final-issuance selection, dual-conjunct policy, wall-clock
+      # freshness, money/credential boundaries, mapping immutability. Fails
+      # here blocks the required aggregate, so the candidate cannot land.
+      - name: P14 Corrective VII-2 exact issuance and authority proofs
+        run: |
+          set -o pipefail
+          python -m pytest \
+            backend/tests/trust/test_b25_p14_vii2_issuance_selection.py \
+            backend/tests/trust/test_b25_p14_vii2_channel_authority.py \
+            -q -s --no-header -p no:randomly | tee /tmp/b25_p14_vii2.out
+          grep -E "11 passed" /tmp/b25_p14_vii2.out
 
       # Directive VI section 15. Every durable B2.8 field declares which of four
       # things it is and what physical evidence makes it true, checked against

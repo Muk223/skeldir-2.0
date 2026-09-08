@@ -1,0 +1,108 @@
+openapi: 3.1.0
+info: {title: Design Partner Simulations, version: 1.0.0}
+paths:
+  /api/trust/v1/simulations:
+    post:
+      operationId: requestTrustSimulation
+      security: [{MachineBearer: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Correlation'}
+        - {$ref: '#/components/parameters/Tenant'}
+        - {$ref: '#/components/parameters/Nonce'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SimulationSubmission'}
+      responses:
+        '201':
+          description: Durable explicit request and deterministic consequence
+          headers:
+            X-Correlation-ID:
+              schema: {type: string, format: uuid}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SimulationReceipt'}
+        '401': {description: Authentication refused}
+        '403': {description: Source or current policy refuses simulation}
+        '404': {description: Tenant-scoped source unavailable}
+        '409': {description: Duplicate request or stale source}
+        '422': {description: Invalid request or insufficient evidence}
+  /api/trust/v1/simulations/{request_id}:
+    get:
+      operationId: readTrustSimulation
+      security: [{MachineBearer: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Correlation'}
+        - {$ref: '#/components/parameters/Tenant'}
+        - {$ref: '#/components/parameters/Nonce'}
+        - {name: request_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Tenant-safe durable status, result and human-review proposal
+          headers:
+            X-Correlation-ID:
+              schema: {type: string, format: uuid}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SimulationRead'}
+        '401': {description: Authentication refused}
+        '404': {description: Request unavailable to this tenant}
+components:
+  securitySchemes:
+    MachineBearer: {type: http, scheme: bearer}
+  parameters:
+    Correlation: {name: X-Correlation-ID, in: header, required: true, schema: {type: string, format: uuid}}
+    Tenant: {name: X-Tenant-ID, in: header, required: true, schema: {type: string, format: uuid}}
+    Nonce: {name: X-Trust-Nonce, in: header, required: true, schema: {type: string, minLength: 16, maxLength: 256}}
+  schemas:
+    SimulationSubmission:
+      type: object
+      additionalProperties: false
+      required: [source_envelope_id, source_final_envelope_hash, total_budget_minor, request_ref]
+      properties:
+        source_envelope_id: {type: string, pattern: '^env_[a-f0-9]{32}$'}
+        source_final_envelope_hash: {type: string, pattern: '^sha256:[a-f0-9]{64}$'}
+        total_budget_minor: {type: integer, minimum: 1, maximum: 9007199254740991}
+        request_ref: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9._:-]+$'}
+    SimulationReceipt:
+      type: object
+      additionalProperties: false
+      required: [request_id, tenant_id_hash, correlation_id, status]
+      properties:
+        request_id: {type: string, format: uuid}
+        tenant_id_hash: {type: string}
+        correlation_id: {type: string, format: uuid}
+        status: {type: string, enum: [completed, refused]}
+    SimulationRead:
+      type: object
+      additionalProperties: false
+      required: [id, source_envelope_id, source_semantic_truth_hash, input_snapshot_hash, total_budget_minor, currency, requested_at, sufficiency_verdict, solver_consequence_kind, allocations, action_authority, proposal_ref, requires_human_approval, tenant_id_hash, correlation_id, status, causal_authority, external_execution_authority]
+      properties:
+        id: {type: string, format: uuid}
+        source_envelope_id: {type: string, pattern: '^env_[a-f0-9]{32}$'}
+        source_semantic_truth_hash: {type: string, pattern: '^sha256:[a-f0-9]{64}$'}
+        input_snapshot_hash: {type: string, pattern: '^sha256:[a-f0-9]{64}$'}
+        total_budget_minor: {type: integer, minimum: 1, maximum: 9007199254740991}
+        currency: {type: string, minLength: 3, maxLength: 3}
+        requested_at: {type: string, format: date-time}
+        sufficiency_verdict: {type: boolean}
+        solver_consequence_kind: {type: [string, 'null']}
+        allocations:
+          type: [array, 'null']
+          items:
+            type: object
+            additionalProperties: false
+            required: [channel_id, allocation_minor, weight_basis_points]
+            properties:
+              channel_id: {type: string}
+              allocation_minor: {type: integer, minimum: 0}
+              weight_basis_points: {type: integer, minimum: 0, maximum: 10000}
+        action_authority: {type: [string, 'null']}
+        proposal_ref: {type: [string, 'null']}
+        requires_human_approval: {type: [boolean, 'null']}
+        tenant_id_hash: {type: string}
+        correlation_id: {type: string, format: uuid}
+        status: {type: string, enum: [completed, pending, refused]}
+        causal_authority: {type: string, enum: [none]}
+        external_execution_authority: {type: string, enum: [none]}

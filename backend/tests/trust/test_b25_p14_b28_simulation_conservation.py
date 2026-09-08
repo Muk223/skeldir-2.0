@@ -161,10 +161,17 @@ def test_b28_gate6_no_scheduler_reaches_the_simulation_package() -> None:
     """H-P14-W2 / Gate 9. Nothing schedules B2.8; it is request-driven only."""
 
     backend = REPO_ROOT / "backend" / "app"
+    # VII production caller: the supported Design-Partner HTTP boundary
+    # reaches the deterministic simulation package through the governed
+    # persistence entrypoint. It is request-driven, never scheduled, and
+    # remains the only lawful importer outside the package itself.
+    lawful_importers = {"backend/app/api/trust_simulations.py"}
     offenders: list[str] = []
     for path in sorted(backend.rglob("*.py")):
         relative = path.relative_to(REPO_ROOT).as_posix()
         if "/app/simulation/" in relative:
+            continue
+        if relative in lawful_importers:
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
         if "app.simulation" in text or "from app import simulation" in text:

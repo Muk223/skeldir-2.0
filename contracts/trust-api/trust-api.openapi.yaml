@@ -94,6 +94,164 @@ paths:
           $ref: "#/components/responses/TrustApiError"
         "503":
           $ref: "#/components/responses/TrustApiError"
+  /api/trust/v1/simulations:
+    post:
+      operationId: requestTrustSimulation
+      summary: Request one deterministic Design-Partner simulation over server-derived evidence
+      description: >
+        B2.5-P14 Corrective VII production boundary. The caller names the exact
+        final Trust artifact (logical envelope_id plus final artifact hash),
+        proves machine-credential possession, and supplies only request intent
+        (budget, request reference). Financial channel evidence is derived
+        server-side from the governed B2.4 snapshot and refused unless it still
+        matches the Trust snapshot hash. Simulation authority requires both the
+        Trust's issuance-time policy and the tenant's current governed policy.
+        READ/SIMULATE/PROPOSE only; never executes external actions.
+      security:
+        - MachineBearer: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/TrustNonce"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - source_envelope_id
+                - source_final_envelope_hash
+                - total_budget_minor
+                - request_ref
+              properties:
+                source_envelope_id:
+                  type: string
+                  pattern: '^env_[a-f0-9]{32}$'
+                source_final_envelope_hash:
+                  type: string
+                  pattern: '^sha256:[a-f0-9]{64}$'
+                total_budget_minor:
+                  type: integer
+                  minimum: 1
+                  maximum: 9007199254740991
+                request_ref:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                  pattern: '^[A-Za-z0-9._:-]+$'
+      responses:
+        "201":
+          description: Durable explicit request and deterministic consequence.
+          headers:
+            X-Correlation-ID:
+              schema: {type: string, format: uuid}
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - request_id
+                  - tenant_id_hash
+                  - correlation_id
+                  - status
+                properties:
+                  request_id: {type: string, format: uuid}
+                  tenant_id_hash: {type: string}
+                  correlation_id: {type: string, format: uuid}
+                  status: {type: string, enum: [completed, refused]}
+        "401":
+          $ref: "#/components/responses/TrustApiError"
+        "403":
+          $ref: "#/components/responses/TrustApiError"
+        "404":
+          $ref: "#/components/responses/TrustApiError"
+        "409":
+          $ref: "#/components/responses/TrustApiError"
+        "422":
+          $ref: "#/components/responses/TrustApiError"
+  /api/trust/v1/simulations/{request_id}:
+    get:
+      operationId: readTrustSimulation
+      summary: Read one durable simulation result and human-review proposal tenant-safely
+      description: >
+        Tenant-scoped read of the durable request, deterministic consequence,
+        and non-authoritative proposal. Foreign identifiers reveal no artifact.
+        Reads preserve or reduce authority, never strengthen it.
+      security:
+        - MachineBearer: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/TenantId"
+        - $ref: "#/components/parameters/TrustNonce"
+        - name: request_id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        "200":
+          description: Tenant-safe durable status, result and human-review proposal.
+          headers:
+            X-Correlation-ID:
+              schema: {type: string, format: uuid}
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - id
+                  - source_envelope_id
+                  - source_semantic_truth_hash
+                  - input_snapshot_hash
+                  - total_budget_minor
+                  - currency
+                  - requested_at
+                  - sufficiency_verdict
+                  - solver_consequence_kind
+                  - allocations
+                  - action_authority
+                  - proposal_ref
+                  - requires_human_approval
+                  - tenant_id_hash
+                  - correlation_id
+                  - status
+                  - causal_authority
+                  - external_execution_authority
+                properties:
+                  id: {type: string, format: uuid}
+                  source_envelope_id: {type: string, pattern: '^env_[a-f0-9]{32}$'}
+                  source_semantic_truth_hash: {type: string, pattern: '^sha256:[a-f0-9]{64}$'}
+                  input_snapshot_hash: {type: string, pattern: '^sha256:[a-f0-9]{64}$'}
+                  total_budget_minor: {type: integer, minimum: 1, maximum: 9007199254740991}
+                  currency: {type: string, minLength: 3, maxLength: 3}
+                  requested_at: {type: string, format: date-time}
+                  sufficiency_verdict: {type: boolean}
+                  solver_consequence_kind: {type: [string, 'null']}
+                  allocations:
+                    type: [array, 'null']
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [channel_id, allocation_minor, weight_basis_points]
+                      properties:
+                        channel_id: {type: string}
+                        allocation_minor: {type: integer, minimum: 0}
+                        weight_basis_points: {type: integer, minimum: 0, maximum: 10000}
+                  action_authority: {type: [string, 'null']}
+                  proposal_ref: {type: [string, 'null']}
+                  requires_human_approval: {type: [boolean, 'null']}
+                  tenant_id_hash: {type: string}
+                  correlation_id: {type: string, format: uuid}
+                  status: {type: string, enum: [completed, pending, refused]}
+                  causal_authority: {type: string, enum: [none]}
+                  external_execution_authority: {type: string, enum: [none]}
+        "401":
+          $ref: "#/components/responses/TrustApiError"
+        "404":
+          $ref: "#/components/responses/TrustApiError"
   /api/trust/v1/envelopes/{subject_type}/{subject_ref}:
     get:
       operationId: getTrustEnvelope

@@ -838,6 +838,23 @@ def test_p14_gate0_each_layer_is_independently_load_bearing() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _publish_current_policy(cursor, tenant_id, policy_state: str) -> None:
+    """Govern the tenant under the VII dual-conjunct model.
+
+    The VII request trigger admits a simulation only when the tenant's
+    current governed policy permits it. Legacy fixtures predate that
+    table, so they must publish the same authority the issuance carries;
+    otherwise the request is refused for policy rather than for the
+    invariant under test. Recorded per VII-3 H-VII3-01 disposition.
+    """
+    cursor.execute(
+        "INSERT INTO public.trust_tenant_policy_events"
+        " (tenant_id, policy_state, approval_reference, published_by)"
+        " VALUES (%s, %s, %s, 'app_trust_policy_admin')",
+        (str(tenant_id), policy_state, "vii3-legacy-reconciliation"),
+    )
+
+
 def _seed_terminal_issuance(
     cursor,
     tenant_id,
@@ -854,6 +871,13 @@ def _seed_terminal_issuance(
     owning connection: the P14 Gate 0 consequence guard exempts the owner for
     the reason it states, and the lawful issuer path is proved separately by
     ``test_p14_gate0_the_lawful_issuer_path_still_conducts``.
+
+    VII-3 reconciliation: the VII ontology additionally requires an exact
+    final signer-artifact mapping (``trust_final_issuance_identity``) and a
+    current governed tenant policy. This helper now persists that
+    production-shaped lineage alongside the historical audit identities, so
+    legacy invariants are adjudicated past the new guards rather than
+    refused before them. Target invariants unchanged.
     """
 
     material = _lawful_material()
@@ -862,8 +886,98 @@ def _seed_terminal_issuance(
         material["semantic_truth_hash"] = semantic_truth
     if subject_ref is not None:
         material["subject_ref_hash"] = subject_ref
+    envelope_id = "env_" + uuid.uuid4().hex
+    material["source_envelope_id"] = envelope_id
     _seed_ledger(cursor, tenant_id, material)
+    signed = {
+        "envelope_id": envelope_id,
+        "semantic_truth_hash": material["semantic_truth_hash"],
+        "policy_action_authority": {"policy_state": policy_state},
+        "subject_type": material["subject_type"],
+        "subject_ref_hash": material["subject_ref_hash"],
+    }
+    signed_json = json.dumps(signed, separators=(",", ":"))
+    signed_hash = _digest()
+    attempt_id = uuid.uuid4()
+    # Lifecycle transitions honor role separation: only the issuer may move
+    # the ledger through signing/issued, only the signer may record the
+    # signature. The owning admin connection seeds the initial ledger row
+    # and the terminal issuance row, exactly as _seed_completed_lineage does.
+    issuer = _role_connection("app_trust_issuer")
+    try:
+        with issuer.cursor() as issuer_cursor:
+            _bind_tenant(issuer_cursor, tenant_id)
+            issuer_cursor.execute(
+                "UPDATE public.trust_access_log SET issuance_state='signing',"
+                " issuance_attempted_at=clock_timestamp(),"
+                " issuance_attempt_count=1"
+                " WHERE tenant_id=%s AND audit_ref=%s",
+                (str(tenant_id), material["audit_ref"]),
+            )
+            issuer_cursor.execute(
+                "INSERT INTO public.trust_issuance_attempts"
+                " (id, tenant_id, audit_ref, attempt_number, attempt_state)"
+                " VALUES (%s,%s,%s,1,'signing')",
+                (str(attempt_id), str(tenant_id), material["audit_ref"]),
+            )
+        issuer.commit()
+    finally:
+        issuer.close()
+
+    signer = _role_connection("app_trust_signer")
+    try:
+        with signer.cursor() as signer_cursor:
+            _bind_tenant(signer_cursor, tenant_id)
+            signer_cursor.execute(
+                "UPDATE public.trust_issuance_attempts"
+                " SET attempt_state='signature_known',"
+                " signature_known_at=clock_timestamp(),"
+                " signing_key_id='kid:p14-fixture',"
+                " signature_hash='sha256:' || repeat('a',64),"
+                " signature=decode(repeat('ab',64),'hex'),"
+                " signed_envelope_hash=%s, signed_envelope=%s::jsonb"
+                " WHERE tenant_id=%s AND id=%s"
+                " RETURNING signature_known_at",
+                (signed_hash, signed_json, str(tenant_id), str(attempt_id)),
+            )
+            known_at = signer_cursor.fetchone()[0]
+            signer_cursor.execute(
+                "UPDATE public.trust_access_log"
+                " SET issuance_state='signature_known',"
+                " known_signature_at=%s, issued_attempt_id=%s"
+                " WHERE tenant_id=%s AND audit_ref=%s",
+                (known_at, str(attempt_id), str(tenant_id), material["audit_ref"]),
+            )
+        signer.commit()
+    finally:
+        signer.close()
+
+    issuer = _role_connection("app_trust_issuer")
+    try:
+        with issuer.cursor() as issuer_cursor:
+            _bind_tenant(issuer_cursor, tenant_id)
+            issuer_cursor.execute(
+                "UPDATE public.trust_access_log SET issuance_state='issued',"
+                " issued_at=clock_timestamp(),"
+                " issued_signing_key_id='kid:p14-fixture',"
+                " issued_signature_hash='sha256:' || repeat('a',64),"
+                " issued_signature=decode(repeat('ab',64),'hex'),"
+                " issued_envelope=%s::jsonb"
+                " WHERE tenant_id=%s AND audit_ref=%s",
+                (signed_json, str(tenant_id), material["audit_ref"]),
+            )
+            issuer_cursor.execute(
+                "UPDATE public.trust_issuance_attempts SET attempt_state='issued',"
+                " issued_at=clock_timestamp()"
+                " WHERE tenant_id=%s AND id=%s",
+                (str(tenant_id), str(attempt_id)),
+            )
+        issuer.commit()
+    finally:
+        issuer.close()
     cursor.execute(_ISSUANCE_INSERT, _issuance_params(tenant_id, material))
+    _publish_current_policy(cursor, tenant_id, policy_state)
+    material["final_envelope_hash"] = signed_hash
     return material
 
 
@@ -889,7 +1003,7 @@ def _insert_materialization(
         (
             str(tenant_id),
             cache_identity,
-            "env_" + uuid.uuid4().hex,
+            issuance["source_envelope_id"],
             semantic_truth,
             issuance["envelope_hash"],
             EXPLANATION_TEMPLATE_REGISTRY_HASH,
@@ -1164,7 +1278,10 @@ def _insert_request(
     issuance = _seed_terminal_issuance(cursor, tenant_id, policy_state=policy_state)
     principal = _seed_agent_credential(cursor, tenant_id)
     channels = _channel_evidence(channel_count)
-    envelope_id = "env_" + uuid.uuid4().hex
+    # VII-3: the request must name the exact final issuance identity. The
+    # pre-VII helper invented an unrelated envelope_id here, which the VII
+    # final-source trigger correctly refuses before any result guard runs.
+    envelope_id = issuance["source_envelope_id"]
     # Corrective V: the snapshot hash is the hash of the retained evidence, and
     # the sufficiency verdict is the adjudicator's, so a fixture cannot choose
     # either. This helper computes both the way the request-entry boundary does.
