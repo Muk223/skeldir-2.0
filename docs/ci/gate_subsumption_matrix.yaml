@@ -3048,3 +3048,108 @@
   local_reproduction_command: python scripts/ci/validate_p2_evacuation_ledger.py --check
   risk_if_removed: Monolith evacuation progress becomes narrative rather than machine-checked.
   decision: keep_all
+- gate_id: b14-env-signature
+  workflow: .github/workflows/b14-privacy-consolidated.yml
+  job: B1.4 Privacy Consolidated Plane
+  script: scripts/ci/b14_env_signature.py
+  owning_phase: Phase-II-B14-Shadow
+  protected_invariant: Content-addressed environment signature binding OS, toolchain, dependency and schema authority for the B14 lane.
+  current_status: required
+  default_execution: false
+  candidate_action: keep_all
+  subsuming_gate: ''
+  subsumption_evidence: Phase II slice 1 vehicle; entries transfer to the DUAL PR unchanged.
+  negative_control_preserved_by: python scripts/ci/b14_env_signature.py --check artifacts/b14_consolidated/env_signature.json
+  local_reproduction_command: python scripts/ci/b14_env_signature.py --check artifacts/b14_consolidated/env_signature.json
+  risk_if_removed: The B14 migration step using this script becomes ungoverned.
+  decision: keep_all
+- gate_id: b14-provision-template-dbs
+  workflow: .github/workflows/b14-privacy-consolidated.yml
+  job: B1.4 Privacy Consolidated Plane
+  script: scripts/ci/b14_provision_template_dbs.py
+  owning_phase: Phase-II-B14-Shadow
+  protected_invariant: Template-plus-clone provisioner - one migrated template, per-proof isolated consequence databases for the B14 lane.
+  current_status: required
+  default_execution: false
+  candidate_action: keep_all
+  subsuming_gate: ''
+  subsumption_evidence: Phase II slice 1 vehicle; entries transfer to the DUAL PR unchanged.
+  negative_control_preserved_by: python scripts/ci/b14_provision_template_dbs.py --phase clone-proofs --maintenance-dsn postgresql://postgres:postgres@127.0.0.1:5432/postgres
+  local_reproduction_command: python scripts/ci/b14_provision_template_dbs.py --phase clone-proofs --maintenance-dsn postgresql://postgres:postgres@127.0.0.1:5432/postgres
+  risk_if_removed: The B14 migration step using this script becomes ungoverned.
+  decision: keep_all
+- gate_id: b14-record-proof-result
+  workflow: .github/workflows/b14-privacy-consolidated.yml
+  job: B1.4 Privacy Consolidated Plane
+  script: scripts/ci/b14_record_proof_result.py
+  owning_phase: Phase-II-B14-Shadow
+  protected_invariant: Per-proof result ledger plus terminal aggregator; refuses wrapper-green-over-missing-child for the B14 lane.
+  current_status: required
+  default_execution: false
+  candidate_action: keep_all
+  subsuming_gate: ''
+  subsumption_evidence: Phase II slice 1 vehicle; entries transfer to the DUAL PR unchanged.
+  negative_control_preserved_by: python scripts/ci/b14_record_proof_result.py --aggregate --artifacts-dir artifacts/b14_consolidated --sha <SHA>
+  local_reproduction_command: python scripts/ci/b14_record_proof_result.py --aggregate --artifacts-dir artifacts/b14_consolidated --sha <SHA>
+  risk_if_removed: The B14 migration step using this script becomes ungoverned.
+  decision: keep_all
+- gate_id: collect-b14-corpus-pair
+  workflow: .github/workflows/b14-privacy-consolidated.yml
+  job: B1.4 Privacy Consolidated Plane
+  script: scripts/ci/collect_b14_corpus_pair.py
+  owning_phase: Phase-II-B14-Shadow
+  protected_invariant: Same-SHA paired corpus collector binding incumbent B14 jobs with the consolidated shadow job.
+  current_status: required
+  default_execution: false
+  candidate_action: keep_all
+  subsuming_gate: ''
+  subsumption_evidence: Phase II slice 1 vehicle; entries transfer to the DUAL PR unchanged.
+  negative_control_preserved_by: python scripts/ci/collect_b14_corpus_pair.py --sha <SHA> --event pull_request --class ordinary --old-run <R1> --new-run <R2> --corpus docs/forensics/p2_b14_equivalence_corpus.json
+  local_reproduction_command: python scripts/ci/collect_b14_corpus_pair.py --sha <SHA> --event pull_request --class ordinary --old-run <R1> --new-run <R2> --corpus docs/forensics/p2_b14_equivalence_corpus.json
+  risk_if_removed: The B14 migration step using this script becomes ungoverned.
+  decision: keep_all
+- gate_id: compare-b14-equivalence
+  workflow: .github/workflows/b14-privacy-consolidated.yml
+  job: B1.4 Privacy Consolidated Plane
+  script: scripts/ci/compare_b14_equivalence.py
+  owning_phase: Phase-II-B14-Shadow
+  protected_invariant: Old/new semantic equivalence comparator for the B14 migration (SHA, test identity, NC evidence, verdict, env authority).
+  current_status: required
+  default_execution: false
+  candidate_action: keep_all
+  subsuming_gate: ''
+  subsumption_evidence: Phase II slice 1 vehicle; entries transfer to the DUAL PR unchanged.
+  negative_control_preserved_by: python scripts/ci/compare_b14_equivalence.py --self-test
+  local_reproduction_command: python scripts/ci/compare_b14_equivalence.py --self-test
+  risk_if_removed: The B14 migration step using this script becomes ungoverned.
+  decision: keep_all
+- gate_id: test-b14-consolidation-negative-controls
+  workflow: .github/workflows/b14-privacy-consolidated.yml
+  job: B1.4 Privacy Consolidated Plane
+  script: scripts/ci/test_b14_consolidation_negative_controls.py
+  owning_phase: Phase-II-B14-Shadow
+  protected_invariant: Negative-control suite for B14 consolidation - env-signature, provisioner isolation, ledger severance.
+  current_status: required
+  default_execution: false
+  candidate_action: keep_all
+  subsuming_gate: ''
+  subsumption_evidence: Phase II slice 1 vehicle; entries transfer to the DUAL PR unchanged.
+  negative_control_preserved_by: python scripts/ci/test_b14_consolidation_negative_controls.py
+  local_reproduction_command: python scripts/ci/test_b14_consolidation_negative_controls.py
+  risk_if_removed: The B14 migration step using this script becomes ungoverned.
+  decision: keep_all
+- gate_id: validate-b14-migration
+  workflow: .github/workflows/b14-privacy-consolidated.yml
+  job: B1.4 Privacy Consolidated Plane
+  script: scripts/ci/validate_b14_migration.py
+  owning_phase: Phase-II-B14-Shadow
+  protected_invariant: Monotonic-authority validator for the B14 migration (SHADOW to DUAL to CUTOVER).
+  current_status: required
+  default_execution: false
+  candidate_action: keep_all
+  subsuming_gate: ''
+  subsumption_evidence: Phase II slice 1 vehicle; entries transfer to the DUAL PR unchanged.
+  negative_control_preserved_by: python scripts/ci/validate_b14_migration.py
+  local_reproduction_command: python scripts/ci/validate_b14_migration.py
+  risk_if_removed: The B14 migration step using this script becomes ungoverned.
+  decision: keep_all

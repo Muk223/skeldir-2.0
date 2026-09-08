@@ -3,6 +3,10 @@
 **State:** PRE-PROMOTION repair. Incumbent authority preserved; no successor
 authority added; no context renamed; no cutover performed.
 **Branch:** `p2-p6-incumbent-repair` from `origin/main@12db0403`.
+**Landed:** PR #723 → `main@0d513130` via `main-merge-queue` ALLGREEN
+2026-09-08T02:39:41Z. Live proof: CI run 34160397839,
+`b14-p6-runtime-artifacts` contains `junit.enforcer.xml` (4 tests,
+0 failures), `proof_plane_report.json`, `tests.log`.
 **Scope:** `b14-p6-proof-plane-binding` (vacuity repair) + `set -o pipefail`
 on the sibling B1.4 `| tee` pytest steps (same failure-masking defect class).
 
