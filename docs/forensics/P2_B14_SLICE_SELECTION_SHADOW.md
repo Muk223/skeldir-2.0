@@ -237,3 +237,36 @@ R-P2-06: pipefail hygiene question deferred (s5).
 | Gate 9 env-construction collapse | COHORT GREEN (-87.5%/-85.7%; runtime-log confirmation pending) | construction counts |
 | Gate 10 production-artifact fidelity | HELD (P13 untouched; host/container boundary unchanged) | no P13 change |
 | C2-01..C2-15 | SHADOW-subset GREEN; C2-04/07/08/09/10/12 await corpus+cutover | this pack |
+
+## 12. Post-repair addendum (successor, 2026-09-08; Directive-2 s0.6/s0.7)
+
+- Incumbent P6 repaired pre-promotion, identity preserved: PR #723 landed
+  `main@0d513130` via `main-merge-queue` ALLGREEN. Live proof CI run
+  34160397839: `b14-p6-runtime-artifacts` holds `junit.enforcer.xml`
+  (4 tests, 0 failures), `proof_plane_report.json`, `tests.log`.
+  Full record: `docs/forensics/P2_P6_INCUMBENT_REPAIR.md`.
+- Pre-repair corpus (`p2_b14_equivalence_corpus.json`, 2 pairs, comparator
+  RED `missing-old-proof:p6/junit.enforcer.xml`) reclassified
+  **DIAGNOSTIC PRE-REPAIR EVIDENCE**; qualifying corpus resets to 0/10.
+- Qualifying pair 1/10: `pull_request-26c08166733c` (class high_risk: the
+  merge carries the B1.4 proof-job repair itself). Old CI 34180993330
+  (B14 8/8 success) + new shadow 34180993206 (success), same SHA.
+  Comparator exit 0: 8/8 test-identity GREEN (p0 6+4+2, p1 5, p2 4, p3 9,
+  p4 5, p5 4, p6 4, p7 3), verdict GREEN, env-authority `9a9066f1b387`.
+  Recorded in `docs/forensics/p2_b14_equivalence_corpus.postrepair.json`.
+- R-P2-06 CLOSED for B14: `set -o pipefail` added to the p6/p0 (2 steps)/
+  p5/p7 pytest `| tee` steps pre-promotion. Verdict-preserving: on every
+  previously-green path the step result is unchanged; only previously
+  masked-failure paths change (false-green to true-red), which is the
+  repair. The s5 "forbidden in-slice" concern is answered: the change is a
+  governed incumbent repair, identical in intent on both lanes (the new
+  lane already fails closed via ledger+junit), and equivalence is
+  re-proven post-repair rather than assumed.
+- Re-verified on the merged tree: comparator self-test 9/9, migration
+  self-test 10/10, consolidation NC 15/15, physics guard 65/65, M3 PASS
+  (7 lane scripts registered in `enforcer_registry.yaml` +
+  `gate_subsumption_matrix.yaml`; entries transfer to the DUAL PR).
+- R-P2-01 updated: qualifying corpus 1/10 (need +2 high_risk, +2
+  docs_only, +2 merge_group, +1 red_team, +2 ordinary).
+- Gate 4 updated: 8/8 semantic GREEN on the post-repair pair; failure
+  equivalence (red-team) still pending.
