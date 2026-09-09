@@ -1,0 +1,186 @@
+phase_id: B2.6-P1
+contract_version: b2.6-p1-semantic-authority-v1
+maturity_mode: DESIGN_PARTNER_MODE
+authority_kind: semantic_constitution_not_financial_result
+
+migration_authority:
+  schema_change_required_in_P1: false
+  expected_single_head: "202609072001"
+  rationale: >-
+    P1 declares semantic and adjudicative authority only. Existing B2.3
+    production relations already provide the sovereign inputs, while legacy
+    reconciliation relations remain fenced false authorities.
+
+coverage_authority:
+  aggregate_callable: app.revenue_verification.verification_coverage.fetch_verification_coverage_aggregate
+  metric_object: app.revenue_verification.verification_coverage.VERIFICATION_COVERAGE
+  metric_method: compute
+  implementation_ast_sha256: c97ce3814f9b28635494cd89dd31b988decce50e95c5ce020b2ba2cf6d103217
+  supported_provider_scope_reference: app.revenue_verification.verification_coverage.SUPPORTED_VERIFICATION_COVERAGE_PLATFORMS
+  supported_currency_scope_reference: app.revenue_verification.verification_coverage.SUPPORTED_VERIFICATION_COVERAGE_CURRENCIES
+  numerator:
+    name: matched_webhook_revenue_minor
+    definition: >-
+      Sum canonical_net_verified_amount_minor from tenant-bound B2.3 verdicts in
+      matched_provisional, matched_confirmed, or adjusted state, joined by the
+      durable webhook_ingress_identity_id to authenticity-verified ingress in
+      the same supported-provider, currency, and half-open event window.
+  denominator:
+    name: connected_platform_revenue_minor
+    definition: >-
+      Sum verified_amount_minor from tenant-bound, authenticity-verified ingress
+      for connected supported providers in the same currency and half-open
+      event_timestamp window, whether or not a matching verdict is final.
+  window_semantics:
+    interval: half_open
+    lower_bound: inclusive
+    upper_bound: exclusive
+    clock_source: persisted_webhook_ingress_identities.event_timestamp
+    timezone: UTC
+  unsupported_rail_doctrine:
+    numerator: excluded
+    denominator: excluded
+    later_finance_representation: deferred_to_B2.6-P2_or_later
+  golden_falsification_vector:
+    matched_minor: 76000
+    connected_supported_minor: 80000
+    total_business_minor: 100000
+    required_percent: "95.00"
+    forbidden_percent: "76.00"
+
+truth_status:
+  coverage_is_not_final_finance_confirmation: true
+  matched_provisional:
+    participates_in_coverage_numerator: true
+    finance_truth_status: provisional
+    may_be_relabelled_confirmed: false
+  matched_confirmed:
+    participates_in_coverage_numerator: true
+    finance_truth_status: confirmed
+  adjusted:
+    participates_in_coverage_numerator: true
+    finance_truth_status: confirmed_adjusted
+  future_consumer_requirement: >-
+    Expose provisional and confirmed amounts/statuses separately and never infer
+    final finance confirmation from coverage_percent alone.
+
+required_reconciliation_reasons:
+  - matched_confirmed
+  - matched_provisional
+  - adjusted_confirmed
+  - supported_unresolved
+  - unsupported_provider_excluded
+  - unsupported_currency_excluded
+  - outside_governed_window_excluded
+  - source_identity_unresolved
+  - authority_unavailable
+
+money_authority:
+  representation: integer_minor_units
+  authoritative_float_or_decimal_major_units: forbidden
+  display_major_units: derived_non_authoritative_only
+
+projection_doctrine:
+  finance_export:
+    authority: projection_only
+    recomputation: forbidden
+    required_source: future_durable_B2.6_reconciliation_authority
+  trust_envelope:
+    authority: projection_only
+    recomputation: forbidden
+    required_source: future_durable_B2.6_reconciliation_authority
+    fields_created_in_P1: false
+  coherent_information_object_requires:
+    - financial_amount
+    - governed_scope
+    - truth_status
+    - reason_or_exclusion
+    - provenance
+    - tenant_authority
+    - contract_version
+    - trust_envelope_identity
+
+tenant_identifier_policy:
+  durable_state: tenant_scoped
+  external_raw_tenant_id: forbidden
+  external_identity: one_way_tenant_id_hash_or_equivalent
+
+ontological_authority:
+  deterministic_B2.3_truth: sovereign_input
+  deterministic_B2.6_reconciliation: future_derived_authority
+  B2.4_estimation_financial_authority: NONE
+  B2.13_counterfactual_financial_authority: NONE
+  LLM_financial_or_classification_authority: NONE
+  B2.4_and_B2.13_usage: optional_separately_labelled_enrichment_only
+
+authority_map:
+  sovereign:
+    - authenticated_commerce_identity:webhook_ingress_identities
+    - deterministic_match_verdict:b23_match_verdicts
+    - verification_coverage:app.revenue_verification.verification_coverage
+  derived:
+    - future_B2.6_reconciliation:from_B2.3_verdict_and_coverage_authority_only
+  projection_only:
+    - finance_export
+    - TrustEnvelope_reconciliation_projection
+  forbidden:
+    - B2.4_confidence_as_money_or_denominator
+    - B2.13_counterfactual_as_revenue_or_discrepancy
+    - LLM_output_as_reconciliation_truth
+
+legacy_false_authorities:
+  - id: legacy_reconciliation_service
+    python_module: app.services.revenue_reconciliation
+    python_symbol: RevenueReconciliationService
+  - id: legacy_revenue_ledger
+    database_relation: public.revenue_ledger
+  - id: legacy_reconciliation_api
+    python_module: app.api.reconciliation
+    route_prefix: /api/reconciliation
+  - id: route_local_source_alias_arithmetic
+    python_module: app.api.reconciliation
+    python_symbol: _SOURCE_ALIASES
+  - id: allocation_grain_export_recomputation
+    python_module: app.api.export
+    python_symbol: _fetch_reporting_rows
+
+future_insertion_seam:
+  - B2.3_deterministic_verdict_and_coverage_authority
+  - future_B2.6_deterministic_reconciliation_projection_boundary
+  - future_finance_projection
+  - future_B2.6_TrustEnvelope_projection
+
+negative_control_registry:
+  - B26-P1-NC-01-mandatory-semantic-element
+  - B26-P1-NC-02-coverage-authority-reference
+  - B26-P1-NC-03-legacy-false-authority-import
+  - B26-P1-NC-04-ontological-authority
+  - B26-P1-NC-05-workflow-execution-identity
+  - B26-P1-NC-06-proof-candidate-identity
+  - B26-P1-NC-07-container-contract-copy
+
+proof_artifact_identity_requirements:
+  - gate_id
+  - phase
+  - contract_version
+  - contract_hash
+  - candidate_sha
+  - candidate_tree
+  - migration_head
+  - producer
+  - workflow
+  - event_type
+  - run_id
+  - artifact_hash
+  - scenario_id
+  - falsifier_id
+  - status
+
+prohibited_P1_product_machinery:
+  - reconciliation_business_table
+  - reconciliation_computation_kernel
+  - reconciliation_API
+  - reconciliation_worker_or_scheduler
+  - reconciliation_outbox
+  - finance_reconciliation_export
+  - TrustEnvelope_reconciliation_fields

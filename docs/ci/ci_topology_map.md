@@ -90,6 +90,7 @@
 - `B2.5-P11 Export Compatibility`
 - `B2.5-P12 CI Gates`
 - `B2.5-P13 E2E Trust Closure`
+- `B2.6 Finance Reconciliation Adjudication`
 - `B1.7 Explanation Runtime Adjudication`
 - `B1.7 P4 Mixed Workload Benchmark`
 - `m0-maintainability-scope-lock`

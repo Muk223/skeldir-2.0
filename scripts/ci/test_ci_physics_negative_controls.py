@@ -213,6 +213,10 @@ REQUIRED_JOB_WITH_MG = REQUIRED_JOB_PR_ONLY.replace(
     "if: github.event_name == 'pull_request'",
     "if: github.event_name == 'pull_request' || github.event_name == 'merge_group'",
 )
+DYNAMIC_REQUIRED_NAME = REQUIRED_JOB_WITH_MG.replace(
+    "name: R Lane Physics",
+    "name: ${{ github.event_name == 'push' && 'R Lane Diagnostic' || 'R Lane Physics' }}",
+)
 REQUIRED_CONTRACT = json.dumps({"required_contexts": ["Example"]})
 
 ADVISORY_WITH_MG = CONFORMING
@@ -401,6 +405,13 @@ EXTRA_CONTROLS: list[tuple[str, str, bool, str, str | None]] = [
     (
         "same required job, once merge_group is admitted",
         REQUIRED_JOB_WITH_MG,
+        True,
+        "",
+        json.dumps({"required_contexts": ["R Lane Physics"]}),
+    ),
+    (
+        "event-partitioned dynamic required check name",
+        DYNAMIC_REQUIRED_NAME,
         True,
         "",
         json.dumps({"required_contexts": ["R Lane Physics"]}),

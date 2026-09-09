@@ -3104,3 +3104,108 @@
   local_reproduction_command: python scripts/ci/viii_local_falsification_battery.py
   risk_if_removed: VIII completion evidence could not be re-executed by an independent reader.
   decision: keep_utility
+- gate_id: b26-p1-static-authority
+  workflow: .github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml
+  job: B2.6-P1 Static Semantic Authority
+  script: scripts/ci/validate_b26_p1_authority.py
+  owning_phase: B2.6-P1
+  protected_invariant: B2.6 semantic authority stays bound to exact B2.3 truth and excludes runtime reconciliation and legacy false authorities.
+  current_status: required
+  default_execution: true
+  candidate_action: keep_required
+  subsuming_gate: ''
+  subsumption_evidence: No inherited gate defines the B2.6 reconciliation ontology or fences dormant reconciliation names from future authority re-entry.
+  negative_control_preserved_by: python scripts/ci/test_b26_p1_negative_controls.py
+  local_reproduction_command: python scripts/ci/validate_b26_p1_authority.py
+  risk_if_removed: Later B2.6 work could silently redefine B2.3 coverage, revive legacy ledgers, or introduce premature reconciliation machinery.
+  decision: keep_required
+- gate_id: b26-p1-proof-plane-adjudicator
+  workflow: .github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml
+  job: B2.6 Finance Reconciliation Adjudication
+  script: scripts/ci/adjudicate_b26_p1_proof_plane.py
+  owning_phase: B2.6-P1
+  protected_invariant: Only exact-candidate content-addressed cells from every independent producer can satisfy the required context.
+  current_status: required
+  default_execution: true
+  candidate_action: keep_required
+  subsuming_gate: ''
+  subsumption_evidence: Branch protection sees one status name; this adjudicator is the sole mechanism that proves every subordinate B2.6 cell belongs to the same candidate and event.
+  negative_control_preserved_by: python scripts/ci/test_b26_p1_negative_controls.py
+  local_reproduction_command: python scripts/ci/adjudicate_b26_p1_proof_plane.py --help
+  risk_if_removed: Missing, stale, or wrong-SHA evidence could be mistaken for B2.6 completion.
+  decision: keep_required
+- gate_id: b26-p1-container-equivalence
+  workflow: .github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml
+  job: B2.6-P1 Candidate Container Equivalence
+  script: scripts/ci/assert_b26_p1_container_equivalence.py
+  owning_phase: B2.6-P1
+  protected_invariant: Deployable-image semantic authority bytes equal the candidate checkout and exclude forbidden authority configuration.
+  current_status: required
+  default_execution: true
+  candidate_action: keep_required
+  subsuming_gate: ''
+  subsumption_evidence: Host-only tests cannot prove that Docker build context and COPY topology preserve B2.6 contract bytes.
+  negative_control_preserved_by: python scripts/ci/_b26_p1_controlled_defect.py apply container_contract_copy
+  local_reproduction_command: python scripts/ci/assert_b26_p1_container_equivalence.py --help
+  risk_if_removed: CI could approve authority files absent or altered in the production image.
+  decision: keep_required
+- gate_id: b26-p1-inherited-conduction-attestor
+  workflow: .github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml
+  job: B2.6-P1 Inherited Production Conduction Attestation
+  script: scripts/ci/attest_b26_p1_inherited_conduction.py
+  owning_phase: B2.6-P1
+  protected_invariant: The exact candidate and event retain independently executed B2.5 C19, C20, C21, and P14 production-conduction physics.
+  current_status: required
+  default_execution: true
+  candidate_action: keep_required
+  subsuming_gate: ''
+  subsumption_evidence: The inherited workflow proves the causal spine; this attestor prevents a green run from another SHA or event from being reused as B2.6 evidence.
+  negative_control_preserved_by: Same-SHA, event, path, status, and subordinate-job refusal predicates in the attestor.
+  local_reproduction_command: python scripts/ci/attest_b26_p1_inherited_conduction.py --help
+  risk_if_removed: A semantic contract could be declared complete while the inherited production truth path is absent or red.
+  decision: keep_required
+- gate_id: b26-p1-negative-controls
+  workflow: .github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml
+  job: B2.6-P1 Static Semantic Authority
+  script: scripts/ci/test_b26_p1_negative_controls.py
+  owning_phase: B2.6-P1
+  protected_invariant: B2.6-P1 semantic and proof-plane sensors demonstrate bounded red, exact restore, and green behavior.
+  current_status: required
+  default_execution: true
+  candidate_action: keep_required
+  subsuming_gate: ''
+  subsumption_evidence: A passing validator does not establish non-vacuity; these controlled mutations independently exercise its refusal predicates.
+  negative_control_preserved_by: It is the red-to-green negative-control battery.
+  local_reproduction_command: python scripts/ci/test_b26_p1_negative_controls.py
+  risk_if_removed: Vacuous green gates could persist indefinitely.
+  decision: keep_required
+- gate_id: b26-p1-controlled-defect
+  workflow: .github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml
+  job: B2.6-P1 Static Semantic Authority
+  script: scripts/ci/_b26_p1_controlled_defect.py
+  owning_phase: B2.6-P1
+  protected_invariant: The negative-control mutation surface is enumerated and byte-exact restoration is reviewable.
+  current_status: required
+  default_execution: true
+  candidate_action: keep_required
+  subsuming_gate: ''
+  subsumption_evidence: Both the static and container jobs invoke this helper to create the real controlled defects their sensors must reject.
+  negative_control_preserved_by: The helper applies the declared controlled defects and emits restoration manifests.
+  local_reproduction_command: python scripts/ci/_b26_p1_controlled_defect.py list
+  risk_if_removed: Negative controls would become inline narrative with no stable mutation contract.
+  decision: keep_required
+- gate_id: b26-p1-evidence-writer
+  workflow: forensic-tooling
+  job: Imported utility, not a standalone merge gate
+  script: scripts/ci/b26_p1_evidence.py
+  owning_phase: B2.6-P1
+  protected_invariant: Proof-cell identity and content hashing have one canonical implementation.
+  current_status: utility
+  default_execution: false
+  candidate_action: keep_utility
+  subsuming_gate: ''
+  subsumption_evidence: Required producers import this shared implementation; it is not an independently executable assertion.
+  negative_control_preserved_by: python scripts/ci/test_b26_p1_negative_controls.py
+  local_reproduction_command: python scripts/ci/b26_p1_evidence.py --help
+  risk_if_removed: Producers could drift to incompatible or incomplete proof-cell identities.
+  decision: keep_utility

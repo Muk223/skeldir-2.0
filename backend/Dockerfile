@@ -11,6 +11,7 @@ COPY backend /app/backend
 COPY alembic.ini /app/alembic.ini
 COPY alembic /app/alembic
 COPY contracts/trust-api /app/contracts/trust-api
+COPY contracts/reconciliation /app/contracts/reconciliation
 COPY contracts-internal/governance /app/contracts-internal/governance
 COPY db/channel_mapping.yaml /app/db/channel_mapping.yaml
 ENV PYTHONPATH=/app/backend

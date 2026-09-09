@@ -147,6 +147,12 @@ on:
       - 'backend/app/ingestion/**'
       - 'backend/app/privacy/**'
       - 'backend/app/revenue_verification/**'
+      - 'backend/app/finance_reconciliation/**'
+      - 'backend/tests/finance_reconciliation/**'
+      - 'contracts/reconciliation/b2.6/**'
+      - 'scripts/ci/*b26_p1*'
+      - '.github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml'
+      - 'backend/Dockerfile'
       - 'api-contracts/openapi/v1/attribution.yaml'
   workflow_dispatch:
 
