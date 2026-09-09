@@ -131,6 +131,13 @@ on:
       - 'scripts/ci/assert_b25_p14_container_projection_parity.py'
       - 'scripts/ci/assert_b25_p14_custody_manifest.py'
       - 'scripts/ci/assert_b25_p14_field_semantics.py'
+      # Corrective VIII: the new falsifiers' governed files and sensors must
+      # trigger post-merge soak when touched on main.
+      - 'backend/app/api/trust_simulations.py'
+      - 'backend/app/main.py'
+      - 'backend/tests/trust/test_b25_p14_viii_route_mount.py'
+      - 'backend/tests/trust/test_b25_p14_viii_execution_identity.py'
+      - 'scripts/ci/validate_b25_p14_viii_execution_identity.py'
       - 'docker-compose.c19.yml'
       - 'scripts/ci/compare_b25_p13_c21_authority_universes.py'
       - 'backend/tests/trust/test_b25_p13_c19_legitimate_source_physics.py'
@@ -4035,6 +4042,110 @@ jobs:
             --image "skeldir-b25-p14-api:${{ github.sha }}" \
             | tee /tmp/nc_p14_07_restored.out
           grep -F '[b25-p14] container projection parity PASSED' /tmp/nc_p14_07_restored.out
+
+      # NC-P14-21. Corrective VIII falsifier C: the production request
+      # boundary must cite the exact signer-backed issuance hash the final
+      # selector resolved. Citing the logical envelope id instead must turn
+      # the vii2 issuance-selection sensor red, and exact restore must return
+      # it green.
+      - name: NC-P14-21 ignoring the final selector turns issuance selection red
+        run: |
+          set -euo pipefail
+          cp backend/app/simulation/persistence.py /tmp/p14_persistence_pristine.py
+          python scripts/ci/_b25_p14_controlled_defect.py apply \
+            final_selector_bypass
+          if python -m pytest \
+              backend/tests/trust/test_b25_p14_vii2_issuance_selection.py \
+              -q --no-header -p no:randomly > /tmp/nc_p14_21.out 2>&1; then
+            echo "NC-P14-21 did not fire: an unselected source was tolerated"
+            cp /tmp/p14_persistence_pristine.py backend/app/simulation/persistence.py
+            cat /tmp/nc_p14_21.out
+            exit 1
+          fi
+          grep -E "[0-9]+ failed" /tmp/nc_p14_21.out
+          cp /tmp/p14_persistence_pristine.py backend/app/simulation/persistence.py
+          git diff --exit-code backend/app/simulation/persistence.py
+          python -m pytest \
+            backend/tests/trust/test_b25_p14_vii2_issuance_selection.py \
+            -q --no-header -p no:randomly | tee /tmp/nc_p14_21_restored.out
+          grep -E "[0-9]+ passed" /tmp/nc_p14_21_restored.out
+
+      # NC-P14-22. Corrective VIII falsifier D: severing policy admission in
+      # the admission conjunction must let a read_only/blocked Trust conduct,
+      # which the B28 conservation sensor must refuse. Red under defect, green
+      # on exact restore.
+      - name: NC-P14-22 severed policy admission turns conservation red
+        run: |
+          set -euo pipefail
+          cp backend/app/simulation/admission.py /tmp/p14_admission_pristine.py
+          python scripts/ci/_b25_p14_controlled_defect.py apply \
+            policy_conjunct_severed
+          if python -m pytest \
+              backend/tests/trust/test_b25_p14_b28_simulation_conservation.py \
+              -q --no-header -p no:randomly > /tmp/nc_p14_22.out 2>&1; then
+            echo "NC-P14-22 did not fire: a read_only source conducted"
+            cp /tmp/p14_admission_pristine.py backend/app/simulation/admission.py
+            cat /tmp/nc_p14_22.out
+            exit 1
+          fi
+          grep -E "[0-9]+ failed" /tmp/nc_p14_22.out
+          cp /tmp/p14_admission_pristine.py backend/app/simulation/admission.py
+          git diff --exit-code backend/app/simulation/admission.py
+          python -m pytest \
+            backend/tests/trust/test_b25_p14_b28_simulation_conservation.py \
+            -q --no-header -p no:randomly | tee /tmp/nc_p14_22_restored.out
+          grep -E "[0-9]+ passed" /tmp/nc_p14_22_restored.out
+
+      # NC-P14-23. Corrective VIII falsifier E: zeroing the 900 s wall-clock
+      # possession fence must break the code/migration mirror (and lawful
+      # conduction liveness). The governed-constants mirror is the fast
+      # sensor; exact restore returns it green.
+      - name: NC-P14-23 a zeroed possession TTL turns the mirror red
+        run: |
+          set -euo pipefail
+          cp backend/app/simulation/requester_identity.py /tmp/p14_requester_pristine.py
+          python scripts/ci/_b25_p14_controlled_defect.py apply \
+            possession_ttl_zero
+          if python -m pytest \
+              backend/tests/trust/test_b25_p14_r6_possession_authority.py \
+              -q --no-header -p no:randomly -k "governed_constants_are_mirrored" > /tmp/nc_p14_23.out 2>&1; then
+            echo "NC-P14-23 did not fire: a zeroed TTL matched the migration"
+            cp /tmp/p14_requester_pristine.py backend/app/simulation/requester_identity.py
+            cat /tmp/nc_p14_23.out
+            exit 1
+          fi
+          grep -E "[0-9]+ failed" /tmp/nc_p14_23.out
+          cp /tmp/p14_requester_pristine.py backend/app/simulation/requester_identity.py
+          git diff --exit-code backend/app/simulation/requester_identity.py
+          python -m pytest \
+            backend/tests/trust/test_b25_p14_r6_possession_authority.py \
+            -q --no-header -p no:randomly -k "governed_constants_are_mirrored" | tee /tmp/nc_p14_23_restored.out
+          grep -E "1 passed" /tmp/nc_p14_23_restored.out
+
+      # NC-P14-24. Corrective VIII route sensor: unmounting the simulation
+      # router must turn the mount sensor red (POST/GET boundary gone) and
+      # exact restore must return it green.
+      - name: NC-P14-24 a disconnected simulation route turns the mount red
+        run: |
+          set -euo pipefail
+          cp backend/app/main.py /tmp/p14_main_pristine.py
+          python scripts/ci/_b25_p14_controlled_defect.py apply \
+            caller_route_disconnected
+          if python -m pytest \
+              backend/tests/trust/test_b25_p14_viii_route_mount.py \
+              -q --no-header -p no:randomly > /tmp/nc_p14_24.out 2>&1; then
+            echo "NC-P14-24 did not fire: an unmounted boundary was accepted"
+            cp /tmp/p14_main_pristine.py backend/app/main.py
+            cat /tmp/nc_p14_24.out
+            exit 1
+          fi
+          grep -E "[0-9]+ failed" /tmp/nc_p14_24.out
+          cp /tmp/p14_main_pristine.py backend/app/main.py
+          git diff --exit-code backend/app/main.py
+          python -m pytest \
+            backend/tests/trust/test_b25_p14_viii_route_mount.py \
+            -q --no-header -p no:randomly | tee /tmp/nc_p14_24_restored.out
+          grep -E "2 passed" /tmp/nc_p14_24_restored.out
 
       - name: Upload P14 evidence
         if: always()

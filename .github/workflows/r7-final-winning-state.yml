@@ -1,5 +1,23 @@
 name: "R7: Final Winning State"
 
+# R7 artifact producer/consumer contract (Corrective VIII §16 / Exit Gate 5).
+#
+#   producer:  R4b..R4f steps -> tmp/r4_results/r4_s{1..5}.json (one file per
+#              scenario S1..S5; publication condition = scenario script exit 0
+#              with {"passed": true}).
+#   consumer:  R4g aggregate step (always()): reads exactly those five paths
+#              for the CURRENT run (no SHA/run namespacing: same-job tmp dir).
+#   missing-artifact semantics: FAIL-CLOSED causal RED naming the absent
+#              producer (R4_MISSING_RESULTS=S..) plus any failed/parse-error
+#              sets. The aggregator MUST NOT manufacture success from absence.
+#   optional artifacts: NONE in the R4 set; every scenario file is mandatory.
+#   R6 note: the R6-under-load phase below uses the same event-based
+#              readiness gate as the standalone R6 lane (sleep is not evidence).
+#
+# R7 is a post-merge diagnostic (non-required). Its assertions are a subset
+# of the standalone lanes', so it is a resource soak rather than a distinct
+# truth (see pre-existing note below, preserved).
+
 on:
   workflow_dispatch:
   # Corrective XX. R7 re-runs the R1-R6 proofs sequentially against one
@@ -627,7 +645,14 @@ jobs:
           R4_POISON_WORKER_POOL: "threads"
         run: |
           set -euo pipefail
+          set +e
           python scripts/r4/worker_failure_semantics.py --scenario S1 --output-json tmp/r4_results/r4_s1.json
+          echo "R4_S1_STEP_EXIT=$?"
+          set -e
+          # Immediate producer/consumer handshake: the R4g aggregate consumes
+          # tmp/r4_results/r4_s1.json; a missing file here is a producer
+          # failure, surfaced now AND fail-closed in R4g (R4_MISSING_RESULTS).
+          if [ -f tmp/r4_results/r4_s1.json ]; then echo "R4_S1_PRODUCED"; else echo "R4_S1_PRODUCER_MISSING"; fi
 
       - name: "R7 Phase R4c: Crash after write"
         shell: bash
@@ -645,7 +670,11 @@ jobs:
           R4_CRASH_WORKER_CONCURRENCY: "1"
         run: |
           set -euo pipefail
+          set +e
           python scripts/r4/worker_failure_semantics.py --scenario S2 --output-json tmp/r4_results/r4_s2.json
+          echo "R4_S2_STEP_EXIT=$?"
+          set -e
+          if [ -f tmp/r4_results/r4_s2.json ]; then echo "R4_S2_PRODUCED"; else echo "R4_S2_PRODUCER_MISSING"; fi
 
       - name: "R7 Phase R4d: RLS probe"
         shell: bash
@@ -660,7 +689,11 @@ jobs:
           R4_WORKER_POOL: "threads"
         run: |
           set -euo pipefail
+          set +e
           python scripts/r4/worker_failure_semantics.py --scenario S3 --output-json tmp/r4_results/r4_s3.json
+          echo "R4_S3_STEP_EXIT=$?"
+          set -e
+          if [ -f tmp/r4_results/r4_s3.json ]; then echo "R4_S3_PRODUCED"; else echo "R4_S3_PRODUCER_MISSING"; fi
 
       - name: "R7 Phase R4e: Runaway no-starve"
         shell: bash
@@ -676,7 +709,11 @@ jobs:
           R4_WORKER_POOL: "prefork"
         run: |
           set -euo pipefail
+          set +e
           python scripts/r4/worker_failure_semantics.py --scenario S4 --output-json tmp/r4_results/r4_s4.json
+          echo "R4_S4_STEP_EXIT=$?"
+          set -e
+          if [ -f tmp/r4_results/r4_s4.json ]; then echo "R4_S4_PRODUCED"; else echo "R4_S4_PRODUCER_MISSING"; fi
 
       - name: "R7 Phase R4f: Least privilege"
         shell: bash
@@ -691,7 +728,11 @@ jobs:
           R4_WORKER_POOL: "threads"
         run: |
           set -euo pipefail
+          set +e
           python scripts/r4/worker_failure_semantics.py --scenario S5 --output-json tmp/r4_results/r4_s5.json
+          echo "R4_S5_STEP_EXIT=$?"
+          set -e
+          if [ -f tmp/r4_results/r4_s5.json ]; then echo "R4_S5_PRODUCED"; else echo "R4_S5_PRODUCER_MISSING"; fi
 
       - name: "R7 Phase R4g: Aggregate"
         shell: bash
@@ -874,7 +915,11 @@ jobs:
             --max-memory-per-child "${CELERY_WORKER_MAX_MEMORY_PER_CHILD_KB}" \
             --logfile r6_worker.log \
             --pidfile /tmp/r6_worker.pid >/dev/null 2>&1 &
-          sleep 5
+
+          # Corrective VIII: same event-based readiness gate as the standalone
+          # R6 lane; a fixed sleep is not a readiness signal (H-VIII-01/08).
+          export R6_SHA="${GITHUB_SHA}"
+          python scripts/r6/r6_wait_for_worker.py
 
           python scripts/r6/r6_context_gathering.py
 

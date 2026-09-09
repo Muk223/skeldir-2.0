@@ -31,6 +31,9 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SIMULATION_SERVICE = REPO_ROOT / "backend/app/simulation/service.py"
 EXPLANATION_SERVICE = REPO_ROOT / "backend/app/explanation/service.py"
+TRUST_SIMULATIONS_ROUTE = REPO_ROOT / "backend/app/api/trust_simulations.py"
+APP_MAIN = REPO_ROOT / "backend/app/main.py"
+SIMULATION_ADMISSION = REPO_ROOT / "backend/app/simulation/admission.py"
 PROFILE_REGISTRY = REPO_ROOT / "contracts/trust-api/projection-profiles.v1.yaml"
 PRODUCTION_DOCKERFILE = REPO_ROOT / "backend/Dockerfile"
 EXPLANATION_CONSERVATION = REPO_ROOT / "backend/app/explanation/conservation.py"
@@ -444,6 +447,94 @@ def custody_secret_reaches_an_untrusted_container() -> None:
     )
 
 
+def final_selector_bypass() -> None:
+    """Corrective VIII falsifier C: mis-handle the exact final-artifact selector.
+
+    The production request boundary (``conduct_requested_simulation``) must
+    cite the exact signer-backed issuance hash the final selector resolved.
+    This control cites the LOGICAL envelope id where the issuance hash
+    belongs, so the durable request no longer names the selected issuance.
+    The vii2 issuance-selection suite must turn RED (exact binding broken,
+    conduction refused by the durable-issuance guard), proving the governing
+    sensor measures selection binding rather than shape.
+
+    Layer note: the HTTP ``_source`` resolver is measured only over live HTTP
+    (C19 topology); pairing an HTTP mutation with this DB-backed suite is
+    vacuous (first VIII attempt demonstrated exactly that non-firing). The
+    cite layer is the governed-system mutation this sensor adjudicates.
+    """
+
+    _replace_once(
+        SIMULATION_PERSISTENCE,
+        '        source_semantic_truth_hash=str(envelope.get("semantic_truth_hash", "")),\n'
+        "        source_issuance_envelope_hash=source_issuance_envelope_hash,\n"
+        "        total_budget_minor",
+        '        source_semantic_truth_hash=str(envelope.get("semantic_truth_hash", "")),\n'
+        '        source_issuance_envelope_hash=str(envelope.get("envelope_id", "")),  # NC-P14-21\n'
+        "        total_budget_minor",
+        what="final_selector_bypass",
+    )
+
+
+def policy_conjunct_severed() -> None:
+    """Corrective VIII falsifier D: sever policy admission in the admission
+    conjunction.
+
+    The governed admission path (``simulate_from_trust``) refuses
+    non-admissible source policy states (``read_only``/``blocked``) before
+    any deterministic work. This control disables that refusal so a
+    ``read_only`` Trust conducts through the solver. The B28 conservation
+    suite's ``read_only``/``blocked`` block must turn RED, proving admission
+    is enforced rather than assumed.
+
+    Layer note: the suite measures the admission conjunction, not the HTTP
+    ``_source`` pre-check; the defect lives where the sensor looks.
+    """
+
+    _replace_once(
+        SIMULATION_ADMISSION,
+        "    if projection.source_policy_state not in SIMULATION_ADMISSIBLE_POLICY_STATES:\n",
+        "    if False:  # NC-P14-22\n",
+        what="policy_conjunct_severed",
+    )
+
+
+def possession_ttl_zero() -> None:
+    """Corrective VIII falsifier E: regress the wall-clock possession fence.
+
+    The 900 s wall-clock witness fence (``clock_timestamp()``-based, mirrored
+    between code and migration) bounds credential replay. Zeroing the TTL
+    makes every lawful witness instantly stale, so lawful conduction REDs via
+    liveness loss AND the governed-constants mirror test REDs via drift. A
+    sensor that stays green under this defect measures neither freshness nor
+    the code/migration mirror.
+    """
+
+    _replace_once(
+        REQUESTER_IDENTITY,
+        "POSSESSION_WITNESS_TTL_SECONDS = 900",
+        "POSSESSION_WITNESS_TTL_SECONDS = 0  # NC-P14-23",
+        what="possession_ttl_zero",
+    )
+
+
+def caller_route_disconnected() -> None:
+    """Corrective VIII falsifier: disconnect the simulation request route.
+
+    The supported product boundary is HTTP: exactly one non-test caller (the
+    mounted POST route) may invoke simulation admission. Unmounting the
+    router must turn the route census (2 routes) RED and make POST/GET
+    unreachable, proving reachability is mounted rather than assumed.
+    """
+
+    _replace_once(
+        APP_MAIN,
+        'app.include_router(trust_simulations.router, prefix="/api", tags=["Trust Simulations"])',
+        '# NC-P14-24 app.include_router(trust_simulations.router, prefix="/api", tags=["Trust Simulations"])',
+        what="caller_route_disconnected",
+    )
+
+
 DEFECTS = {
     "platform_write": platform_write,
     "second_solver_caller": second_solver_caller,
@@ -464,6 +555,10 @@ DEFECTS = {
     "custody_secret_reaches_an_untrusted_container": (
         custody_secret_reaches_an_untrusted_container
     ),
+    "final_selector_bypass": final_selector_bypass,
+    "policy_conjunct_severed": policy_conjunct_severed,
+    "possession_ttl_zero": possession_ttl_zero,
+    "caller_route_disconnected": caller_route_disconnected,
 }
 
 
