@@ -110,6 +110,15 @@ ALLOWED_DOCKER_PATHS = {
     # the beat scheduler, which is the exact falsifier NC-P14-20 drives.
     Path("scripts/ci/assert_b25_p14_custody_manifest.py"),
     Path("scripts/ci/validate_m0_scope_lock.py"),
+    # B2.6-P1 Gate 5 proves that the already-authorized `backend/Dockerfile`
+    # image ships the exact candidate semantic-contract bytes (source hash =
+    # container-loaded hash). The validator statically asserts that COPY layer,
+    # the controlled-defect applier mutates that same COPY layer for NC-07, and
+    # the adjudication workflow builds that same authorized image. Same reason
+    # as P14 Gate 4: they check the authorized substrate, they do not add one.
+    Path("scripts/ci/validate_b26_p1_authority.py"),
+    Path("scripts/ci/_b26_p1_controlled_defect.py"),
+    Path(".github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml"),
     Path("scripts/ci/validate_m1_local_dev_authority.py"),
     Path("scripts/ci/validate_m2_test_feedback_loop.py"),
     Path("scripts/phase8/run_phase8_closure_pack.py"),

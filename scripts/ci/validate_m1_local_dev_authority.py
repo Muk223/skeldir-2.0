@@ -565,6 +565,24 @@ ALLOWED_M1_PATH_PREFIXES = [
     "scripts/ci/apply_throughput_topology.py",
     "scripts/ci/dissolve_barrier_edges.py",
     "scripts/ci/prune_unused_cache_keys.py",
+    # --- B2.6-P1 contract-authority surface (semantic freeze + proof plane) ---
+    # Authority-only slice: versioned semantic contract, runtime contract
+    # identity, false-authority validator, content-addressed proof cells,
+    # negative controls, container-equivalence validator, inherited-conduction
+    # attestor, aggregate adjudicator, and the merge_group-native adjudication
+    # workflow. Declared explicitly; every prohibition above is retained
+    # unchanged. No reconciliation state, computation, API, worker, scheduler,
+    # export, migration, or TrustEnvelope field is included.
+    ".github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml",
+    "backend/app/finance_reconciliation/",
+    "contracts/reconciliation/b2.6/",
+    "scripts/ci/_b26_p1_controlled_defect.py",
+    "scripts/ci/adjudicate_b26_p1_proof_plane.py",
+    "scripts/ci/assert_b26_p1_container_equivalence.py",
+    "scripts/ci/attest_b26_p1_inherited_conduction.py",
+    "scripts/ci/b26_p1_evidence.py",
+    "scripts/ci/test_b26_p1_negative_controls.py",
+    "scripts/ci/validate_b26_p1_authority.py",
 ]
 
 PROHIBITED_PATH_PATTERNS = [
