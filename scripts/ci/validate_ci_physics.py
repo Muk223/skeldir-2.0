@@ -74,15 +74,29 @@ def load_required_contexts() -> set[str] | None:
     return set(contexts) if isinstance(contexts, list) else set()
 
 
+def possible_names(value: object) -> set[str]:
+    """Return a static name and literal outcomes of a GitHub name expression."""
+    rendered = str(value)
+    names = {rendered}
+    if rendered.startswith("${{"):
+        names.update(
+            left or right
+            for left, right in re.findall(r"'([^']+)'|\"([^\"]+)\"", rendered)
+            if left or right
+        )
+    return names
+
+
 def produced_names(doc: dict) -> set[str]:
     """Every check-run name a workflow file can emit (workflow + job names)."""
+
     names: set[str] = set()
     if doc.get("name"):
-        names.add(str(doc["name"]))
+        names.update(possible_names(doc["name"]))
     for jid, body in (doc.get("jobs") or {}).items():
         names.add(str(jid))
         if isinstance(body, dict) and body.get("name"):
-            names.add(str(body["name"]))
+            names.update(possible_names(body["name"]))
     return names
 
 
@@ -254,7 +268,7 @@ def check_workflow(path: Path, contexts: set[str] | None = None) -> list[str]:
                 continue
             names = {str(jid)}
             if body.get("name"):
-                names.add(str(body["name"]))
+                names.update(possible_names(body["name"]))
             matched = [c for c in contexts if c in names]
             if not matched:
                 stems = {c.split(" (")[0] for c in contexts if " (" in c}
@@ -381,11 +395,7 @@ def check_merge_queue_coverage(files: list[Path]) -> list[str]:
             continue
         if not isinstance(doc, dict):
             continue
-        names = {str(doc["name"])} if doc.get("name") else set()
-        for jid, body in (doc.get("jobs") or {}).items():
-            names.add(str(jid))
-            if isinstance(body, dict) and body.get("name"):
-                names.add(str(body["name"]))
+        names = produced_names(doc)
         index[path.name] = {"names": names, "mg": "merge_group" in triggers(doc)}
 
     fails: list[str] = []

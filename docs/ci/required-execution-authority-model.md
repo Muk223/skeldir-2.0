@@ -8,13 +8,13 @@ required contexts -- including `R6 Worker Resource Governance` -- from three
 trigger lifecycles (`pull_request`, `merge_group`, `push` to `main`) under one
 name. The exact protected-main SHA `97721048` therefore carried both a
 merge-group GREEN and a later push RED for the same required name, with no
-machine-readable distinction between them. "80/80 required checks green" is
+machine-readable distinction between them. "81/81 required checks green" is
 epistemically meaningless while that ambiguity exists.
 
 ## Decision (least-complex architecture)
 
 Separate the lifecycles by trigger elimination; do not rename the governing
-contexts (renaming 80 required contexts would require a synchronized
+contexts (renaming 81 required contexts would require a synchronized
 branch-protection change with a far larger blast radius). Gating the job with
 `if:` is explicitly NOT accepted: the merge-governance validator correctly
 refuses conditional required contexts (a skipped required context is not a

@@ -1,0 +1,214 @@
+name: B2.6-P1 Contract Authority, Semantic Freeze and Proof Plane
+
+# Pre-landing events emit the sole required context. The exact-main push event
+# emits a deliberately different diagnostic context, so a push result cannot
+# satisfy, collide with, or override merge admission.
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  actions: read
+  checks: read
+
+env:
+  B26_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+  B26_EVENT_TYPE: ${{ github.event_name }}
+  PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/backend
+
+jobs:
+  b26-p1-static-authority:
+    name: B2.6-P1 Static Semantic Authority
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.B26_CANDIDATE_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install authority dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Validate semantic and governing authority
+        run: |
+          python scripts/ci/validate_b26_p1_authority.py \
+            --evidence-dir artifacts/b26_p1/static
+
+      - name: Prove static sensors and proof identity are non-vacuous
+        run: |
+          python scripts/ci/test_b26_p1_negative_controls.py \
+            --evidence-out artifacts/b26_p1/static/negative-controls.json
+          git diff --exit-code
+
+      - name: Upload static authority evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: b26-p1-static-${{ github.run_id }}
+          path: artifacts/b26_p1/static/*.json
+          if-no-files-found: error
+
+  b26-p1-container-equivalence:
+    name: B2.6-P1 Candidate Container Equivalence
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.B26_CANDIDATE_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install evidence dependencies
+        run: pip install "pyyaml>=6.0" alembic
+
+      - name: Build and inspect pristine production image
+        run: |
+          docker build -f backend/Dockerfile -t skeldir-b26-p1:${{ github.sha }} .
+          python scripts/ci/assert_b26_p1_container_equivalence.py \
+            --image skeldir-b26-p1:${{ github.sha }}
+
+      - name: NC-B26-P1-07 image-layer contract drift turns red then restores green
+        run: |
+          set -euo pipefail
+          pristine_hash="$(sha256sum backend/Dockerfile | awk '{print $1}')"
+          cp backend/Dockerfile "$RUNNER_TEMP/b26-p1-Dockerfile"
+          python scripts/ci/_b26_p1_controlled_defect.py apply container_contract_copy
+          docker build -f backend/Dockerfile -t skeldir-b26-p1-defect:${{ github.sha }} .
+          if python scripts/ci/assert_b26_p1_container_equivalence.py \
+            --image skeldir-b26-p1-defect:${{ github.sha }}; then
+            echo "B26-P1-NC-07 did not turn red"
+            exit 1
+          fi
+          cp "$RUNNER_TEMP/b26-p1-Dockerfile" backend/Dockerfile
+          test "$(sha256sum backend/Dockerfile | awk '{print $1}')" = "$pristine_hash"
+          docker build -f backend/Dockerfile -t skeldir-b26-p1-restored:${{ github.sha }} .
+          python scripts/ci/assert_b26_p1_container_equivalence.py \
+            --image skeldir-b26-p1-restored:${{ github.sha }} \
+            --evidence-out artifacts/b26_p1/container/container-equivalence.json
+          git diff --exit-code -- backend/Dockerfile
+
+      - name: Upload container evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: b26-p1-container-${{ github.run_id }}
+          path: artifacts/b26_p1/container/*.json
+          if-no-files-found: error
+
+  b26-p1-inherited-conduction:
+    name: B2.6-P1 Inherited Production Conduction Attestation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.B26_CANDIDATE_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install evidence dependencies
+        run: pip install "pyyaml>=6.0" alembic
+
+      - name: Attest independently produced C19 C20 C21 exact-SHA physics
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python scripts/ci/attest_b26_p1_inherited_conduction.py \
+            --wait-seconds 2400 \
+            --poll-seconds 30 \
+            --evidence-out artifacts/b26_p1/inherited/inherited-physics.json
+
+      - name: Upload inherited-conduction evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: b26-p1-inherited-${{ github.run_id }}
+          path: artifacts/b26_p1/inherited/*.json
+          if-no-files-found: error
+
+  b26-p1-finance-reconciliation-adjudication:
+    name: ${{ github.event_name == 'push' && 'B2.6 P1 Exact-Main Diagnostics' || 'B2.6 Finance Reconciliation Adjudication' }}
+    if: always()
+    needs:
+      - b26-p1-static-authority
+      - b26-p1-container-equivalence
+      - b26-p1-inherited-conduction
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Refuse absent skipped or red producers
+        env:
+          STATIC_RESULT: ${{ needs['b26-p1-static-authority'].result }}
+          CONTAINER_RESULT: ${{ needs['b26-p1-container-equivalence'].result }}
+          INHERITED_RESULT: ${{ needs['b26-p1-inherited-conduction'].result }}
+        run: |
+          test "$STATIC_RESULT" = success
+          test "$CONTAINER_RESULT" = success
+          test "$INHERITED_RESULT" = success
+
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.B26_CANDIDATE_SHA }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install adjudicator dependencies
+        run: pip install "pyyaml>=6.0" alembic
+
+      - name: Download all producer evidence
+        uses: actions/download-artifact@v4
+        with:
+          pattern: b26-p1-*-${{ github.run_id }}
+          path: artifacts/b26_p1/all
+          merge-multiple: true
+
+      - name: Adjudicate exact candidate proof plane
+        run: |
+          python scripts/ci/adjudicate_b26_p1_proof_plane.py \
+            --artifact-root artifacts/b26_p1/all \
+            --candidate-sha "$B26_CANDIDATE_SHA" \
+            --event-type "$GITHUB_EVENT_NAME" \
+            --run-id "$GITHUB_RUN_ID" \
+            --workflow "$GITHUB_WORKFLOW" \
+            --capsule-out artifacts/b26_p1/aggregate/governance-capsule.json
+
+      - name: Upload adjudicated governance capsule
+        uses: actions/upload-artifact@v4
+        with:
+          name: b26-p1-governance-capsule-${{ github.run_id }}
+          path: artifacts/b26_p1/aggregate/governance-capsule.json
+          if-no-files-found: error

@@ -4213,3 +4213,156 @@
   deprecation_reason: Utility-only until a workflow references it through the registry.
   subsumed_by: ''
   registry_action: utility
+- id: b26-p1-static-authority
+  path: scripts/ci/validate_b26_p1_authority.py
+  status: required
+  owning_phase: B2.6-P1
+  protected_invariant: The B2.6-P1 semantic contract remains bound to the exact normalized B2.3 coverage producer, preserves provisional and unsupported-rail semantics, declares no reconciliation runtime machinery, and fences every known legacy reconciliation surface from authority.
+  command: python scripts/ci/validate_b26_p1_authority.py --evidence-dir evidence/b26-p1/static
+  workflow_references:
+  - .github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml
+  workflow_job_name: B2.6-P1 Static Semantic Authority
+  local_reproduction_command: python scripts/ci/validate_b26_p1_authority.py
+  expected_failure_meaning: Semantic authority drifted from B2.3 production truth, an excluded rail or legacy false authority re-entered, forbidden P1 machinery appeared, or the required context acquired ambiguous execution identity.
+  first_diagnostic_command: python scripts/ci/validate_b26_p1_authority.py
+  depends_on_db: false
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: true
+  execution_cohort: b26-p1-finance-reconciliation-adjudication
+  ci_visibility: workflow_job
+  replacement: ''
+  deprecation_reason: ''
+  subsumed_by: ''
+  registry_action: keep
+- id: b26-p1-proof-plane-adjudicator
+  path: scripts/ci/adjudicate_b26_p1_proof_plane.py
+  status: required
+  owning_phase: B2.6-P1
+  protected_invariant: The required B2.6-P1 context succeeds only after independently verifying one content-addressed PASS cell from every declared producer on the exact candidate SHA, tree, migration head, workflow event, semantic contract, scenario, and falsifier.
+  command: python scripts/ci/adjudicate_b26_p1_proof_plane.py --evidence-root evidence/b26-p1 --capsule-out evidence/b26-p1/capsule.json
+  workflow_references:
+  - .github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml
+  workflow_job_name: B2.6 Finance Reconciliation Adjudication
+  local_reproduction_command: python scripts/ci/adjudicate_b26_p1_proof_plane.py --help
+  expected_failure_meaning: A proof cell is missing, stale, corrupt, self-inconsistent, or belongs to a different candidate or execution identity.
+  first_diagnostic_command: python scripts/ci/adjudicate_b26_p1_proof_plane.py --help
+  depends_on_db: false
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: true
+  execution_cohort: b26-p1-finance-reconciliation-adjudication
+  ci_visibility: workflow_job
+  replacement: ''
+  deprecation_reason: ''
+  subsumed_by: ''
+  registry_action: keep
+- id: b26-p1-container-equivalence
+  path: scripts/ci/assert_b26_p1_container_equivalence.py
+  status: required
+  owning_phase: B2.6-P1
+  protected_invariant: The production Dockerfile contains the same B2.6 semantic contract bytes and normalized B2.3 coverage producer as the candidate checkout and carries no private-key or alternate-authority environment surface.
+  command: python scripts/ci/assert_b26_p1_container_equivalence.py --image skeldir-b26-p1:${B26_CANDIDATE_SHA} --evidence-out evidence/b26-p1/container/cell.json
+  workflow_references:
+  - .github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml
+  workflow_job_name: B2.6-P1 Candidate Container Equivalence
+  local_reproduction_command: python scripts/ci/assert_b26_p1_container_equivalence.py --help
+  expected_failure_meaning: The deployable image omitted or changed the semantic authority inputs, or exposed forbidden signing or authority configuration.
+  first_diagnostic_command: python scripts/ci/assert_b26_p1_container_equivalence.py --help
+  depends_on_db: false
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: true
+  execution_cohort: b26-p1-finance-reconciliation-adjudication
+  ci_visibility: workflow_job
+  replacement: ''
+  deprecation_reason: ''
+  subsumed_by: ''
+  registry_action: keep
+- id: b26-p1-inherited-conduction-attestor
+  path: scripts/ci/attest_b26_p1_inherited_conduction.py
+  status: required
+  owning_phase: B2.6-P1
+  protected_invariant: The exact candidate has an independently successful B2.5-P13 run from the same governance event whose C19, C20, C21, and P14 subordinate jobs all completed successfully.
+  command: python scripts/ci/attest_b26_p1_inherited_conduction.py --evidence-out evidence/b26-p1/inherited/cell.json
+  workflow_references:
+  - .github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml
+  workflow_job_name: B2.6-P1 Inherited Production Conduction Attestation
+  local_reproduction_command: python scripts/ci/attest_b26_p1_inherited_conduction.py --help
+  expected_failure_meaning: The candidate lacks same-event, exact-SHA production-conduction evidence for inherited B2.3-to-B2.5 truth and signing physics.
+  first_diagnostic_command: python scripts/ci/attest_b26_p1_inherited_conduction.py --help
+  depends_on_db: true
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: true
+  execution_cohort: b26-p1-finance-reconciliation-adjudication
+  ci_visibility: workflow_job
+  replacement: ''
+  deprecation_reason: ''
+  subsumed_by: ''
+  registry_action: keep
+- id: b26-p1-negative-controls
+  path: scripts/ci/test_b26_p1_negative_controls.py
+  status: required
+  owning_phase: B2.6-P1
+  protected_invariant: Every semantic, false-authority, execution-identity, and proof-candidate sensor demonstrably turns red under a controlled defect, restores exact bytes, and returns green.
+  command: python scripts/ci/test_b26_p1_negative_controls.py --evidence-out evidence/b26-p1/static/negative-controls.json
+  workflow_references:
+  - .github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml
+  workflow_job_name: B2.6-P1 Static Semantic Authority
+  local_reproduction_command: python scripts/ci/test_b26_p1_negative_controls.py
+  expected_failure_meaning: A B2.6-P1 gate cannot detect the defect class it claims to exclude or cannot restore governing bytes exactly.
+  first_diagnostic_command: python scripts/ci/test_b26_p1_negative_controls.py
+  depends_on_db: false
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: true
+  execution_cohort: b26-p1-finance-reconciliation-adjudication
+  ci_visibility: inline_step
+  replacement: ''
+  deprecation_reason: ''
+  subsumed_by: ''
+  registry_action: keep
+- id: b26-p1-controlled-defect
+  path: scripts/ci/_b26_p1_controlled_defect.py
+  status: required
+  owning_phase: B2.6-P1
+  protected_invariant: Controlled defects mutate only an enumerated B2.6-P1 authority surface and preserve byte-exact restoration metadata for non-vacuous red-to-green proof.
+  command: python scripts/ci/_b26_p1_controlled_defect.py list
+  workflow_references:
+  - .github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml
+  workflow_job_name: B2.6-P1 Static Semantic Authority
+  local_reproduction_command: python scripts/ci/_b26_p1_controlled_defect.py list
+  expected_failure_meaning: Negative controls can no longer create a bounded real defect or prove exact restoration.
+  first_diagnostic_command: python scripts/ci/_b26_p1_controlled_defect.py list
+  depends_on_db: false
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: true
+  execution_cohort: b26-p1-finance-reconciliation-adjudication
+  ci_visibility: inline_step
+  replacement: ''
+  deprecation_reason: ''
+  subsumed_by: ''
+  registry_action: keep
+- id: b26-p1-evidence-writer
+  path: scripts/ci/b26_p1_evidence.py
+  status: utility
+  owning_phase: B2.6-P1
+  protected_invariant: Every B2.6-P1 evidence cell is normalized, content-addressed, and bound to candidate SHA, tree, migration head, contract bytes, producer, workflow event, scenario, and falsifier.
+  command: python scripts/ci/b26_p1_evidence.py --help
+  workflow_references: []
+  workflow_job_name: ''
+  local_reproduction_command: python scripts/ci/b26_p1_evidence.py --help
+  expected_failure_meaning: Proof producers cannot emit a canonical independently verifiable evidence-cell identity.
+  first_diagnostic_command: python scripts/ci/b26_p1_evidence.py --help
+  depends_on_db: false
+  depends_on_celery: false
+  depends_on_pooler: false
+  default_execution: false
+  execution_cohort: utility-only
+  ci_visibility: imported_utility
+  replacement: ''
+  deprecation_reason: Utility-only; the required producer scripts import it.
+  subsumed_by: ''
+  registry_action: utility

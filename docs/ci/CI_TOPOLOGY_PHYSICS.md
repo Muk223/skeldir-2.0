@@ -2,7 +2,7 @@
 
 **Audience:** any agent or engineer who adds a workflow, adds a phase, or changes `.github/workflows/`.
 **Enforced by:** `.github/workflows/ci-physics-guard.yml` → `scripts/ci/validate_ci_physics.py`
-**Non-vacuity:** `scripts/ci/test_ci_physics_negative_controls.py` (24 controls)
+**Non-vacuity:** `scripts/ci/test_ci_physics_negative_controls.py` (25 controls)
 
 If you only read one section, read [§5 Adding a phase](#5-adding-a-phase).
 
@@ -77,7 +77,7 @@ checks**. Only the ordering constraint was removed, and only where nothing
 depended on it: the jobs that read `needs.<job>.result`, and the jobs whose
 `needs:` a governance contract pins, all kept their edges (see rule 4).
 
-Nothing was removed, skipped, or made optional. All 80 required contexts remain
+Nothing was removed, skipped, or made optional. All 81 required contexts remain
 required — `Checkout Code` and `CI Physics Guard` were **added** to that set, the
 first because removing its edges meant its assertions had to block merges
 explicitly rather than by starving downstream contexts.
@@ -126,7 +126,7 @@ merge. The proof on an exact SHA always runs to completion.
 Every workflow with a `pull_request` trigger also declares `merge_group:`.
 
 **A merge queue is enabled on `main`**, validating the speculative merge commit —
-the object that actually becomes `main` — against all 80 required contexts before
+the object that actually becomes `main` — against all 81 required contexts before
 it lands.
 
 **`strict: true` is retained alongside it.** A first attempt set `strict: false`

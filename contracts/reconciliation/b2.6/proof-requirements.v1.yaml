@@ -1,0 +1,51 @@
+phase: B2.6-P1
+manifest_version: b2.6-p1-proof-requirements-v1
+contract_path: contracts/reconciliation/b2.6/semantic-authority.v1.yaml
+required_cells:
+  - gate_id: B26-P1-G4-SEMANTIC-AUTHORITY
+    producer: b26-p1-static-authority
+    scenario_id: semantic-authority-pristine
+    falsifier_id: B26-P1-NC-01-through-04
+  - gate_id: B26-P1-G8-EXECUTION-IDENTITY
+    producer: b26-p1-static-authority
+    scenario_id: governing-workflow-pristine
+    falsifier_id: B26-P1-NC-05
+  - gate_id: B26-P1-G9-NEGATIVE-CONTROLS
+    producer: b26-p1-static-authority
+    scenario_id: red-restore-green-ledger
+    falsifier_id: B26-P1-NC-01-through-06
+  - gate_id: B26-P1-G3-G10-CONTAINER-EQUIVALENCE
+    producer: b26-p1-container-equivalence
+    scenario_id: candidate-production-image
+    falsifier_id: B26-P1-NC-07
+  - gate_id: B26-P1-G1-G2-INHERITED-PHYSICS
+    producer: b26-p1-inherited-conduction
+    scenario_id: b25-p13-context-robust-production-closure
+    falsifier_id: inherited-C19-C20-C21-negative-controls
+
+accepted_status: PASS
+required_inherited_jobs:
+  - B2.5-P13 C19 Context-Robust Production Closure
+  - B2.5-P13 C20 Verdict Authority Conservation
+  - B2.5-P13 C21 Freshness and Issuance Authority Conservation
+  - B2.5-P14 Downstream Projection Safety
+accepted_events:
+  - pull_request
+  - merge_group
+  - push
+required_identity_fields:
+  - gate_id
+  - phase
+  - contract_version
+  - contract_hash
+  - candidate_sha
+  - candidate_tree
+  - migration_head
+  - producer
+  - workflow
+  - event_type
+  - run_id
+  - artifact_hash
+  - scenario_id
+  - falsifier_id
+  - status

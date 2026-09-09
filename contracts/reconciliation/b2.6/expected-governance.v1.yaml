@@ -1,0 +1,27 @@
+phase: B2.6-P1
+contract_version: b2.6-p1-governance-v1
+protected_branch: main
+required_context: B2.6 Finance Reconciliation Adjudication
+diagnostic_context: B2.6 P1 Exact-Main Diagnostics
+governing_events:
+  - pull_request
+  - merge_group
+diagnostic_events:
+  - push
+required_context_must_not_emit_on:
+  - push
+  - workflow_dispatch
+branch_protection:
+  strict: true
+  enforce_admins: true
+merge_queue:
+  ruleset_name: main-merge-queue
+  enforcement: active
+  grouping_strategy: ALLGREEN
+  bypass_actors: []
+workflow_path: .github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml
+aggregate_job_id: b26-p1-finance-reconciliation-adjudication
+required_producer_jobs:
+  - b26-p1-static-authority
+  - b26-p1-container-equivalence
+  - b26-p1-inherited-conduction

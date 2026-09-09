@@ -3,7 +3,8 @@
   "artifact_fidelity": {
    "container_proof_workflows": [
     "b2_5-p13-e2e-trust-closure.yml",
-    "b2_4-gate-dry-run.yml"
+    "b2_4-gate-dry-run.yml",
+    "b2_6-p1-finance-reconciliation-adjudication.yml"
    ],
    "host_only_remainder": true,
    "negative_control": "NC-P14-07 Dockerfile parity (P13 lines 3571-3589): Dockerfile-only defect red while host gates stay green"
@@ -31,7 +32,7 @@
    "wall_min": 38.63
   },
   "required_match_live": true,
-  "required_total": 80
+  "required_total": 81
  },
  "conservation_laws": [
   "CI-C1 proof conservation",
@@ -41,7 +42,7 @@
   "CI-C5 merge authority conservation"
  ],
  "contract_id": "ci.proof_conservation",
- "contract_version": "v1.0.2",
+ "contract_version": "v1.0.3",
  "invariants": [
   {
    "advisory_owners": [
@@ -141,11 +142,17 @@
      "context": "B2.1-P0 Runtime Authority Closeout",
      "job": "b21-p0-runtime-authority-closeout",
      "workflow": "ci.yml"
+    },
+    {
+     "context": "B2.6 Finance Reconciliation Adjudication",
+     "job": "b26-p1-finance-reconciliation-adjudication",
+     "workflow": "b2_6-p1-finance-reconciliation-adjudication.yml"
     }
    ],
    "sensors": [
     "ci.yml b23-p5-composite-proof (21-gate harness)",
-    "backend/tests numeric authority (test-backend job, ci.yml)"
+    "backend/tests numeric authority (test-backend job, ci.yml)",
+    "b2_6-p1 semantic, container, inherited-physics and exact-candidate adjudication"
    ]
   },
   {
@@ -419,7 +426,7 @@
    "evidence_tier": "meta-proof: guards prove the proofs run (Plane D discipline); 18/18 NC must pass",
    "id": "I-10",
    "negative_controls": [
-    "validate_ci_physics.py NC suite 24/24 (15 inherited + advisory-MG x3 + advisory-paths x3 + required-missing-MG x1 + required-job-if x2)",
+    "validate_ci_physics.py NC suite 25/25 (15 inherited + advisory-MG x3 + advisory-paths x3 + required-missing-MG x1 + required-job-if x2 + dynamic required-name x1)",
     "validate_p13_merge_governance.py NC suite",
     "P12 Plane D (projection 3 + isolation 4 + ci_gate 7, asserted counts)",
     "forensics INDEX enforcer E-VAC-01 + 2026-09-06 re-check"
@@ -463,7 +470,7 @@
   "branch": "main",
   "live_match_contract": true,
   "merge_queue": "main-merge-queue (ALLGREEN, max_entries_to_build=1, check_response_timeout=60m)",
-  "required_total": 80,
+  "required_total": 81,
   "strict": true
  },
  "remediation_scope": "Orchestration and execution physics only. No required context renamed, removed, or weakened. Non-required (advisory) lanes are risk-selected (paths) and removed from merge_group; required lanes untouched. ci.yml job names untouched; only environment-construction steps accelerated (Playwright/Go caches).",
@@ -743,6 +750,11 @@
    "invariant": "I-4"
   },
   {
+   "context": "B2.6 Finance Reconciliation Adjudication",
+   "workflow": "b2_6-p1-finance-reconciliation-adjudication.yml",
+   "invariant": "I-2"
+  },
+  {
    "context": "B2.5-P8 Signing Verification",
    "workflow": "b2_5-p8-signing-verification.yml",
    "invariant": "I-5"
@@ -873,5 +885,5 @@
    "invariant": "I-9"
   }
  ],
- "coverage_note": "Every live required context (80/80) maps to exactly one primary invariant and one producing workflow. Matrix legs (e.g. Phase Gates (B0.3)) resolve via stem to the matrix job. Falsifier: if any required context has no producer firing on merge_group, validate_ci_physics.py check_merge_queue_coverage fails."
+ "coverage_note": "Every live required context (81/81) maps to exactly one primary invariant and one producing workflow. Matrix legs (e.g. Phase Gates (B0.3)) resolve via stem to the matrix job. Falsifier: if any required context has no producer firing on merge_group, validate_ci_physics.py check_merge_queue_coverage fails."
 }
