@@ -58,6 +58,13 @@ EXPECTED_GATES = {
     "B26-P1-G8-EXECUTION-IDENTITY",
     "B26-P1-G9-NEGATIVE-CONTROLS",
 }
+EXPECTED_GATE_PRODUCERS = {
+    "B26-P1-G4-SEMANTIC-AUTHORITY": "b26-p1-static-authority",
+    "B26-P1-G8-EXECUTION-IDENTITY": "b26-p1-static-authority",
+    "B26-P1-G9-NEGATIVE-CONTROLS": "b26-p1-static-authority",
+    "B26-P1-G3-G10-CONTAINER-EQUIVALENCE": "b26-p1-container-equivalence",
+    "B26-P1-G1-G2-INHERITED-PHYSICS": "b26-p1-inherited-conduction",
+}
 EXPECTED_IDENTITY_FIELDS = {
     "gate_id",
     "phase",
@@ -87,12 +94,108 @@ FORBIDDEN_IMPORT_PREFIXES = (
     "celery",
     "kombu",
 )
+# Worker-mechanism subset of the import fence (Corrective II-2): broker-client
+# imports are P1-closure-prohibited worker wiring, lifted together with AST
+# machinery names under a governed successor authorization. Every other
+# forbidden import (legacy finance authority, LLM/estimation surfaces) is a
+# permanent ontological boundary and is never lifted.
+WORKER_MECHANISM_IMPORT_PREFIXES = (
+    "celery",
+    "kombu",
+)
+# Repo-wide legacy fence (Corrective II): these first-party modules must never
+# be imported as finance authority anywhere under backend/app. Zero legitimate
+# production importers exist, so repo-wide enforcement has no false positives.
+REPO_WIDE_FORBIDDEN_IMPORT_PREFIXES = (
+    "app.services.revenue_reconciliation",
+    "app.api.reconciliation",
+    "app.api.export",
+)
 FORBIDDEN_SQL_AUTHORITY_TOKENS = (
     "revenue_ledger",
     "reconciliation_runs",
     "attribution_allocations",
     "canonical_net_verified_amount_minor",
     "verified_amount_minor",
+)
+# P1 closure coordinate (historical fact). Permanent law is ancestry, not equality.
+P1_CLOSURE_MIGRATION_HEAD = "202609072001"
+# A file is a plausible future B2.6 authority surface when its repo-relative
+# path contains one of these substrings. Canonical package always matches via
+# "finance_reconciliation". Audit probes used future_b26_probe/.
+B26_SURFACE_SUBSTRINGS = (
+    "finance_reconciliation",
+    "finance",
+    "reconcil",
+    "b26",
+    "future_b26",
+    "future_finance",
+)
+# Known fenced legacy definitions (Corrective II-2): these files ARE the fenced
+# false authorities, not future consumers. They are NOT skipped: every new
+# violation signature inside them is RED. Only the exact violation signatures
+# measured at P1 closure (rule + symbol, line numbers stripped so cosmetic
+# edits stay GREEN) are grandfathered. schemas/reconciliation.py carries no
+# violations and is scanned as an ordinary surface.
+KNOWN_GRANDFATHERED_SURFACE_SIGNATURES = {
+    "backend/app/api/reconciliation.py": frozenset(
+        {
+            "b26_prohibited_product_machinery:APIRouter",
+            "b26_authoritative_float_literal",
+            "b26_duplicate_financial_sql",
+        }
+    ),
+    "backend/app/api/export.py": frozenset(
+        {
+            "b26_prohibited_product_machinery:APIRouter",
+            "b26_authoritative_float_literal",
+            "b26_duplicate_financial_sql",
+        }
+    ),
+    "backend/app/services/revenue_reconciliation.py": frozenset(
+        {
+            "b26_duplicate_financial_sql",
+        }
+    ),
+}
+# Coverage-money columns: the B2.3 coverage-money identity. Any SQL aggregation
+# over these columns outside the grandfathered sovereign files is a duplicate
+# coverage authority candidate and is RED, regardless of directory naming.
+# Legitimate growth consumes the B2.3 callable (LG-09, GREEN); new coverage SQL
+# must amend this registry through a recorded contract migration, never silently.
+COVERAGE_MONEY_SQL_TOKENS = (
+    "verified_amount_minor",
+    "canonical_net_verified_amount_minor",
+)
+COVERAGE_SQL_GRANDFATHERED_FILES = frozenset(
+    {
+        "backend/app/revenue_verification/verification_coverage.py",
+        "backend/app/revenue_verification/batch_engine.py",
+        "backend/app/revenue_verification/match_engine_kernel.py",
+        "backend/app/bayesian/eligibility.py",
+    }
+)
+# semantic_contract.py legitimately names total_business_minor inside the golden
+# falsification vector as the forbidden reference. Exclude only that file from
+# the total-business string fence; every other B2.6 surface must not name it.
+TOTAL_BUSINESS_ALLOWLIST_FILES = frozenset(
+    {
+        "backend/app/finance_reconciliation/semantic_contract.py",
+    }
+)
+# AST names that would create P1-prohibited product machinery inside a B2.6
+# surface (tables, APIs, workers/schedulers, outbox). Docstrings/comments are
+# not AST names, so prose mentioning these words stays GREEN.
+FORBIDDEN_B26_PRODUCT_MACHINERY_NAMES = frozenset(
+    {
+        "Table",
+        "Column",
+        "APIRouter",
+        "shared_task",
+        "Celery",
+        "outbox",
+        "Outbox",
+    }
 )
 
 
@@ -118,6 +221,82 @@ def _imports(tree: ast.AST) -> Iterable[str]:
             yield node.module
 
 
+def _dynamic_imports(tree: ast.AST) -> Iterable[str]:
+    """Yield dotted module names loaded via importlib.import_module/__import__.
+
+    Open-world probe (Corrective II-2): a static Import-node fence alone misses
+    dynamic loads of fenced legacy authority. Aliased imports
+    (``import importlib as il`` / ``from importlib import import_module as im``)
+    are resolved so renaming does not evade the fence. Only constant-string
+    targets are reported; non-constant targets cannot be resolved statically
+    and remain a documented residual (see final report).
+    """
+    importlib_aliases = {"importlib"}
+    import_module_aliases: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "importlib":
+                    importlib_aliases.add(alias.asname or alias.name)
+        elif isinstance(node, ast.ImportFrom) and node.module == "importlib":
+            for alias in node.names:
+                if alias.name == "import_module":
+                    import_module_aliases.add(alias.asname or alias.name)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        target: str | None = None
+        if (
+            isinstance(func, ast.Attribute)
+            and func.attr == "import_module"
+            and isinstance(func.value, ast.Name)
+            and func.value.id in importlib_aliases
+        ):
+            if node.args and isinstance(node.args[0], ast.Constant):
+                value = node.args[0].value
+                target = value if isinstance(value, str) else None
+        elif (
+            isinstance(func, ast.Name)
+            and (func.id == "__import__" or func.id in import_module_aliases)
+        ):
+            if node.args and isinstance(node.args[0], ast.Constant):
+                value = node.args[0].value
+                target = value if isinstance(value, str) else None
+        if target:
+            yield target
+
+
+def _successor_authorizes_machinery() -> bool:
+    """Return True only when the live contract records a governed phase grant."""
+    try:
+        sys.path.insert(0, str(BACKEND))
+        from app.finance_reconciliation.semantic_contract import (  # noqa: PLC0415
+            B26_SUCCESSOR_STATUS_AUTHORIZED,
+            load_b26_p1_semantic_contract,
+        )
+
+        contract = load_b26_p1_semantic_contract()
+        successor = contract.get("successor_product_authorization", {})
+        return successor.get("status") == B26_SUCCESSOR_STATUS_AUTHORIZED
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _violation_signature(violation: str) -> str:
+    """Reduce a violation line to its grandfather-comparable signature.
+
+    Line numbers are stripped so cosmetic edits inside grandfathered files stay
+    GREEN; any new rule or symbol is a new signature and stays RED. Legacy
+    imports are never grandfathered (always emitted separately).
+    """
+    parts = violation.split(":")
+    rule = parts[0]
+    if rule == "b26_prohibited_product_machinery" and len(parts) >= 4:
+        return f"{rule}:{parts[2]}"
+    return rule
+
+
 def _migration_heads() -> set[str]:
     completed = subprocess.run(
         (sys.executable, "-m", "alembic", "heads"),
@@ -131,6 +310,109 @@ def _migration_heads() -> set[str]:
         for line in completed.stdout.splitlines()
         if (match := re.match(r"^([0-9a-f]+)\b", line.strip()))
     }
+
+
+def _alembic_revision_graph() -> dict[str, list[str]]:
+    """Parse revision/down_revision pairs from all alembic version files.
+
+    Offline ancestry check: no database required. Handles down_revision as a
+    string, tuple/list, or None; typed assignments (``revision: str =``); and
+    multi-line parent tuples with balanced-parenthesis continuation. Verified
+    against Alembic's own resolved graph by the LG-03 battery leg.
+    """
+    graph: dict[str, list[str]] = {}
+    for path in (REPO_ROOT / "alembic").rglob("*.py"):
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        revision: str | None = None
+        parents: list[str] = []
+        index = 0
+        while index < len(lines):
+            line = lines[index]
+            rev_match = re.match(
+                r"^revision\s*(?::[^=]*)?=\s*['\"]([^'\"]+)['\"]", line
+            )
+            if rev_match and revision is None:
+                revision = rev_match.group(1)
+                index += 1
+                continue
+            down_match = re.match(
+                r"^down_revision\s*(?::[^=]*)?=\s*(.+)$", line
+            )
+            if down_match:
+                expr = down_match.group(1).strip()
+                # Balance parentheses across continued lines for multi-line tuples.
+                open_parens = expr.count("(") - expr.count(")")
+                while open_parens > 0 and index + 1 < len(lines):
+                    index += 1
+                    expr += " " + lines[index].strip()
+                    open_parens = expr.count("(") - expr.count(")")
+                expr = expr.rstrip(",").strip()
+                if expr not in ("None", "none"):
+                    parents = re.findall(r"['\"]([^'\"]+)['\"]", expr)
+                index += 1
+                continue
+            index += 1
+        if revision is not None:
+            graph[revision] = parents
+    return graph
+
+
+def _is_ancestor(ancestor: str, descendant: str, graph: dict[str, list[str]]) -> bool:
+    seen: set[str] = set()
+    stack = [descendant]
+    while stack:
+        current = stack.pop()
+        if current == ancestor:
+            return True
+        if current in seen:
+            continue
+        seen.add(current)
+        stack.extend(graph.get(current, []))
+    return False
+
+
+def _check_migration_ancestry(
+    violations: list[str], details: dict[str, Any], expected_closure_head: str
+) -> None:
+    """Permanent law: every current head must descend from P1 closure head.
+
+    Historical equality (heads == {closure}) is a PHASE_LOCAL closure fact and
+    MUST NOT block lawful descendant migrations. Ancestry + intact P1 semantics
+    (checked via the semantic contract loader above) is the permanent law.
+    """
+    try:
+        migration_heads = _migration_heads()
+    except subprocess.CalledProcessError as exc:
+        violations.append(f"b26_p1_migration_heads_unresolvable:{exc}")
+        return
+    details["migration_heads"] = sorted(migration_heads)
+    details["p1_closure_migration_head"] = expected_closure_head
+    if len(migration_heads) != 1:
+        violations.append(
+            f"b26_p1_migration_branch_detected:heads={sorted(migration_heads)}"
+        )
+        return
+    if expected_closure_head in migration_heads:
+        details["migration_ancestry"] = "at_p1_closure_head"
+        return
+    graph = _alembic_revision_graph()
+    head = next(iter(migration_heads))
+    if expected_closure_head not in graph and expected_closure_head not in migration_heads:
+        # Closure revision file missing entirely: history was rewritten.
+        violations.append(
+            f"b26_p1_closure_head_missing_from_history:expected={expected_closure_head}"
+        )
+        return
+    if not _is_ancestor(expected_closure_head, head, graph):
+        violations.append(
+            f"b26_p1_unjustified_migration_head_drift:"
+            f"expected_ancestor={expected_closure_head}:actual={sorted(migration_heads)}"
+        )
+        return
+    details["migration_ancestry"] = f"descendant_of_{expected_closure_head}"
 
 
 def _validate_contract_and_b23_binding(violations: list[str], details: dict[str, Any]) -> None:
@@ -157,13 +439,10 @@ def _validate_contract_and_b23_binding(violations: list[str], details: dict[str,
         return
 
     coverage = contract["coverage_authority"]
-    migration_heads = _migration_heads()
-    expected_migration_head = contract["migration_authority"]["expected_single_head"]
-    if migration_heads != {expected_migration_head}:
-        violations.append(
-            "b26_p1_unjustified_migration_head_drift:"
-            f"expected={expected_migration_head}:actual={sorted(migration_heads)}"
-        )
+    expected_closure_head = contract["migration_authority"].get(
+        "p1_closure_head", P1_CLOSURE_MIGRATION_HEAD
+    )
+    _check_migration_ancestry(violations, details, str(expected_closure_head))
     try:
         aggregate_callable = _resolve_dotted(coverage["aggregate_callable"])
         metric = _resolve_dotted(coverage["metric_object"])
@@ -218,41 +497,219 @@ def _validate_contract_and_b23_binding(violations: list[str], details: dict[str,
             "coverage_observed_percent": str(observed),
             "coverage_providers": sorted(providers),
             "coverage_currencies": sorted(currencies),
-            "migration_heads": sorted(migration_heads),
         }
     )
+    if "migration_heads" not in details:
+        try:
+            details["migration_heads"] = sorted(_migration_heads())
+        except subprocess.CalledProcessError:
+            pass
 
 
-def _validate_b26_namespace(violations: list[str], details: dict[str, Any]) -> None:
+def _is_b26_surface(path: Path) -> bool:
+    rel = path.relative_to(REPO_ROOT).as_posix().lower()
+    return any(sub in rel for sub in B26_SURFACE_SUBSTRINGS)
+
+
+def _check_b26_file_semantics(
+    path: Path,
+    source: str,
+    tree: ast.AST,
+    violations: list[str],
+    *,
+    enforce_product_machinery: bool = True,
+) -> None:
+    rel = path.relative_to(REPO_ROOT).as_posix()
+    for imported in _imports(tree):
+        if any(
+            imported == prefix or imported.startswith(prefix + ".")
+            for prefix in FORBIDDEN_IMPORT_PREFIXES
+        ):
+            if not enforce_product_machinery and any(
+                imported == prefix or imported.startswith(prefix + ".")
+                for prefix in WORKER_MECHANISM_IMPORT_PREFIXES
+            ):
+                # Governed successor phase: the worker-mechanism imports are
+                # permitted alongside machinery names. Legacy finance authority
+                # and LLM/estimation imports below stay banned permanently.
+                continue
+            violations.append(f"b26_false_authority_import:{rel}:{imported}")
+    for dynamic in _dynamic_imports(tree):
+        if any(
+            dynamic == prefix or dynamic.startswith(prefix + ".")
+            for prefix in FORBIDDEN_IMPORT_PREFIXES
+        ):
+            violations.append(f"b26_dynamic_false_authority_import:{rel}:{dynamic}")
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, float):
+            violations.append(f"b26_authoritative_float_literal:{rel}:{node.lineno}")
+        if enforce_product_machinery:
+            if isinstance(node, ast.Name) and node.id in FORBIDDEN_B26_PRODUCT_MACHINERY_NAMES:
+                violations.append(f"b26_prohibited_product_machinery:{rel}:{node.id}:{node.lineno}")
+            if (
+                isinstance(node, ast.Attribute)
+                and node.attr in FORBIDDEN_B26_PRODUCT_MACHINERY_NAMES
+            ):
+                violations.append(f"b26_prohibited_product_machinery:{rel}:{node.attr}:{node.lineno}")
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            lowered = node.value.lower()
+            if "select " in lowered or "sum(" in lowered:
+                if any(token in lowered for token in FORBIDDEN_SQL_AUTHORITY_TOKENS):
+                    violations.append(f"b26_duplicate_financial_sql:{rel}:{node.lineno}")
+            if (
+                "total_business" in lowered
+                and rel not in TOTAL_BUSINESS_ALLOWLIST_FILES
+            ):
+                violations.append(f"b26_total_business_denominator_authority:{rel}:{node.lineno}")
+    if (
+        "total_business" in source.lower()
+        and rel not in TOTAL_BUSINESS_ALLOWLIST_FILES
+    ):
+        # Catch non-string occurrences (variable names, comments excluded by AST
+        # are intentionally not distinguished: B2.6 surfaces must not name a
+        # total-business denominator at all).
+        if not any(
+            f"b26_total_business_denominator_authority:{rel}:" in v for v in violations
+        ):
+            violations.append(f"b26_total_business_denominator_authority:{rel}:source")
+
+
+def _validate_b26_namespace(
+    violations: list[str], details: dict[str, Any], *, enforce_product_machinery: bool
+) -> None:
+    """Permanent law is semantic prohibition, not file count.
+
+    Lawful future modules under backend/app/finance_reconciliation/ (or any
+    plausible future B2.6 surface) are GREEN when they contain no forbidden
+    authority. Only semantic violations turn RED. The P1 closure file census
+    is preserved in the contract closure_snapshot as a historical fact.
+    The product-machinery prohibition is a P1-closure check: it is enforced
+    unless the live contract records a governed successor-phase grant.
+    """
     files = sorted(B26_PACKAGE.rglob("*.py"))
-    if {path.name for path in files} != {"__init__.py", "semantic_contract.py"}:
-        violations.append("b26_p1_product_machinery_or_unregistered_module_present")
+    if not files:
+        violations.append("b26_p1_authority_package_missing")
+        return
     for path in files:
         source = path.read_text(encoding="utf-8")
-        tree = ast.parse(source, filename=str(path))
-        for imported in _imports(tree):
-            if any(
-                imported == prefix or imported.startswith(prefix + ".")
-                for prefix in FORBIDDEN_IMPORT_PREFIXES
-            ):
-                violations.append(
-                    f"b26_false_authority_import:{path.relative_to(REPO_ROOT)}:{imported}"
-                )
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Constant) and isinstance(node.value, float):
-                violations.append(
-                    f"b26_authoritative_float_literal:{path.relative_to(REPO_ROOT)}:{node.lineno}"
-                )
-            if isinstance(node, ast.Constant) and isinstance(node.value, str):
-                lowered = node.value.lower()
-                if "select " in lowered or "sum(" in lowered:
-                    if any(token in lowered for token in FORBIDDEN_SQL_AUTHORITY_TOKENS):
-                        violations.append(
-                            f"b26_duplicate_financial_sql:{path.relative_to(REPO_ROOT)}:{node.lineno}"
-                        )
+        try:
+            tree = ast.parse(source, filename=str(path))
+        except SyntaxError as exc:
+            violations.append(f"b26_package_syntax_error:{path.relative_to(REPO_ROOT)}:{exc}")
+            continue
+        _check_b26_file_semantics(
+            path, source, tree, violations, enforce_product_machinery=enforce_product_machinery
+        )
     details["b26_namespace_files"] = [
         path.relative_to(REPO_ROOT).as_posix() for path in files
     ]
+    details["b26_successor_product_machinery_enforced"] = enforce_product_machinery
+
+
+def _check_repo_wide_coverage_and_denominator(
+    path: Path, source: str, tree: ast.AST, violations: list[str]
+) -> None:
+    """System-wide duplicate-coverage fence (Corrective II-2).
+
+    The coverage-money columns are the B2.3 coverage-money identity, and
+    total_business names the forbidden denominator. Outside the grandfathered
+    sovereign files, SQL aggregating coverage money or any mention of a
+    total-business denominator in first-party application code is RED,
+    regardless of directory naming (SW-08). Consuming the B2.3 callable
+    without new coverage SQL stays GREEN (LG-09).
+    """
+    rel = path.relative_to(REPO_ROOT).as_posix()
+    if rel not in COVERAGE_SQL_GRANDFATHERED_FILES:
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                lowered = node.value.lower()
+                if "select " in lowered or "sum(" in lowered:
+                    if any(token in lowered for token in COVERAGE_MONEY_SQL_TOKENS):
+                        violations.append(
+                            f"b26_duplicate_coverage_authority:{rel}:{node.lineno}"
+                        )
+                        break
+    if rel not in TOTAL_BUSINESS_ALLOWLIST_FILES:
+        found = False
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                if "total_business" in node.value.lower():
+                    violations.append(
+                        f"b26_total_business_denominator_authority:{rel}:{node.lineno}"
+                    )
+                    found = True
+                    break
+        if not found and "total_business" in source.lower():
+            violations.append(f"b26_total_business_denominator_authority:{rel}:source")
+
+
+def _validate_repo_wide_false_authority(
+    violations: list[str], details: dict[str, Any], *, enforce_product_machinery: bool
+) -> None:
+    """System-wide fence (Corrective II).
+
+    Legacy finance authority must not become reachable from any first-party
+    application module, and duplicate finance-coverage authority must not appear
+    in any plausible future B2.6 surface outside the canonical package.
+    Grandfathered legacy definition files are scanned like any other surface:
+    only their exact P1-closure violation signatures are tolerated, so new
+    authority inside them is RED.
+    """
+    app_root = BACKEND / "app"
+    legacy_hits: list[str] = []
+    dynamic_hits: list[str] = []
+    b26_surface_files: list[str] = []
+    scanned = 0
+    for path in sorted(app_root.rglob("*.py")):
+        scanned += 1
+        try:
+            source = path.read_text(encoding="utf-8")
+            tree = ast.parse(source, filename=str(path))
+        except (OSError, SyntaxError):
+            continue
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        for imported in _imports(tree):
+            if any(
+                imported == prefix or imported.startswith(prefix + ".")
+                for prefix in REPO_WIDE_FORBIDDEN_IMPORT_PREFIXES
+            ):
+                # The definition module itself and the B2.3 freeze list reference
+                # the legacy symbol as a fenced string/registry entry, never as
+                # an import. Only real imports are violations.
+                legacy_hits.append(f"{rel}:{imported}")
+                violations.append(f"b26_false_authority_import:{rel}:{imported}")
+        for dynamic in _dynamic_imports(tree):
+            if any(
+                dynamic == prefix or dynamic.startswith(prefix + ".")
+                for prefix in REPO_WIDE_FORBIDDEN_IMPORT_PREFIXES
+            ):
+                dynamic_hits.append(f"{rel}:{dynamic}")
+                violations.append(f"b26_dynamic_false_authority_import:{rel}:{dynamic}")
+        _check_repo_wide_coverage_and_denominator(path, source, tree, violations)
+        if _is_b26_surface(path) or rel in KNOWN_GRANDFATHERED_SURFACE_SIGNATURES:
+            # Canonical package already checked above to avoid duplicate lines.
+            if path.is_relative_to(B26_PACKAGE):
+                continue
+            b26_surface_files.append(rel)
+            collected: list[str] = []
+            _check_b26_file_semantics(
+                path,
+                source,
+                tree,
+                collected,
+                enforce_product_machinery=enforce_product_machinery,
+            )
+            known = KNOWN_GRANDFATHERED_SURFACE_SIGNATURES.get(rel, frozenset())
+            for item in collected:
+                if item.startswith("b26_false_authority_import:"):
+                    # Legacy imports are never grandfathered; already reported above.
+                    continue
+                if _violation_signature(item) not in known:
+                    violations.append(item)
+    details["repo_wide_app_files_scanned"] = scanned
+    details["repo_wide_legacy_import_hits"] = legacy_hits
+    details["repo_wide_dynamic_import_hits"] = dynamic_hits
+    details["b26_future_surface_files"] = sorted(b26_surface_files)
 
 
 def _validate_governance(violations: list[str], details: dict[str, Any]) -> None:
@@ -303,16 +760,54 @@ def _validate_governance(violations: list[str], details: dict[str, Any]) -> None
     }:
         violations.append("b26_required_context_exclusion_set_drift")
     proof_cells = requirements.get("required_cells", [])
-    if {cell.get("gate_id") for cell in proof_cells} != EXPECTED_GATES:
+    observed_gates = {cell.get("gate_id") for cell in proof_cells}
+    if not EXPECTED_GATES.issubset(observed_gates):
         violations.append("b26_proof_gate_census_drift")
-    if {cell.get("producer") for cell in proof_cells} != {
-        "b26-p1-static-authority",
-        "b26-p1-container-equivalence",
-        "b26-p1-inherited-conduction",
-    }:
-        violations.append("b26_proof_producer_census_drift")
+    for gate_id, expected_producer in EXPECTED_GATE_PRODUCERS.items():
+        matches = [cell for cell in proof_cells if cell.get("gate_id") == gate_id]
+        if not matches:
+            continue  # already reported as census drift above
+        if matches[0].get("producer") != expected_producer:
+            violations.append(f"b26_proof_producer_census_drift:{gate_id}")
+    manifest_version = str(requirements.get("manifest_version", ""))
+    if not manifest_version.startswith("b2.6-p1-proof-requirements-v"):
+        violations.append("b26_proof_manifest_version_drift")
+    if requirements.get("manifest_evolution_policy") != (
+        "additive_only_permanent_P1_cells_remain_required"
+    ):
+        violations.append("b26_proof_manifest_evolution_policy_drift")
+    additional = requirements.get("additional_accepted_cells", [])
+    if not isinstance(additional, list):
+        violations.append("b26_proof_additional_cells_malformed")
+    else:
+        for entry in additional:
+            if not isinstance(entry, dict) or "gate_id" not in entry or "producer" not in entry:
+                violations.append("b26_proof_additional_cells_malformed")
+                break
+            if "required" in entry and not isinstance(entry["required"], bool):
+                violations.append("b26_proof_additional_cells_malformed")
+                break
+            if entry["gate_id"] in observed_gates:
+                violations.append(
+                    f"b26_proof_additional_cell_collides:{entry['gate_id']}"
+                )
+                break
     if set(requirements.get("required_identity_fields", [])) != EXPECTED_IDENTITY_FIELDS:
         violations.append("b26_proof_identity_fields_drift")
+    try:
+        sys.path.insert(0, str(BACKEND))
+        from app.finance_reconciliation.semantic_contract import (  # noqa: PLC0415
+            load_b26_p1_semantic_contract as _load_contract,
+        )
+
+        _contract_doc = _load_contract()
+    except Exception as exc:  # noqa: BLE001
+        violations.append(f"semantic_contract_refused:{exc}")
+        return
+    if set(_contract_doc.get("proof_artifact_identity_requirements", [])) != set(
+        requirements.get("required_identity_fields", [])
+    ):
+        violations.append("b26_proof_identity_fields_contract_manifest_mismatch")
     if set(requirements.get("accepted_events", [])) != {
         "pull_request",
         "merge_group",
@@ -342,7 +837,13 @@ def validate() -> tuple[list[str], dict[str, Any]]:
     violations: list[str] = []
     details: dict[str, Any] = {}
     _validate_contract_and_b23_binding(violations, details)
-    _validate_b26_namespace(violations, details)
+    enforce_machinery = not _successor_authorizes_machinery()
+    _validate_b26_namespace(
+        violations, details, enforce_product_machinery=enforce_machinery
+    )
+    _validate_repo_wide_false_authority(
+        violations, details, enforce_product_machinery=enforce_machinery
+    )
     _validate_governance(violations, details)
     dockerfile = PRODUCTION_DOCKERFILE.read_text(encoding="utf-8")
     if "COPY contracts/reconciliation /app/contracts/reconciliation" not in dockerfile:

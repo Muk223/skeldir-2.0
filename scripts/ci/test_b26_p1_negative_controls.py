@@ -27,6 +27,13 @@ STATIC_CONTROLS = (
     ("legacy_false_authority_import", SEMANTIC_MODULE, "b26_false_authority_import"),
     ("ontological_authority", CONTRACT, "semantic_contract_refused"),
     ("workflow_execution_identity", WORKFLOW, "b26_required_context_event_identity_ambiguous"),
+    ("reason_identity_substitution", CONTRACT, "semantic_contract_refused"),
+    ("discrepancy_member_removal", CONTRACT, "semantic_contract_refused"),
+    ("tenant_policy_weakening", CONTRACT, "semantic_contract_refused"),
+    ("insertion_seam_corruption", CONTRACT, "semantic_contract_refused"),
+    ("discrepancy_addition_without_version_bump", CONTRACT, "semantic_contract_refused"),
+    ("unclassified_normative_field", CONTRACT, "b26_p1_unclassified_normative_field"),
+    ("dynamic_legacy_import", SEMANTIC_MODULE, "b26_dynamic_false_authority_import"),
 )
 
 
@@ -169,6 +176,152 @@ def _proof_identity_control() -> dict[str, Any]:
     }
 
 
+def _proof_required_additional_cell_control() -> dict[str, Any]:
+    """Prove governed proof growth is required, not merely tolerated (LG-05).
+
+    Registers a synthetic next-phase REQUIRED cell in a patched manifest copy,
+    then shows: present+valid GREEN, omitted RED, restored GREEN, and
+    unregistered extra evidence RED (SW-17 direction).
+    """
+    import yaml  # type: ignore[import-untyped]  # noqa: PLC0415
+
+    import scripts.ci.adjudicate_b26_p1_proof_plane as proof_plane  # noqa: PLC0415
+    from scripts.ci.adjudicate_b26_p1_proof_plane import (  # noqa: PLC0415
+        AdjudicationError,
+        adjudicate,
+    )
+    from scripts.ci.b26_p1_evidence import (  # noqa: PLC0415
+        canonical_json,
+        git_identity,
+        write_evidence_cell,
+    )
+
+    sha, tree = git_identity()
+    workflow = "B2.6-P1 Contract Authority, Semantic Freeze and Proof Plane"
+    event = "pull_request"
+    run_id = "negative-control-local-required-cell"
+    manifest = yaml.safe_load(proof_plane.REQUIREMENTS.read_text(encoding="utf-8"))
+    simulated = {
+        "gate_id": "B26-P2-SIM-REQUIRED",
+        "producer": "b26-p2-simulated",
+        "scenario_id": "simulated-next-phase-evidence",
+        "falsifier_id": "B26-P2-SIM-FALSIFIER",
+        "required": True,
+    }
+    manifest.setdefault("additional_accepted_cells", []).append(simulated)
+    with tempfile.TemporaryDirectory(prefix="b26-p1-proof-req-") as directory:
+        manifest_path = Path(directory) / "proof-requirements.sim.yaml"
+        manifest_path.write_text(
+            yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8"
+        )
+        previous = proof_plane.REQUIREMENTS
+        proof_plane.REQUIREMENTS = manifest_path
+        try:
+            with tempfile.TemporaryDirectory(prefix="b26-p1-cells-") as cell_dir:
+                root = Path(cell_dir)
+                for cell in manifest["required_cells"]:
+                    details: dict[str, Any] = {}
+                    if cell["gate_id"] == "B26-P1-G1-G2-INHERITED-PHYSICS":
+                        details = {
+                            "source_event": event,
+                            "source_sha": sha,
+                            "required_jobs": {
+                                "B2.5-P13 C19 Context-Robust Production Closure": "success",
+                                "B2.5-P13 C20 Verdict Authority Conservation": "success",
+                                "B2.5-P13 C21 Freshness and Issuance Authority Conservation": "success",
+                                "B2.5-P14 Downstream Projection Safety": "success",
+                            },
+                        }
+                    write_evidence_cell(
+                        root / f"{cell['gate_id']}.json",
+                        gate_id=cell["gate_id"],
+                        producer=cell["producer"],
+                        scenario_id=cell["scenario_id"],
+                        falsifier_id=cell["falsifier_id"],
+                        details=details,
+                        event_type=event,
+                        run_id=run_id,
+                        workflow=workflow,
+                    )
+                # Omitted required P2 cell must RED.
+                try:
+                    adjudicate(
+                        artifact_root=root,
+                        candidate_sha=sha,
+                        candidate_tree=tree,
+                        event_type=event,
+                        run_id=run_id,
+                        workflow=workflow,
+                    )
+                except AdjudicationError as exc:
+                    observed_red = str(exc)
+                    if "missing_required_additional" not in observed_red:
+                        raise RuntimeError(
+                            f"required_cell_omission_wrong_reason:{observed_red}"
+                        )
+                else:
+                    raise RuntimeError("required_cell_omission_did_not_turn_red")
+                # Unregistered extra evidence must RED (SW-17 direction).
+                write_evidence_cell(
+                    root / "B26-P2-SIM-UNREGISTERED.json",
+                    gate_id="B26-P2-SIM-UNREGISTERED",
+                    producer="b26-p2-simulated",
+                    scenario_id="simulated-next-phase-evidence",
+                    falsifier_id="B26-P2-SIM-FALSIFIER",
+                    details={},
+                    event_type=event,
+                    run_id=run_id,
+                    workflow=workflow,
+                )
+                try:
+                    adjudicate(
+                        artifact_root=root,
+                        candidate_sha=sha,
+                        candidate_tree=tree,
+                        event_type=event,
+                        run_id=run_id,
+                        workflow=workflow,
+                    )
+                except AdjudicationError as exc:
+                    if "unexpected" not in str(exc):
+                        raise RuntimeError(
+                            f"unregistered_cell_wrong_reason:{exc}"
+                        )
+                else:
+                    raise RuntimeError("unregistered_cell_did_not_turn_red")
+                (root / "B26-P2-SIM-UNREGISTERED.json").unlink()
+                # Present correct required P2 cell must GREEN.
+                write_evidence_cell(
+                    root / "B26-P2-SIM-REQUIRED.json",
+                    gate_id="B26-P2-SIM-REQUIRED",
+                    producer="b26-p2-simulated",
+                    scenario_id="simulated-next-phase-evidence",
+                    falsifier_id="B26-P2-SIM-FALSIFIER",
+                    details={},
+                    event_type=event,
+                    run_id=run_id,
+                    workflow=workflow,
+                )
+                adjudicate(
+                    artifact_root=root,
+                    candidate_sha=sha,
+                    candidate_tree=tree,
+                    event_type=event,
+                    run_id=run_id,
+                    workflow=workflow,
+                )
+        finally:
+            proof_plane.REQUIREMENTS = previous
+    void = hashlib.sha256(canonical_json({"control": "proof_required"})).hexdigest()
+    return {
+        "control": "proof_required_additional_cell",
+        "pristine_hash": void,
+        "observed_red": observed_red,
+        "restoration_hash": void,
+        "restored_green": True,
+    }
+
+
 def run_battery() -> list[dict[str, Any]]:
     pristine = _validator()
     if pristine.returncode != 0:
@@ -202,6 +355,7 @@ def run_battery() -> list[dict[str, Any]]:
             }
         )
     ledger.append(_proof_identity_control())
+    ledger.append(_proof_required_additional_cell_control())
     return ledger
 
 

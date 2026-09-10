@@ -72,6 +72,73 @@ def container_contract_copy() -> None:
     )
 
 
+def reason_identity_substitution() -> None:
+    _replace_once(
+        CONTRACT,
+        "    - amount_mismatch_tax_shipping\n",
+        "    - arbitrary_unrelated_reason\n",
+        defect="reason_identity_substitution",
+    )
+
+
+def discrepancy_member_removal() -> None:
+    _replace_once(
+        CONTRACT,
+        "    - privacy_limited_resolution\n",
+        "",
+        defect="discrepancy_member_removal",
+    )
+
+
+def tenant_policy_weakening() -> None:
+    _replace_once(
+        CONTRACT,
+        "  external_raw_tenant_id: forbidden\n",
+        "  external_raw_tenant_id: allowed\n",
+        defect="tenant_policy_weakening",
+    )
+
+
+def insertion_seam_corruption() -> None:
+    _replace_once(
+        CONTRACT,
+        "  - future_finance_projection\n",
+        "",
+        defect="insertion_seam_corruption",
+    )
+
+
+def discrepancy_addition_without_version_bump() -> None:
+    _replace_once(
+        CONTRACT,
+        "    - privacy_limited_resolution\n",
+        "    - privacy_limited_resolution\n    - future_probe_reason\n",
+        defect="discrepancy_addition_without_version_bump",
+    )
+
+
+def unclassified_normative_field() -> None:
+    _replace_once(
+        CONTRACT,
+        "negative_control_registry:\n  - B26-P1-NC-01",
+        "future_probe_field: true\nnegative_control_registry:\n  - B26-P1-NC-01",
+        defect="unclassified_normative_field",
+    )
+
+
+def dynamic_legacy_import() -> None:
+    _replace_once(
+        SEMANTIC_MODULE,
+        'if __name__ == "__main__":\n'
+        "    print(json.dumps(semantic_contract_identity().__dict__, sort_keys=True))",
+        'if __name__ == "__main__":\n'
+        "    import importlib as _nc_importlib  # NC-B26-P1-DYNAMIC\n"
+        '    _nc_probe = _nc_importlib.import_module("app.services.revenue_reconciliation")\n'
+        "    print(json.dumps(semantic_contract_identity().__dict__, sort_keys=True))",
+        defect="dynamic_legacy_import",
+    )
+
+
 DEFECTS: dict[str, Callable[[], None]] = {
     "mandatory_semantic_element": mandatory_semantic_element,
     "coverage_authority_reference": coverage_authority_reference,
@@ -79,6 +146,13 @@ DEFECTS: dict[str, Callable[[], None]] = {
     "ontological_authority": ontological_authority,
     "workflow_execution_identity": workflow_execution_identity,
     "container_contract_copy": container_contract_copy,
+    "reason_identity_substitution": reason_identity_substitution,
+    "discrepancy_member_removal": discrepancy_member_removal,
+    "tenant_policy_weakening": tenant_policy_weakening,
+    "insertion_seam_corruption": insertion_seam_corruption,
+    "discrepancy_addition_without_version_bump": discrepancy_addition_without_version_bump,
+    "unclassified_normative_field": unclassified_normative_field,
+    "dynamic_legacy_import": dynamic_legacy_import,
 }
 
 

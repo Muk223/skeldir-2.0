@@ -1,15 +1,31 @@
 phase_id: B2.6-P1
-contract_version: b2.6-p1-semantic-authority-v1
+contract_version: b2.6-p1-semantic-authority-v2
 maturity_mode: DESIGN_PARTNER_MODE
 authority_kind: semantic_constitution_not_financial_result
+
+# Version-identity record (Corrective II-2): this constitution materially
+# supersedes the landed v1 taxonomy (nine collapsed labels as discrepancy
+# authority). Two semantically different constitutions MUST NOT share a
+# human-readable version; identity is (contract_path, contract_version,
+# source_sha256). Historical v1 proof artifacts remain distinguishable by
+# version AND hash.
+supersession:
+  supersedes: b2.6-p1-semantic-authority-v1
+  reason: separated_truth_scope_discrepancy_ontologies_with_governed_evolution
 
 migration_authority:
   schema_change_required_in_P1: false
   expected_single_head: "202609072001"
+  p1_closure_head: "202609072001"
+  ancestry_law: descendant_of_p1_closure_head_required
   rationale: >-
     P1 declares semantic and adjudicative authority only. Existing B2.3
     production relations already provide the sovereign inputs, while legacy
     reconciliation relations remain fenced false authorities.
+    expected_single_head records the historical P1 closure coordinate and is
+    NOT a permanent future law. The permanent law is ancestry_law: every
+    current migration head must descend from p1_closure_head with P1 semantic
+    values intact.
 
 coverage_authority:
   aggregate_callable: app.revenue_verification.verification_coverage.fetch_verification_coverage_aggregate
@@ -64,7 +80,14 @@ truth_status:
     Expose provisional and confirmed amounts/statuses separately and never infer
     final finance confirmation from coverage_percent alone.
 
-required_reconciliation_reasons:
+required_reconciliation_reasons: []
+# Superseded collapsed category (B2.6-P1 Corrective II): the nine legacy labels
+# below are preserved ONLY as separated ontologies. truth_state_vocabulary holds
+# truth states, scope_dispositions holds scope/exclusion/availability outcomes,
+# and finance_discrepancy_reasons holds the versioned finance discrepancy
+# obligation. The collapsed list above MUST remain empty so no consumer can
+# mistake it for discrepancy authority.
+legacy_collapsed_reason_labels_superseded:
   - matched_confirmed
   - matched_provisional
   - adjusted_confirmed
@@ -74,6 +97,38 @@ required_reconciliation_reasons:
   - outside_governed_window_excluded
   - source_identity_unresolved
   - authority_unavailable
+
+truth_state_vocabulary:
+  - matched_confirmed
+  - matched_provisional
+  - adjusted_confirmed
+
+scope_dispositions:
+  - supported_unresolved
+  - unsupported_provider_excluded
+  - unsupported_currency_excluded
+  - outside_governed_window_excluded
+  - source_identity_unresolved
+  - authority_unavailable
+
+finance_discrepancy_reasons:
+  taxonomy_version: b2.6-discrepancy-taxonomy-v1
+  required_reasons:
+    - amount_mismatch_tax_shipping
+    - amount_mismatch_platform_claim
+    - late_webhook
+    - unsupported_payment_rail
+    - refund_or_chargeback_adjustment
+    - missing_order_reference
+    - duplicate_claim
+    - privacy_limited_resolution
+  # Governed additive slot (Corrective II-2): a lawful future reason MUST be
+  # listed here AND carry a taxonomy minor-version bump
+  # (b2.6-discrepancy-taxonomy-v1.<n>). Additions without a bump, removals of
+  # baseline members, or unlisted reasons are RED.
+  additional_governed_reasons: []
+  evolution_policy: additive_only_with_minor_version_bump
+  classifier_status: deferred_to_B2.6-P3_no_classifier_in_P1
 
 money_authority:
   representation: integer_minor_units
@@ -184,3 +239,65 @@ prohibited_P1_product_machinery:
   - reconciliation_outbox
   - finance_reconciliation_export
   - TrustEnvelope_reconciliation_fields
+
+# Phase-lifetime gate for product machinery (Corrective II-2): at P1 closure
+# (status none) the AST product-machinery fence is enforced. A governed later
+# phase retires this closure check ONLY via an explicit recorded authorization
+# in this contract (status authorized_p2_product_growth with a non-empty
+# authorized_machinery record). All other permanent P1 semantic laws remain
+# enforced regardless of this flag. closure_snapshot permanently records that
+# no such machinery existed at P1 closure.
+successor_product_authorization:
+  status: none
+  authorized_machinery: []
+
+authority_classes:
+  phase_id: PERMANENT_MACHINE_ENFORCED
+  contract_version: PERMANENT_MACHINE_ENFORCED
+  supersession: DOCUMENTATION_ONLY
+  maturity_mode: PERMANENT_MACHINE_ENFORCED
+  authority_kind: PERMANENT_MACHINE_ENFORCED
+  migration_authority.schema_change_required_in_P1: PHASE_LOCAL_CLOSURE_FACT
+  migration_authority.expected_single_head: PHASE_LOCAL_CLOSURE_FACT
+  migration_authority.p1_closure_head: PHASE_LOCAL_CLOSURE_FACT
+  migration_authority.ancestry_law: PERMANENT_MACHINE_ENFORCED
+  migration_authority.rationale: DOCUMENTATION_ONLY
+  coverage_authority: PERMANENT_MACHINE_ENFORCED
+  coverage_authority.supported_provider_scope_reference: PERMANENT_MACHINE_ENFORCED
+  coverage_authority.supported_currency_scope_reference: PERMANENT_MACHINE_ENFORCED
+  coverage_authority.numerator.definition: DOCUMENTATION_ONLY
+  coverage_authority.denominator.definition: DOCUMENTATION_ONLY
+  coverage_authority.window_semantics: DOCUMENTATION_ONLY
+  coverage_authority.unsupported_rail_doctrine.later_finance_representation: DOCUMENTATION_ONLY
+  truth_status: PERMANENT_MACHINE_ENFORCED
+  truth_status.future_consumer_requirement: DOCUMENTATION_ONLY
+  truth_state_vocabulary: PERMANENT_MACHINE_ENFORCED
+  scope_dispositions: PERMANENT_MACHINE_ENFORCED
+  finance_discrepancy_reasons: PERMANENT_MACHINE_ENFORCED
+  finance_discrepancy_reasons.additional_governed_reasons: PERMANENT_MACHINE_ENFORCED
+  finance_discrepancy_reasons.evolution_policy: PERMANENT_MACHINE_ENFORCED
+  finance_discrepancy_reasons.classifier_status: FUTURE_REQUIRED_EXTENSION
+  required_reconciliation_reasons: PHASE_LOCAL_CLOSURE_FACT
+  legacy_collapsed_reason_labels_superseded: DOCUMENTATION_ONLY
+  money_authority: PERMANENT_MACHINE_ENFORCED
+  projection_doctrine: PERMANENT_MACHINE_ENFORCED
+  tenant_identifier_policy: PERMANENT_MACHINE_ENFORCED
+  ontological_authority: PERMANENT_MACHINE_ENFORCED
+  authority_map: PERMANENT_MACHINE_ENFORCED
+  legacy_false_authorities: PERMANENT_MACHINE_ENFORCED
+  future_insertion_seam: PERMANENT_MACHINE_ENFORCED
+  negative_control_registry: PHASE_LOCAL_CLOSURE_FACT
+  proof_artifact_identity_requirements: PERMANENT_MACHINE_ENFORCED
+  prohibited_P1_product_machinery: PHASE_LOCAL_CLOSURE_FACT
+  successor_product_authorization: PERMANENT_MACHINE_ENFORCED
+  closure_snapshot: PHASE_LOCAL_CLOSURE_FACT
+
+closure_snapshot:
+  p1_closure_migration_head: "202609072001"
+  p1_closure_package_files:
+    - __init__.py
+    - semantic_contract.py
+  p1_closure_proof_cell_count: 5
+  p1_closure_contract_version: b2.6-p1-semantic-authority-v2
+  p1_closure_collapsed_reason_count: 9
+  note: historical_closure_facts_not_permanent_law
