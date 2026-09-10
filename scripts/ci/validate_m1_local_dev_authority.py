@@ -605,6 +605,16 @@ PROHIBITED_ADDED_PATTERNS = [
     r"az\.ess\b",
 ]
 
+# B2.6-P1 Corrective II handoff fix: these B2.6 authority prefixes are allowed
+# as diff paths (lawful P2+ growth lives here) but MUST NOT exempt added lines
+# from prohibited-pattern content scanning. Previously the exact-two-file P1
+# shape pin incidentally backstopped this skip; once package growth becomes
+# lawful, a broad skip would blind M1 to prohibited surfaces beneath it.
+M1_CONTENT_SCAN_ALWAYS_PREFIXES = (
+    "backend/app/finance_reconciliation/",
+    "contracts/reconciliation/b2.6/",
+)
+
 
 class Result:
     def __init__(self) -> None:
@@ -856,7 +866,9 @@ def check_diff_scope(result: Result, baseline_sha: str | None, local_dev: bool) 
             continue
         if not line.startswith("+") or line.startswith("+++"):
             continue
-        if _allowed_m1_path(current_path):
+        if _allowed_m1_path(current_path) and not current_path.startswith(
+            M1_CONTENT_SCAN_ALWAYS_PREFIXES
+        ):
             continue
         if current_path.startswith("docs/") or current_path == "DEVELOPMENT.md":
             continue

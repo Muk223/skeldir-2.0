@@ -101,30 +101,52 @@ def adjudicate(
     required_cells = {
         cell["gate_id"]: cell for cell in requirements["required_cells"]
     }
+    additional_cells = {
+        cell["gate_id"]: cell
+        for cell in requirements.get("additional_accepted_cells", [])
+        if isinstance(cell, dict) and "gate_id" in cell
+    }
+    registered_cells = {**required_cells, **additional_cells}
     observed = _load_cells(artifact_root)
+    # Governed extension law (Corrective II-2): permanent P1 cells stay
+    # mandatory, and an additional cell registered with `required: true`
+    # becomes mandatory for the current phase. Missing either is RED;
+    # unregistered evidence is RED (fail-closed).
+    required_additional = sorted(
+        gate_id
+        for gate_id, cell in additional_cells.items()
+        if cell.get("required") is True
+    )
     missing = sorted(set(required_cells) - set(observed))
-    unexpected = sorted(set(observed) - set(required_cells))
-    if missing or unexpected:
+    missing_required_additional = sorted(set(required_additional) - set(observed))
+    if missing or missing_required_additional:
         raise AdjudicationError(
-            f"proof_cell_census_mismatch:missing={missing}:unexpected={unexpected}"
+            f"proof_cell_census_mismatch:missing={missing}:"
+            f"missing_required_additional={missing_required_additional}:unexpected=[]"
+        )
+    unregistered = sorted(set(observed) - set(registered_cells))
+    if unregistered:
+        raise AdjudicationError(
+            f"proof_cell_census_mismatch:missing=[]:unexpected={unregistered}"
         )
 
     contract = _contract_identity()
     migration = _migration_head()
     accepted_fields = set(requirements["required_identity_fields"])
     hashes: dict[str, str] = {}
-    for gate_id, expected in sorted(required_cells.items()):
+    for gate_id in sorted(observed):
+        expected = registered_cells[gate_id]
         cell = observed[gate_id]
         absent_fields = sorted(accepted_fields - set(cell))
         if absent_fields:
             raise AdjudicationError(f"proof_cell_fields_missing:{gate_id}:{absent_fields}")
         if cell["phase"] != requirements["phase"]:
             raise AdjudicationError(f"proof_cell_phase_mismatch:{gate_id}")
-        if cell["producer"] != expected["producer"]:
+        if "producer" in expected and cell["producer"] != expected["producer"]:
             raise AdjudicationError(f"proof_cell_producer_mismatch:{gate_id}")
-        if cell["scenario_id"] != expected["scenario_id"]:
+        if "scenario_id" in expected and cell["scenario_id"] != expected["scenario_id"]:
             raise AdjudicationError(f"proof_cell_scenario_mismatch:{gate_id}")
-        if cell["falsifier_id"] != expected["falsifier_id"]:
+        if "falsifier_id" in expected and cell["falsifier_id"] != expected["falsifier_id"]:
             raise AdjudicationError(f"proof_cell_falsifier_mismatch:{gate_id}")
         if cell["status"] != requirements["accepted_status"]:
             raise AdjudicationError(f"proof_cell_not_pass:{gate_id}:{cell['status']}")

@@ -1,5 +1,6 @@
 phase: B2.6-P1
-manifest_version: b2.6-p1-proof-requirements-v1
+manifest_version: b2.6-p1-proof-requirements-v2
+manifest_evolution_policy: additive_only_permanent_P1_cells_remain_required
 contract_path: contracts/reconciliation/b2.6/semantic-authority.v1.yaml
 required_cells:
   - gate_id: B26-P1-G4-SEMANTIC-AUTHORITY
@@ -22,6 +23,11 @@ required_cells:
     producer: b26-p1-inherited-conduction
     scenario_id: b25-p13-context-robust-production-closure
     falsifier_id: inherited-C19-C20-C21-negative-controls
+
+# Governed future extension slot (B2.6-P1 Corrective II): lawful P2+ evidence
+# MUST be registered here to be accepted. Unregistered artifacts remain RED.
+# Permanent P1 cells above MUST remain required across all manifest versions.
+additional_accepted_cells: []
 
 accepted_status: PASS
 required_inherited_jobs:

@@ -3,7 +3,11 @@ from __future__ import annotations
 from decimal import Decimal
 
 from app.finance_reconciliation.semantic_contract import (
+    B26_DISCREPANCY_TAXONOMY_V1,
     B26_P1_CONTRACT_VERSION,
+    B26_P1_SUPERSEDES_VERSION,
+    B26_REQUIRED_DISCREPANCY_REASONS,
+    B26_SUCCESSOR_STATUS_NONE,
     load_b26_p1_semantic_contract,
     semantic_contract_identity,
 )
@@ -50,3 +54,82 @@ def test_b26_p1_provisional_coverage_is_not_confirmation() -> None:
     assert provisional["participates_in_coverage_numerator"] is True
     assert provisional["finance_truth_status"] == "provisional"
     assert provisional["may_be_relabelled_confirmed"] is False
+
+
+def test_b26_p1_discrepancy_taxonomy_is_machine_governed() -> None:
+    contract = load_b26_p1_semantic_contract()
+    discrepancy = contract["finance_discrepancy_reasons"]
+
+    assert discrepancy["taxonomy_version"] == B26_DISCREPANCY_TAXONOMY_V1
+    assert set(discrepancy["required_reasons"]) == set(B26_REQUIRED_DISCREPANCY_REASONS)
+    assert len(discrepancy["required_reasons"]) == 8
+    # Governed additive slot is empty at P1 closure; baseline alone is law.
+    assert discrepancy["additional_governed_reasons"] == []
+    # Collapsed category must stay empty so no consumer mistakes it for authority.
+    assert contract["required_reconciliation_reasons"] == []
+    # Separated ontologies preserve the superseded nine meanings without collapse.
+    assert set(contract["truth_state_vocabulary"]) == {
+        "matched_confirmed",
+        "matched_provisional",
+        "adjusted_confirmed",
+    }
+    assert set(contract["scope_dispositions"]) == {
+        "supported_unresolved",
+        "unsupported_provider_excluded",
+        "unsupported_currency_excluded",
+        "outside_governed_window_excluded",
+        "source_identity_unresolved",
+        "authority_unavailable",
+    }
+
+
+def test_b26_p1_tenant_and_seam_are_sensed() -> None:
+    contract = load_b26_p1_semantic_contract()
+    tenant = contract["tenant_identifier_policy"]
+
+    assert tenant["durable_state"] == "tenant_scoped"
+    assert tenant["external_raw_tenant_id"] == "forbidden"
+    assert set(contract["future_insertion_seam"]) == {
+        "B2.3_deterministic_verdict_and_coverage_authority",
+        "future_B2.6_deterministic_reconciliation_projection_boundary",
+        "future_finance_projection",
+        "future_B2.6_TrustEnvelope_projection",
+    }
+
+
+def test_b26_p1_authority_classes_distinguish_permanent_from_closure() -> None:
+    contract = load_b26_p1_semantic_contract()
+    classes = contract["authority_classes"]
+
+    assert classes["finance_discrepancy_reasons"] == "PERMANENT_MACHINE_ENFORCED"
+    assert classes["tenant_identifier_policy"] == "PERMANENT_MACHINE_ENFORCED"
+    assert classes["future_insertion_seam"] == "PERMANENT_MACHINE_ENFORCED"
+    assert classes["migration_authority.expected_single_head"] == "PHASE_LOCAL_CLOSURE_FACT"
+    assert classes["closure_snapshot"] == "PHASE_LOCAL_CLOSURE_FACT"
+    assert classes["coverage_authority.denominator.definition"] == "DOCUMENTATION_ONLY"
+    assert classes["successor_product_authorization"] == "PERMANENT_MACHINE_ENFORCED"
+    assert classes["supersession"] == "DOCUMENTATION_ONLY"
+    snapshot = contract["closure_snapshot"]
+    assert snapshot["p1_closure_migration_head"] == "202609072001"
+
+
+def test_b26_p1_version_identity_is_unambiguous() -> None:
+    contract = load_b26_p1_semantic_contract()
+
+    assert B26_P1_CONTRACT_VERSION == "b2.6-p1-semantic-authority-v2"
+    assert contract["contract_version"] == B26_P1_CONTRACT_VERSION
+    supersession = contract["supersession"]
+    assert supersession["supersedes"] == B26_P1_SUPERSEDES_VERSION
+    assert supersession["supersedes"] != B26_P1_CONTRACT_VERSION
+    assert isinstance(supersession["reason"], str) and supersession["reason"]
+    assert contract["closure_snapshot"]["p1_closure_contract_version"] == (
+        B26_P1_CONTRACT_VERSION
+    )
+
+
+def test_b26_p1_successor_product_gate_defaults_to_closure() -> None:
+    contract = load_b26_p1_semantic_contract()
+    successor = contract["successor_product_authorization"]
+
+    assert successor["status"] == B26_SUCCESSOR_STATUS_NONE
+    assert successor["authorized_machinery"] == []
