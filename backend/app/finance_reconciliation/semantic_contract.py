@@ -28,8 +28,8 @@ _REPO_ROOT = (
 B26_P1_SEMANTIC_CONTRACT_PATH = (
     _REPO_ROOT / "contracts/reconciliation/b2.6/semantic-authority.v1.yaml"
 )
-B26_P1_CONTRACT_VERSION = "b2.6-p1-semantic-authority-v2"
-B26_P1_SUPERSEDES_VERSION = "b2.6-p1-semantic-authority-v1"
+B26_P1_CONTRACT_VERSION = "b2.6-p1-semantic-authority-v3"
+B26_P1_SUPERSEDES_VERSION = "b2.6-p1-semantic-authority-v2"
 
 _REQUIRED_TOP_LEVEL = frozenset(
     {
@@ -52,6 +52,7 @@ _REQUIRED_TOP_LEVEL = frozenset(
         "ontological_authority",
         "authority_map",
         "legacy_false_authorities",
+        "legacy_authority_quarantine",
         "future_insertion_seam",
         "negative_control_registry",
         "proof_artifact_identity_requirements",
@@ -221,8 +222,10 @@ B26_REQUIRED_AUTHORITY_CLASSES = {    "phase_id": "PERMANENT_MACHINE_ENFORCED",
     "migration_authority.expected_single_head": "PHASE_LOCAL_CLOSURE_FACT",
     "migration_authority.p1_closure_head": "PHASE_LOCAL_CLOSURE_FACT",
     "migration_authority.ancestry_law": "PERMANENT_MACHINE_ENFORCED",
+    "migration_authority.revision_graph_source": "PERMANENT_MACHINE_ENFORCED",
     "migration_authority.rationale": "DOCUMENTATION_ONLY",
     "coverage_authority": "PERMANENT_MACHINE_ENFORCED",
+    "coverage_authority.canonical_admission_seam": "PERMANENT_MACHINE_ENFORCED",
     "coverage_authority.supported_provider_scope_reference": "PERMANENT_MACHINE_ENFORCED",
     "coverage_authority.supported_currency_scope_reference": "PERMANENT_MACHINE_ENFORCED",
     "coverage_authority.numerator.definition": "DOCUMENTATION_ONLY",
@@ -245,6 +248,7 @@ B26_REQUIRED_AUTHORITY_CLASSES = {    "phase_id": "PERMANENT_MACHINE_ENFORCED",
     "ontological_authority": "PERMANENT_MACHINE_ENFORCED",
     "authority_map": "PERMANENT_MACHINE_ENFORCED",
     "legacy_false_authorities": "PERMANENT_MACHINE_ENFORCED",
+    "legacy_authority_quarantine": "PERMANENT_MACHINE_ENFORCED",
     "future_insertion_seam": "PERMANENT_MACHINE_ENFORCED",
     "negative_control_registry": "PHASE_LOCAL_CLOSURE_FACT",
     "proof_artifact_identity_requirements": "PERMANENT_MACHINE_ENFORCED",
@@ -311,7 +315,8 @@ def _validate_contract(document: Mapping[str, Any]) -> None:
         migration.get("schema_change_required_in_P1") is False
         and migration.get("expected_single_head") == "202609072001"
         and migration.get("p1_closure_head") == "202609072001"
-        and migration.get("ancestry_law") == "descendant_of_p1_closure_head_required",
+        and migration.get("ancestry_law") == "descendant_of_p1_closure_head_required"
+        and migration.get("revision_graph_source") == "alembic_native_ScriptDirectory",
         "b26_p1_migration_authority_drift",
     )
 
@@ -376,6 +381,30 @@ def _validate_contract(document: Mapping[str, Any]) -> None:
         unsupported.get("numerator") == "excluded"
         and unsupported.get("denominator") == "excluded",
         "b26_p1_unsupported_rail_denominator_drift",
+    )
+    seam_decl = coverage.get("canonical_admission_seam", {})
+    _require(
+        seam_decl.get("module")
+        == "app.finance_reconciliation.coverage_authority"
+        and seam_decl.get("sealed_type")
+        == "app.finance_reconciliation.coverage_authority."
+        "CanonicalVerificationCoverage"
+        and seam_decl.get("loader")
+        == "app.finance_reconciliation.coverage_authority."
+        "load_canonical_verification_coverage"
+        and seam_decl.get("admitter")
+        == "app.finance_reconciliation.coverage_authority."
+        "admit_canonical_verification_coverage"
+        and seam_decl.get("scope_verifier")
+        == "app.finance_reconciliation.coverage_authority."
+        "require_canonical_scope"
+        and seam_decl.get("sovereign_producer")
+        == "app.revenue_verification.verification_coverage."
+        "fetch_verification_coverage_aggregate"
+        "+app.revenue_verification.verification_coverage."
+        "VERIFICATION_COVERAGE.compute"
+        and seam_decl.get("law") == "only_sealed_B2.3_origin_may_be_canonical",
+        "b26_p1_coverage_admission_seam_drift",
     )
 
     truth_status = document["truth_status"]
@@ -525,7 +554,12 @@ def _validate_contract(document: Mapping[str, Any]) -> None:
         isinstance(snapshot, dict)
         and snapshot.get("p1_closure_migration_head") == "202609072001"
         and snapshot.get("p1_closure_package_files")
-        == ["__init__.py", "semantic_contract.py"]
+        == [
+            "__init__.py",
+            "semantic_contract.py",
+            "coverage_authority.py",
+            "legacy_quarantine.py",
+        ]
         and snapshot.get("p1_closure_proof_cell_count") == 5
         and snapshot.get("p1_closure_contract_version")
         == B26_P1_CONTRACT_VERSION,
@@ -575,6 +609,26 @@ def _validate_contract(document: Mapping[str, Any]) -> None:
         document["legacy_false_authorities"]
         == B26_REQUIRED_LEGACY_FALSE_AUTHORITIES,
         "b26_p1_false_authority_registry_drift",
+    )
+    quarantine = document["legacy_authority_quarantine"]
+    _require(
+        isinstance(quarantine, dict)
+        and quarantine.get("status") == "compatibility_only_non_authoritative"
+        and quarantine.get("mounted_for_compatibility") is True
+        and quarantine.get("canonical_admission") == "refused"
+        and set(quarantine.get("route_paths", []))
+        == {
+            "/api/reconciliation/status",
+            "/api/reconciliation/platform/{platform_id}",
+            "/api/reconciliation/sync",
+        }
+        and set(quarantine.get("modules", []))
+        == {
+            "app.services.revenue_reconciliation",
+            "app.api.reconciliation",
+            "app.api.export",
+        },
+        "b26_p1_legacy_quarantine_drift",
     )
     _require(
         document["proof_artifact_identity_requirements"]

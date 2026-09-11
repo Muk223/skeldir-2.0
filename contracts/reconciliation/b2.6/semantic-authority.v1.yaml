@@ -1,23 +1,24 @@
 phase_id: B2.6-P1
-contract_version: b2.6-p1-semantic-authority-v2
+contract_version: b2.6-p1-semantic-authority-v3
 maturity_mode: DESIGN_PARTNER_MODE
 authority_kind: semantic_constitution_not_financial_result
 
-# Version-identity record (Corrective II-2): this constitution materially
-# supersedes the landed v1 taxonomy (nine collapsed labels as discrepancy
-# authority). Two semantically different constitutions MUST NOT share a
-# human-readable version; identity is (contract_path, contract_version,
-# source_sha256). Historical v1 proof artifacts remain distinguishable by
-# version AND hash.
+# Version-identity record (Corrective III): this constitution materially
+# extends the v2 taxonomy with a positive coverage-origin admission seam, an
+# explicit legacy-authority quarantine, and Alembic-native migration physics.
+# Two semantically different constitutions MUST NOT share a human-readable
+# version; identity is (contract_path, contract_version, source_sha256).
+# Historical v1/v2 proof artifacts remain distinguishable by version AND hash.
 supersession:
-  supersedes: b2.6-p1-semantic-authority-v1
-  reason: separated_truth_scope_discrepancy_ontologies_with_governed_evolution
+  supersedes: b2.6-p1-semantic-authority-v2
+  reason: positive_B2.3_coverage_origin_admission_with_legacy_quarantine_and_native_migration_physics
 
 migration_authority:
   schema_change_required_in_P1: false
   expected_single_head: "202609072001"
   p1_closure_head: "202609072001"
   ancestry_law: descendant_of_p1_closure_head_required
+  revision_graph_source: alembic_native_ScriptDirectory
   rationale: >-
     P1 declares semantic and adjudicative authority only. Existing B2.3
     production relations already provide the sovereign inputs, while legacy
@@ -63,6 +64,17 @@ coverage_authority:
     total_business_minor: 100000
     required_percent: "95.00"
     forbidden_percent: "76.00"
+  # Positive origin admission seam (Corrective III): canonical coverage is
+  # whatever the sovereign producer below seals through the admission module.
+  # Numeric coincidence with the golden vector never confers authority.
+  canonical_admission_seam:
+    module: app.finance_reconciliation.coverage_authority
+    sealed_type: app.finance_reconciliation.coverage_authority.CanonicalVerificationCoverage
+    loader: app.finance_reconciliation.coverage_authority.load_canonical_verification_coverage
+    admitter: app.finance_reconciliation.coverage_authority.admit_canonical_verification_coverage
+    scope_verifier: app.finance_reconciliation.coverage_authority.require_canonical_scope
+    sovereign_producer: app.revenue_verification.verification_coverage.fetch_verification_coverage_aggregate+app.revenue_verification.verification_coverage.VERIFICATION_COVERAGE.compute
+    law: only_sealed_B2.3_origin_may_be_canonical
 
 truth_status:
   coverage_is_not_final_finance_confirmation: true
@@ -199,6 +211,24 @@ legacy_false_authorities:
     python_module: app.api.export
     python_symbol: _fetch_reporting_rows
 
+# Legacy authority quarantine (Corrective III): the fenced surfaces above
+# remain mounted for contract compatibility only. They are explicitly
+# non-authoritative and cannot conduct into canonical B2.6 through import,
+# dynamic load, helper, database relation, or network/service invocation.
+legacy_authority_quarantine:
+  status: compatibility_only_non_authoritative
+  mounted_for_compatibility: true
+  canonical_admission: refused
+  route_paths:
+    - /api/reconciliation/status
+    - /api/reconciliation/platform/{platform_id}
+    - /api/reconciliation/sync
+  modules:
+    - app.services.revenue_reconciliation
+    - app.api.reconciliation
+    - app.api.export
+  enforcement: app.finance_reconciliation.legacy_quarantine+app.finance_reconciliation.coverage_authority.admit_canonical_verification_coverage+static_capability_fences
+
 future_insertion_seam:
   - B2.3_deterministic_verdict_and_coverage_authority
   - future_B2.6_deterministic_reconciliation_projection_boundary
@@ -261,8 +291,10 @@ authority_classes:
   migration_authority.expected_single_head: PHASE_LOCAL_CLOSURE_FACT
   migration_authority.p1_closure_head: PHASE_LOCAL_CLOSURE_FACT
   migration_authority.ancestry_law: PERMANENT_MACHINE_ENFORCED
+  migration_authority.revision_graph_source: PERMANENT_MACHINE_ENFORCED
   migration_authority.rationale: DOCUMENTATION_ONLY
   coverage_authority: PERMANENT_MACHINE_ENFORCED
+  coverage_authority.canonical_admission_seam: PERMANENT_MACHINE_ENFORCED
   coverage_authority.supported_provider_scope_reference: PERMANENT_MACHINE_ENFORCED
   coverage_authority.supported_currency_scope_reference: PERMANENT_MACHINE_ENFORCED
   coverage_authority.numerator.definition: DOCUMENTATION_ONLY
@@ -285,6 +317,7 @@ authority_classes:
   ontological_authority: PERMANENT_MACHINE_ENFORCED
   authority_map: PERMANENT_MACHINE_ENFORCED
   legacy_false_authorities: PERMANENT_MACHINE_ENFORCED
+  legacy_authority_quarantine: PERMANENT_MACHINE_ENFORCED
   future_insertion_seam: PERMANENT_MACHINE_ENFORCED
   negative_control_registry: PHASE_LOCAL_CLOSURE_FACT
   proof_artifact_identity_requirements: PERMANENT_MACHINE_ENFORCED
@@ -297,7 +330,9 @@ closure_snapshot:
   p1_closure_package_files:
     - __init__.py
     - semantic_contract.py
+    - coverage_authority.py
+    - legacy_quarantine.py
   p1_closure_proof_cell_count: 5
-  p1_closure_contract_version: b2.6-p1-semantic-authority-v2
+  p1_closure_contract_version: b2.6-p1-semantic-authority-v3
   p1_closure_collapsed_reason_count: 9
   note: historical_closure_facts_not_permanent_law

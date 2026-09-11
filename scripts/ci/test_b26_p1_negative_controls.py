@@ -19,6 +19,7 @@ VALIDATOR = ROOT / "scripts/ci/validate_b26_p1_authority.py"
 MUTATOR = ROOT / "scripts/ci/_b26_p1_controlled_defect.py"
 CONTRACT = ROOT / "contracts/reconciliation/b2.6/semantic-authority.v1.yaml"
 SEMANTIC_MODULE = ROOT / "backend/app/finance_reconciliation/semantic_contract.py"
+COVERAGE_AUTHORITY_MODULE = ROOT / "backend/app/finance_reconciliation/coverage_authority.py"
 WORKFLOW = ROOT / ".github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml"
 
 STATIC_CONTROLS = (
@@ -34,6 +35,21 @@ STATIC_CONTROLS = (
     ("discrepancy_addition_without_version_bump", CONTRACT, "semantic_contract_refused"),
     ("unclassified_normative_field", CONTRACT, "b26_p1_unclassified_normative_field"),
     ("dynamic_legacy_import", SEMANTIC_MODULE, "b26_dynamic_false_authority_import"),
+    (
+        "legacy_network_client_in_canonical_surface",
+        SEMANTIC_MODULE,
+        "b26_legacy_network_client_in_canonical_surface",
+    ),
+    (
+        "legacy_route_reference_in_canonical_surface",
+        COVERAGE_AUTHORITY_MODULE,
+        "b26_legacy_route_reference_in_canonical_surface",
+    ),
+    (
+        "unregistered_coverage_origin",
+        SEMANTIC_MODULE,
+        "b26_unregistered_coverage_origin",
+    ),
 )
 
 
