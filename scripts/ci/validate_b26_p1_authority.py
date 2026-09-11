@@ -9,8 +9,6 @@ import hashlib
 import importlib
 import json
 import os
-import re
-import subprocess
 import sys
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -183,6 +181,46 @@ TOTAL_BUSINESS_ALLOWLIST_FILES = frozenset(
         "backend/app/finance_reconciliation/semantic_contract.py",
     }
 )
+# Network-capable clients must never appear in a canonical B2.6 surface
+# (Corrective III, Theorem A). A B2.6 module holding one of these clients
+# could invoke the mounted legacy reconciliation surface and consume its
+# response, so capability is refused at the boundary. Plain URL parsing
+# (urllib.parse) carries no fetch capability and stays permitted. Diagnostic
+# code outside B2.6 surfaces is unaffected: it simply can never be admitted
+# as canonical authority (see coverage_authority.admit_*).
+LEGACY_NETWORK_CLIENT_PREFIXES = (
+    "httpx",
+    "requests",
+    "aiohttp",
+    "urllib.request",
+    "urllib3",
+    "http.client",
+)
+# Legacy operation paths quarantined as compatibility-only (Corrective III).
+# The /api/reconciliation prefix itself is shared with the sovereign B2.3
+# verdict routes, so only the legacy operations are fenced. The quarantine
+# registry module and the semantic contract declare these paths as data;
+# every other B2.6 surface must not name them.
+LEGACY_QUARANTINED_ROUTE_LITERALS = (
+    "/api/reconciliation/status",
+    "/api/reconciliation/platform",
+    "/api/reconciliation/sync",
+)
+LEGACY_ROUTE_LITERAL_ALLOWLIST_FILES = frozenset(
+    {
+        "backend/app/finance_reconciliation/legacy_quarantine.py",
+        "backend/app/finance_reconciliation/semantic_contract.py",
+    }
+)
+# Positive coverage-origin seal (Corrective III, Theorem B). The sealed type
+# may only be constructed inside its defining authority module; every other
+# B2.6 surface holding a CanonicalVerificationCoverage(...) construction is
+# attempting to forge canonical origin and is RED. Unsealed runtime forgeries
+# are additionally refused by admit_canonical_verification_coverage.
+CANONICAL_SEALED_TYPE_NAME = "CanonicalVerificationCoverage"
+CANONICAL_SEAL_DEFINING_FILE = (
+    "backend/app/finance_reconciliation/coverage_authority.py"
+)
 # AST names that would create P1-prohibited product machinery inside a B2.6
 # surface (tables, APIs, workers/schedulers, outbox). Docstrings/comments are
 # not AST names, so prose mentioning these words stays GREEN.
@@ -297,66 +335,42 @@ def _violation_signature(violation: str) -> str:
     return rule
 
 
+def _native_revision_graph() -> tuple[dict[str, list[str]], set[str]]:
+    """Load the authoritative revision graph through native Alembic machinery.
+
+    Corrective III, Theorem C: P1 observes Alembic's own configured revision
+    universe (ScriptDirectory over the repository's actual alembic.ini
+    version_locations) instead of a redundant custom language parser. Any
+    legal Python declaration form Alembic accepts is therefore observed
+    identically, and files outside the configured locations never enter the
+    authoritative graph. Offline: no database required.
+    """
+    from alembic.config import Config  # noqa: PLC0415
+    from alembic.script import ScriptDirectory  # noqa: PLC0415
+
+    config = Config(str(REPO_ROOT / "alembic.ini"))
+    script = ScriptDirectory.from_config(config)
+    graph: dict[str, list[str]] = {}
+    for revision in script.walk_revisions():
+        down = revision.down_revision
+        if down is None:
+            parents: list[str] = []
+        elif isinstance(down, str):
+            parents = [down]
+        else:
+            parents = list(down)
+        graph[revision.revision] = parents
+    return graph, set(script.get_heads())
+
+
 def _migration_heads() -> set[str]:
-    completed = subprocess.run(
-        (sys.executable, "-m", "alembic", "heads"),
-        cwd=REPO_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return {
-        match.group(1)
-        for line in completed.stdout.splitlines()
-        if (match := re.match(r"^([0-9a-f]+)\b", line.strip()))
-    }
+    _, heads = _native_revision_graph()
+    return heads
 
 
 def _alembic_revision_graph() -> dict[str, list[str]]:
-    """Parse revision/down_revision pairs from all alembic version files.
-
-    Offline ancestry check: no database required. Handles down_revision as a
-    string, tuple/list, or None; typed assignments (``revision: str =``); and
-    multi-line parent tuples with balanced-parenthesis continuation. Verified
-    against Alembic's own resolved graph by the LG-03 battery leg.
-    """
-    graph: dict[str, list[str]] = {}
-    for path in (REPO_ROOT / "alembic").rglob("*.py"):
-        try:
-            lines = path.read_text(encoding="utf-8").splitlines()
-        except OSError:
-            continue
-        revision: str | None = None
-        parents: list[str] = []
-        index = 0
-        while index < len(lines):
-            line = lines[index]
-            rev_match = re.match(
-                r"^revision\s*(?::[^=]*)?=\s*['\"]([^'\"]+)['\"]", line
-            )
-            if rev_match and revision is None:
-                revision = rev_match.group(1)
-                index += 1
-                continue
-            down_match = re.match(
-                r"^down_revision\s*(?::[^=]*)?=\s*(.+)$", line
-            )
-            if down_match:
-                expr = down_match.group(1).strip()
-                # Balance parentheses across continued lines for multi-line tuples.
-                open_parens = expr.count("(") - expr.count(")")
-                while open_parens > 0 and index + 1 < len(lines):
-                    index += 1
-                    expr += " " + lines[index].strip()
-                    open_parens = expr.count("(") - expr.count(")")
-                expr = expr.rstrip(",").strip()
-                if expr not in ("None", "none"):
-                    parents = re.findall(r"['\"]([^'\"]+)['\"]", expr)
-                index += 1
-                continue
-            index += 1
-        if revision is not None:
-            graph[revision] = parents
+    """Authoritative revision graph: native Alembic, single universe."""
+    graph, _ = _native_revision_graph()
     return graph
 
 
@@ -384,21 +398,27 @@ def _check_migration_ancestry(
     (checked via the semantic contract loader above) is the permanent law.
     """
     try:
-        migration_heads = _migration_heads()
-    except subprocess.CalledProcessError as exc:
+        graph, migration_heads = _native_revision_graph()
+    except Exception as exc:  # noqa: BLE001
         violations.append(f"b26_p1_migration_heads_unresolvable:{exc}")
         return
     details["migration_heads"] = sorted(migration_heads)
     details["p1_closure_migration_head"] = expected_closure_head
+    details["revision_graph_source"] = "alembic_native_ScriptDirectory"
+    details["native_revision_count"] = len(graph)
     if len(migration_heads) != 1:
         violations.append(
             f"b26_p1_migration_branch_detected:heads={sorted(migration_heads)}"
         )
         return
     if expected_closure_head in migration_heads:
+        if expected_closure_head not in graph:
+            violations.append(
+                f"b26_p1_closure_head_missing_from_history:expected={expected_closure_head}"
+            )
+            return
         details["migration_ancestry"] = "at_p1_closure_head"
         return
-    graph = _alembic_revision_graph()
     head = next(iter(migration_heads))
     if expected_closure_head not in graph and expected_closure_head not in migration_heads:
         # Closure revision file missing entirely: history was rewritten.
@@ -461,6 +481,41 @@ def _validate_contract_and_b23_binding(violations: list[str], details: dict[str,
     if currencies != SUPPORTED_VERIFICATION_COVERAGE_CURRENCIES:
         violations.append("coverage_currency_scope_reference_mismatch")
 
+    seam = contract["coverage_authority"]["canonical_admission_seam"]
+    try:
+        seam_module = importlib.import_module(seam["module"])
+        sealed_type = getattr(seam_module, "CanonicalVerificationCoverage")
+        loader = getattr(seam_module, "load_canonical_verification_coverage")
+        admitter = getattr(seam_module, "admit_canonical_verification_coverage")
+        scope_verifier = getattr(seam_module, "require_canonical_scope")
+        producer = getattr(seam_module, "B23_SOVEREIGN_COVERAGE_PRODUCER")
+    except Exception as exc:  # noqa: BLE001
+        violations.append(f"coverage_admission_seam_unresolvable:{exc}")
+        return
+    if producer != seam["sovereign_producer"]:
+        violations.append("coverage_admission_producer_reference_mismatch")
+    if (
+        sealed_type.__module__ != "app.finance_reconciliation.coverage_authority"
+        or loader.__module__ != "app.finance_reconciliation.coverage_authority"
+        or admitter.__module__ != "app.finance_reconciliation.coverage_authority"
+        or scope_verifier.__module__
+        != "app.finance_reconciliation.coverage_authority"
+    ):
+        violations.append("coverage_admission_seam_not_authority_owned")
+    # The seam must refuse a numerically correct but unregistered value:
+    # origin refusal is runtime physics, not lexical coincidence.
+    try:
+        admitter(9500)
+    except Exception:  # noqa: BLE001
+        pass
+    else:
+        violations.append("coverage_admission_seam_accepts_unregistered_origin")
+    details["coverage_admission_seam"] = {
+        "module": seam["module"],
+        "law": seam["law"],
+        "producer": producer,
+    }
+
     coverage_source = REPO_ROOT / "backend/app/revenue_verification/verification_coverage.py"
     source_ast_hash = hashlib.sha256(
         ast.dump(
@@ -502,7 +557,7 @@ def _validate_contract_and_b23_binding(violations: list[str], details: dict[str,
     if "migration_heads" not in details:
         try:
             details["migration_heads"] = sorted(_migration_heads())
-        except subprocess.CalledProcessError:
+        except Exception:  # noqa: BLE001
             pass
 
 
@@ -534,15 +589,45 @@ def _check_b26_file_semantics(
                 # and LLM/estimation imports below stay banned permanently.
                 continue
             violations.append(f"b26_false_authority_import:{rel}:{imported}")
+        if any(
+            imported == prefix or imported.startswith(prefix + ".")
+            for prefix in LEGACY_NETWORK_CLIENT_PREFIXES
+        ):
+            violations.append(
+                f"b26_legacy_network_client_in_canonical_surface:{rel}:{imported}"
+            )
     for dynamic in _dynamic_imports(tree):
         if any(
             dynamic == prefix or dynamic.startswith(prefix + ".")
             for prefix in FORBIDDEN_IMPORT_PREFIXES
         ):
             violations.append(f"b26_dynamic_false_authority_import:{rel}:{dynamic}")
+        if any(
+            dynamic == prefix or dynamic.startswith(prefix + ".")
+            for prefix in LEGACY_NETWORK_CLIENT_PREFIXES
+        ):
+            violations.append(
+                f"b26_legacy_network_client_in_canonical_surface:{rel}:{dynamic}"
+            )
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, float):
             violations.append(f"b26_authoritative_float_literal:{rel}:{node.lineno}")
+        if isinstance(node, ast.Call):
+            func = node.func
+            called = (
+                func.id
+                if isinstance(func, ast.Name)
+                else func.attr
+                if isinstance(func, ast.Attribute)
+                else ""
+            )
+            if (
+                called == CANONICAL_SEALED_TYPE_NAME
+                and rel != CANONICAL_SEAL_DEFINING_FILE
+            ):
+                violations.append(
+                    f"b26_unregistered_coverage_origin:{rel}:{node.lineno}"
+                )
         if enforce_product_machinery:
             if isinstance(node, ast.Name) and node.id in FORBIDDEN_B26_PRODUCT_MACHINERY_NAMES:
                 violations.append(f"b26_prohibited_product_machinery:{rel}:{node.id}:{node.lineno}")
@@ -561,6 +646,12 @@ def _check_b26_file_semantics(
                 and rel not in TOTAL_BUSINESS_ALLOWLIST_FILES
             ):
                 violations.append(f"b26_total_business_denominator_authority:{rel}:{node.lineno}")
+            if rel not in LEGACY_ROUTE_LITERAL_ALLOWLIST_FILES and any(
+                literal in node.value for literal in LEGACY_QUARANTINED_ROUTE_LITERALS
+            ):
+                violations.append(
+                    f"b26_legacy_route_reference_in_canonical_surface:{rel}:{node.lineno}"
+                )
     if (
         "total_business" in source.lower()
         and rel not in TOTAL_BUSINESS_ALLOWLIST_FILES

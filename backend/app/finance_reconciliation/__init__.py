@@ -1,10 +1,38 @@
 """B2.6 semantic authority boundary.
 
-P1 deliberately exports contract identity only. Reconciliation state,
-computation, workers, APIs, exports, and TrustEnvelope fields begin in later
-dependency-ordered phases.
+P1 deliberately exports contract identity plus the positive
+coverage-origin admission seam and the legacy quarantine record.
+Reconciliation state, computation, workers, APIs, exports, and
+TrustEnvelope fields begin in later dependency-ordered phases.
 """
 
+from .coverage_authority import (
+    B23_SOVEREIGN_COVERAGE_PRODUCER,
+    CANONICAL_ADMISSION_MODULE,
+    CANONICAL_ADMITTER,
+    CANONICAL_COVERAGE_LAW,
+    CANONICAL_LOADER,
+    CANONICAL_SCOPE_VERIFIER,
+    CANONICAL_SEALED_TYPE,
+    CanonicalCoverageAuthorityError,
+    CanonicalVerificationCoverage,
+    admit_canonical_verification_coverage,
+    load_canonical_verification_coverage,
+    require_canonical_scope,
+    to_diagnostic_dict,
+)
+from .legacy_quarantine import (
+    LEGACY_NON_AUTHORITATIVE_MODULES,
+    LEGACY_NON_AUTHORITATIVE_RELATIONS,
+    LEGACY_NON_AUTHORITATIVE_ROUTE_PATHS,
+    LEGACY_QUARANTINE_ENFORCEMENT,
+    LEGACY_QUARANTINE_NOTE,
+    LEGACY_QUARANTINE_STATUS,
+    LegacyAuthorityError,
+    is_canonical_b26_authority,
+    mark_legacy_diagnostic,
+    refuse_legacy_as_canonical,
+)
 from .semantic_contract import (
     B26_DISCREPANCY_TAXONOMY_V1,
     B26_KNOWN_AUTHORITY_CLASSES,
@@ -24,6 +52,7 @@ from .semantic_contract import (
 )
 
 __all__ = [
+    "B23_SOVEREIGN_COVERAGE_PRODUCER",
     "B26_DISCREPANCY_TAXONOMY_V1",
     "B26_KNOWN_AUTHORITY_CLASSES",
     "B26_P1_CONTRACT_VERSION",
@@ -35,8 +64,30 @@ __all__ = [
     "B26_REQUIRED_TRUTH_STATE_VOCABULARY",
     "B26_SUCCESSOR_STATUS_AUTHORIZED",
     "B26_SUCCESSOR_STATUS_NONE",
+    "CANONICAL_ADMISSION_MODULE",
+    "CANONICAL_ADMITTER",
+    "CANONICAL_COVERAGE_LAW",
+    "CANONICAL_LOADER",
+    "CANONICAL_SCOPE_VERIFIER",
+    "CANONICAL_SEALED_TYPE",
+    "CanonicalCoverageAuthorityError",
+    "CanonicalVerificationCoverage",
+    "LEGACY_NON_AUTHORITATIVE_MODULES",
+    "LEGACY_NON_AUTHORITATIVE_RELATIONS",
+    "LEGACY_NON_AUTHORITATIVE_ROUTE_PATHS",
+    "LEGACY_QUARANTINE_ENFORCEMENT",
+    "LEGACY_QUARANTINE_NOTE",
+    "LEGACY_QUARANTINE_STATUS",
+    "LegacyAuthorityError",
     "SemanticContractError",
     "SemanticContractIdentity",
+    "admit_canonical_verification_coverage",
+    "is_canonical_b26_authority",
     "load_b26_p1_semantic_contract",
+    "load_canonical_verification_coverage",
+    "mark_legacy_diagnostic",
+    "refuse_legacy_as_canonical",
+    "require_canonical_scope",
     "semantic_contract_identity",
+    "to_diagnostic_dict",
 ]

@@ -116,7 +116,7 @@ def test_b26_p1_authority_classes_distinguish_permanent_from_closure() -> None:
 def test_b26_p1_version_identity_is_unambiguous() -> None:
     contract = load_b26_p1_semantic_contract()
 
-    assert B26_P1_CONTRACT_VERSION == "b2.6-p1-semantic-authority-v2"
+    assert B26_P1_CONTRACT_VERSION == "b2.6-p1-semantic-authority-v3"
     assert contract["contract_version"] == B26_P1_CONTRACT_VERSION
     supersession = contract["supersession"]
     assert supersession["supersedes"] == B26_P1_SUPERSEDES_VERSION
@@ -133,3 +133,177 @@ def test_b26_p1_successor_product_gate_defaults_to_closure() -> None:
 
     assert successor["status"] == B26_SUCCESSOR_STATUS_NONE
     assert successor["authorized_machinery"] == []
+
+
+def _b26_p1_test_aggregate_and_result():
+    from datetime import datetime, timezone
+    from uuid import UUID
+
+    from app.revenue_verification.verification_coverage import (
+        VerificationCoverageAggregate,
+        compute_verification_coverage,
+    )
+
+    aggregate = VerificationCoverageAggregate(
+        tenant_id=UUID("11111111-1111-1111-1111-111111111111"),
+        currency_code="USD",
+        window_start=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        window_end=datetime(2026, 2, 1, tzinfo=timezone.utc),
+        matched_webhook_revenue_minor=76000,
+        connected_platform_revenue_minor=80000,
+    )
+    return aggregate, compute_verification_coverage(aggregate)
+
+
+def test_b26_p1_canonical_admission_seam_is_declared() -> None:
+    contract = load_b26_p1_semantic_contract()
+    seam = contract["coverage_authority"]["canonical_admission_seam"]
+
+    assert seam["module"] == "app.finance_reconciliation.coverage_authority"
+    assert seam["law"] == "only_sealed_B2.3_origin_may_be_canonical"
+    assert contract["authority_classes"]["coverage_authority.canonical_admission_seam"] == (
+        "PERMANENT_MACHINE_ENFORCED"
+    )
+
+
+def test_b26_p1_unregistered_coverage_origin_is_refused() -> None:
+    import pytest
+
+    from app.finance_reconciliation.coverage_authority import (
+        CanonicalCoverageAuthorityError,
+        CanonicalVerificationCoverage,
+        admit_canonical_verification_coverage,
+    )
+
+    aggregate, result = _b26_p1_test_aggregate_and_result()
+
+    # Numerically correct but unregistered: plain numbers, ratios, dicts.
+    for candidate in (
+        9500,
+        "95.00",
+        {"coverage_percent": "95.00"},
+        (76000 * 10000) // 80000,
+    ):
+        with pytest.raises(CanonicalCoverageAuthorityError):
+            admit_canonical_verification_coverage(candidate)
+
+    # Forged sealed-type construction outside the authority module is
+    # unsealed and refused even with sovereign field values.
+    forged = CanonicalVerificationCoverage(
+        aggregate=aggregate,
+        result=result,
+        producer="app.revenue_verification.verification_coverage."
+        "fetch_verification_coverage_aggregate"
+        "+app.revenue_verification.verification_coverage."
+        "VERIFICATION_COVERAGE.compute",
+        supported_platforms=("paypal", "shopify", "stripe", "woocommerce"),
+    )
+    assert forged._sealed is False
+    with pytest.raises(CanonicalCoverageAuthorityError):
+        admit_canonical_verification_coverage(forged)
+
+
+def test_b26_p1_canonical_scope_mismatch_is_refused() -> None:
+    import pytest
+
+    from datetime import datetime, timezone
+    from uuid import UUID
+
+    from app.finance_reconciliation.coverage_authority import (
+        CanonicalCoverageAuthorityError,
+        _seal,
+        admit_canonical_verification_coverage,
+        require_canonical_scope,
+    )
+
+    aggregate, result = _b26_p1_test_aggregate_and_result()
+    platforms = ("paypal", "shopify", "stripe", "woocommerce")
+    sealed = _seal(aggregate, result, platforms)
+
+    # Sovereign origin with governed scope admits.
+    assert admit_canonical_verification_coverage(sealed) is sealed
+    assert (
+        require_canonical_scope(
+            sealed,
+            tenant_id=UUID("11111111-1111-1111-1111-111111111111"),
+            currency_code="USD",
+            window_start=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            window_end=datetime(2026, 2, 1, tzinfo=timezone.utc),
+            supported_platforms=list(platforms),
+        )
+        is sealed
+    )
+
+    # Same digits, foreign tenant scope: refused.
+    with pytest.raises(CanonicalCoverageAuthorityError):
+        require_canonical_scope(
+            sealed,
+            tenant_id=UUID("22222222-2222-2222-2222-222222222222"),
+            currency_code="USD",
+            window_start=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            window_end=datetime(2026, 2, 1, tzinfo=timezone.utc),
+            supported_platforms=list(platforms),
+        )
+
+    # Diagnostic copies are explicitly non-authoritative and refused.
+    from app.finance_reconciliation.coverage_authority import to_diagnostic_dict
+
+    with pytest.raises(CanonicalCoverageAuthorityError):
+        admit_canonical_verification_coverage(to_diagnostic_dict(sealed))
+
+
+def test_b26_p1_legacy_quarantine_is_declared_and_enforced() -> None:
+    import pytest
+
+    from app.finance_reconciliation.legacy_quarantine import (
+        LEGACY_NON_AUTHORITATIVE_MODULES,
+        LEGACY_NON_AUTHORITATIVE_ROUTE_PATHS,
+        LEGACY_QUARANTINE_STATUS,
+        LegacyAuthorityError,
+        is_canonical_b26_authority,
+        mark_legacy_diagnostic,
+        refuse_legacy_as_canonical,
+    )
+
+    contract = load_b26_p1_semantic_contract()
+    quarantine = contract["legacy_authority_quarantine"]
+
+    assert quarantine["status"] == LEGACY_QUARANTINE_STATUS == (
+        "compatibility_only_non_authoritative"
+    )
+    assert set(quarantine["route_paths"]) == set(LEGACY_NON_AUTHORITATIVE_ROUTE_PATHS)
+    assert set(quarantine["modules"]) == set(LEGACY_NON_AUTHORITATIVE_MODULES)
+    assert quarantine["canonical_admission"] == "refused"
+
+    with pytest.raises(LegacyAuthorityError):
+        refuse_legacy_as_canonical({"revenue_verified": 1})
+    assert is_canonical_b26_authority({"revenue_verified": 1}) is False
+    diagnostic = mark_legacy_diagnostic({"revenue_verified": 1})
+    assert diagnostic["authority"] == "non_authoritative_legacy_diagnostic"
+    assert is_canonical_b26_authority(diagnostic) is False
+
+
+def test_b26_p1_migration_graph_is_alembic_native() -> None:
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "scripts" / "ci"))
+    from validate_b26_p1_authority import (  # noqa: PLC0415
+        _native_revision_graph,
+    )
+
+    from alembic.config import Config  # noqa: PLC0415
+    from alembic.script import ScriptDirectory  # noqa: PLC0415
+
+    repo_root = Path(__file__).resolve().parents[3]
+    script = ScriptDirectory.from_config(Config(str(repo_root / "alembic.ini")))
+    native_revisions = {revision.revision for revision in script.walk_revisions()}
+
+    graph, heads = _native_revision_graph()
+
+    # P1 observes exactly Alembic's configured universe: triple-quoted
+    # legal syntax is present, excluded-directory files are absent.
+    assert set(graph) == native_revisions
+    assert "202512151410" in graph
+    assert "202511171000" not in graph
+    assert heads == set(script.get_heads()) == {"202609072001"}

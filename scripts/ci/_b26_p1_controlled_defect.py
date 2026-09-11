@@ -11,6 +11,7 @@ from typing import Callable
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = ROOT / "contracts/reconciliation/b2.6/semantic-authority.v1.yaml"
 SEMANTIC_MODULE = ROOT / "backend/app/finance_reconciliation/semantic_contract.py"
+COVERAGE_AUTHORITY_MODULE = ROOT / "backend/app/finance_reconciliation/coverage_authority.py"
 WORKFLOW = ROOT / ".github/workflows/b2_6-p1-finance-reconciliation-adjudication.yml"
 DOCKERFILE = ROOT / "backend/Dockerfile"
 
@@ -139,6 +140,40 @@ def dynamic_legacy_import() -> None:
     )
 
 
+def legacy_network_client_in_canonical_surface() -> None:
+    _replace_once(
+        SEMANTIC_MODULE,
+        "import yaml  # type: ignore[import-untyped]\n",
+        "import yaml  # type: ignore[import-untyped]\n"
+        "import httpx  # NC-B26-P1-III-NETWORK\n",
+        defect="legacy_network_client_in_canonical_surface",
+    )
+
+
+def legacy_route_reference_in_canonical_surface() -> None:
+    _replace_once(
+        COVERAGE_AUTHORITY_MODULE,
+        'CANONICAL_COVERAGE_LAW = "only_sealed_B2.3_origin_may_be_canonical"\n',
+        'CANONICAL_COVERAGE_LAW = "only_sealed_B2.3_origin_may_be_canonical"\n'
+        '_NC_LEGACY_ROUTE = "/api/reconciliation/status"  # NC-B26-P1-III-ROUTE\n',
+        defect="legacy_route_reference_in_canonical_surface",
+    )
+
+
+def unregistered_coverage_origin() -> None:
+    _replace_once(
+        SEMANTIC_MODULE,
+        'if __name__ == "__main__":\n'
+        "    print(json.dumps(semantic_contract_identity().__dict__, sort_keys=True))",
+        'if __name__ == "__main__":\n'
+        "    _nc_forged = CanonicalVerificationCoverage(  # NC-B26-P1-III-ORIGIN\n"
+        '        aggregate=None, result=None, producer="forged", supported_platforms=()\n'
+        "    )\n"
+        "    print(json.dumps(semantic_contract_identity().__dict__, sort_keys=True))",
+        defect="unregistered_coverage_origin",
+    )
+
+
 DEFECTS: dict[str, Callable[[], None]] = {
     "mandatory_semantic_element": mandatory_semantic_element,
     "coverage_authority_reference": coverage_authority_reference,
@@ -153,6 +188,9 @@ DEFECTS: dict[str, Callable[[], None]] = {
     "discrepancy_addition_without_version_bump": discrepancy_addition_without_version_bump,
     "unclassified_normative_field": unclassified_normative_field,
     "dynamic_legacy_import": dynamic_legacy_import,
+    "legacy_network_client_in_canonical_surface": legacy_network_client_in_canonical_surface,
+    "legacy_route_reference_in_canonical_surface": legacy_route_reference_in_canonical_surface,
+    "unregistered_coverage_origin": unregistered_coverage_origin,
 }
 
 
